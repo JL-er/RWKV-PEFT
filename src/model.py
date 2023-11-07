@@ -214,7 +214,6 @@ class RWKV_TimeMix_RWKV5(MyModule):
     def jit_func_2(self, x, g):
         B, T, C = x.size()
         x = x.view(B * T, C)
-        
         x = self.ln_x(x / self.head_size_divisor).view(B, T, C)
         x = self.output(x * g)
         return x
@@ -222,9 +221,7 @@ class RWKV_TimeMix_RWKV5(MyModule):
     def forward(self, x):
         B, T, C = x.size()
         H = self.n_head
-
         r, k, v, g = self.jit_func(x)
-
         x = RUN_CUDA_RWKV5(B, T, C, H, r, k, v, w=self.time_decay, u=self.time_faaaa)
 
         return self.jit_func_2(x, g)

@@ -324,6 +324,8 @@ if __name__ == "__main__":
             if k not in load_keys:
                 load_dict[k] = model.state_dict()[k]
     # model.load_state_dict(load_dict)
+    
+    model.load_state_dict(load_dict, strict=(not args.lora))
     if os.path.isfile(args.lora_load):
         model.load_state_dict(torch.load(args.lora_load, map_location="cpu"),
                               strict=False)
