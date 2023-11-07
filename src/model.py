@@ -535,7 +535,6 @@ class RWKV(pl.LightningModule):
         args = self.args
         if args.my_qa_mask != 1:
             idx, targets = batch
-            print(idx)
             logits = self(idx)
             loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1))
             # if '0' in os.environ["RWKV_MY_TESTING"]:
