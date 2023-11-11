@@ -268,17 +268,7 @@ if __name__ == "__main__":
     if args.lora:
         model.requires_grad_(False)
         for name, module in model.named_modules():
-            # if any(n.startswith("emb.") for n, _ in module.named_parameters()):
-            #     for pname, param in module.named_parameters():
-            #         if args.emb and 'emb.weight'==pname:
-            #             print(f'  EMB additionally training module {pname}')
-            #             param.requires_grad = True
-            #have to check param name since it may have been wrapped by torchscript
-            # if any(n.startswith("img_") for n, _ in module.named_parameters()):
-            #     #print(name)
-            #     print(f'  IMG {name}')
-            #     for pname, param in module.named_parameters():
-            #         param.requires_grad = 'img_' in pname
+           
             if any(n.startswith("lora_") for n, _ in module.named_parameters()):
                 print(f'  LoRA additionally training module {name}')
                 for pname, param in module.named_parameters():
