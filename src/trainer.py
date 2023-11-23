@@ -3,6 +3,7 @@ import torch
 from torch.utils.data import DataLoader
 import pytorch_lightning as pl
 from pytorch_lightning.utilities import rank_zero_info, rank_zero_only
+from .model import LORA_CONFIG
 
 def my_save(args, trainer, dd, ff):
     if '14b-run1' in ff:
@@ -154,6 +155,19 @@ class train_callback(pl.Callback):
                         to_save_dict,
                         f"{args.proj_dir}/rwkv-final.pth",
                     )
+        if args.batch_save==batch_idx :
+            to_save_dict = pl_module.state_dict()
+            for name, state in to_save_dict.items():
+                if 'img' in name:
+                    to_save_dict[name] = state
+            try:
+                    my_save(
+                        args, trainer,
+                        to_save_dict,
+                        f"{args.proj_dir}/rwkv-{args.epoch_begin + trainer.current_epoch}-{batch_idx}.pth",
+                    )
+            except Exception as e:
+                print('Error\n\n', e, '\n\n')
                 
 
     def on_train_epoch_start(self, trainer, pl_module):
@@ -180,6 +194,25 @@ class train_callback(pl.Callback):
                             to_save_dict[k] = raw_dict[k]
                 else:
                     to_save_dict = pl_module.state_dict()
+
+                if args.data_type=='img' and not args.lora:
+                    for name, state in to_save_dict.items():
+                        if 'img' in name:
+                            to_save_dict[name] = state
+
+                if args.lora:
+                    enable_time_finetune = 'time' in LORA_CONFIG["parts"]
+                    enable_ln_finetune = 'ln' in LORA_CONFIG["parts"]
+                    lora_dict = {}
+                    for name, state in to_save_dict.items():
+                        if 'img' in name:
+                            lora_dict[name] = state
+                        if ('.lora_' in name
+                                or (enable_time_finetune and '.time_' in name)
+                                or (enable_ln_finetune and '.ln' in name)):
+                            lora_dict[name] = state
+                    to_save_dict = lora_dict
+
                 try:
                     my_save(
                         args, trainer,
