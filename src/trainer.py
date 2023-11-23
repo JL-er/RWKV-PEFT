@@ -155,19 +155,19 @@ class train_callback(pl.Callback):
                         to_save_dict,
                         f"{args.proj_dir}/rwkv-final.pth",
                     )
-        if args.batch_save==batch_idx :
-            to_save_dict = pl_module.state_dict()
-            for name, state in to_save_dict.items():
-                if 'img' in name:
-                    to_save_dict[name] = state
-            try:
-                    my_save(
-                        args, trainer,
-                        to_save_dict,
-                        f"{args.proj_dir}/rwkv-{args.epoch_begin + trainer.current_epoch}-{batch_idx}.pth",
-                    )
-            except Exception as e:
-                print('Error\n\n', e, '\n\n')
+        # if args.batch_save==batch_idx :
+        #     to_save_dict = pl_module.state_dict()
+        #     for name, state in to_save_dict.items():
+        #         if 'img' in name:
+        #             to_save_dict[name] = state
+        #     try:
+        #             my_save(
+        #                 args, trainer,
+        #                 to_save_dict,
+        #                 f"{args.proj_dir}/rwkv-{args.epoch_begin + trainer.current_epoch}-{batch_idx}.pth",
+        #             )
+        #     except Exception as e:
+        #         print('Error\n\n', e, '\n\n')
                 
 
     def on_train_epoch_start(self, trainer, pl_module):
