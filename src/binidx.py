@@ -243,6 +243,32 @@ class MMapIndexedDataset(torch.utils.data.Dataset):
             self._bin_buffer, dtype=self._index.dtype, count=length, offset=ptr
         )
         return np_array
+    
+    
+    def pad(self, idx, length=None):
+        ptr, size = self._index[idx]
+        try:
+            np_array = np.frombuffer(
+                    self._bin_buffer, dtype=self._index.dtype, count=length, offset=ptr
+                )
+        except:
+            np_array = np.frombuffer(
+                    self._bin_buffer, dtype=self._index.dtype, count=size, offset=ptr
+                )
+            ptr0,_ = self._index[0]
+            np_array0 = np.frombuffer(
+                self._bin_buffer, dtype=self._index.dtype, count=length-size, offset=ptr0
+            )
+            np_array = np.append(np_array, np_array0)
+        return np_array
+    
+    def only(self, idx):
+        ptr, size = self._index[idx]
+        np_array = np.frombuffer(
+                self._bin_buffer, dtype=self._index.dtype, count=size, offset=ptr
+            )
+    
+        return np_array
 
     @property
     def sizes(self):
