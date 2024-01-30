@@ -1,5 +1,6 @@
 # RWKV-V4-lora
 源代码地址：https://github.com/Blealtan/RWKV-LM-LoRA
+```
 python3 train.py \
   --load_model <pretrained base model> \
   --proj_dir <place to save checkpoints> \
@@ -10,7 +11,7 @@ python3 train.py \
   --lora --lora_r 8 --lora_alpha 16 --lora_dropout 0.01 \
   --lora_load <lora checkpoint to continue training> \ # optional
   --lora_parts=att,ffn,time,ln # configure which parts to finetune
-
+```
 
 ![Uploading image.png…]()
 
