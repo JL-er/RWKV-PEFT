@@ -23,5 +23,5 @@ python train.py --load_model /home/asd/model/RWKV-5-World-1B5-v2-20231025-ctx409
 
 # Merge lora
 ```
-python merge_lora.py --use-gpu 16 /home/asd/model/RWKV-5-World-1B5-v2-20231025-ctx4096.pth img595k/rwkv-0.pth /home/asd/model/Wedjat-5-World-1.5B-pretrain-lora.pth
+python merge_lora.py --use-gpu 16 /home/asd/model/RWKV-5-World-1B5-v2-20231025-ctx4096.pth img595k/rwkv-0.pth /home/asd/model/RWKV-5-World-1.5B--lora.pth
 ```
