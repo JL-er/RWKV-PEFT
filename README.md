@@ -12,7 +12,15 @@ python3 train.py \
   --lora_load <lora checkpoint to continue training> \ # optional
   --lora_parts=att,ffn,time,ln # configure which parts to finetune
 ```
-
+# v4训练配置
+```
+GPU：4090 24G
+CPU：64G  
+base model：rwkv-v4-7B  
+lora：
+  --lora_r 64 --lora_alpha 128
+```
+效果展示
 ![Uploading image.png…]()
 
 
@@ -23,5 +31,5 @@ python train.py --load_model /home/asd/model/RWKV-5-World-1B5-v2-20231025-ctx409
 
 # Merge lora
 ```
-python merge_lora.py --use-gpu 16 /home/asd/model/RWKV-5-World-1B5-v2-20231025-ctx4096.pth img595k/rwkv-0.pth /home/asd/model/RWKV-5-World-1.5B--lora.pth
+python merge_lora.py --use-gpu 128 /home/asd/model/RWKV-5-World-1B5-v2-20231025-ctx4096.pth img595k/rwkv-0.pth /home/asd/model/RWKV-5-World-1.5B--lora.pth
 ```
