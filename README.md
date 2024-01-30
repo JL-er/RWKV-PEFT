@@ -28,7 +28,7 @@ lora：
 # RWKV-v5-lora
 训练技巧：
   标准的全量微调方法： 将数据复制多遍（如果你想炼多个epoch），注意，其中的条目，必须每次用不同的随机排列！ 然后用我这里的 --my_pile_stage 3 --my_exit_tokens xxx --magic_prime xxx 技术，这样采样才是完美无重复的。 学习速率建议 --lr_init 1e-5 --lr_final 1e-5  
-  my_exit_tokens = datalen，数据的精确 token 数，在载入数据时会显示 # magic_prime = the largest 3n+2 prime smaller than datalen/ctxlen-1 (= 1498226207/512-1 = 2926222.06 in this case) # use
+  my_exit_tokens = datalen，数据的精确 token 数，在载入数据时会显示 # magic_prime = the largest 3n+2 prime smaller than datalen/ctxlen-1 (= 1498226207/512-1 = 2926222.06 in this case) # use  
   lora：
     --lora_r 64 --lora_alpha 128  r和a 同时增大，越大效果越好但训练速度也会变慢，目前较好参数为64/128
 ```
