@@ -15,9 +15,6 @@ python3 train.py \
 # v4训练配置 RWKV-4-Doctor-7B-lora.pth
 ```
 数据：334MB 问诊对话
-interface = ":"
-user = "Patient"
-bot = "Doctor"
 数据格式：Patient: {content}\n\nDoctor:{content}\n\n
 单卡  
 GPU：4090 24G
