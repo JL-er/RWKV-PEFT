@@ -23,8 +23,7 @@ base model：rwkv-v4-7B
 lora：
   --lora_r 64 --lora_alpha 128
 ```
-效果展示
-![Uploading image.png…]()
+
 # 推理配置 RWKV-4-Doctor-7B-lora.pth
 ```
 interface = ":"
@@ -36,6 +35,8 @@ GEN_alpha_presence = 0.0 # Presence Penalty
 GEN_alpha_frequency = 0.0 # Frequency Penalty
 GEN_penalty_decay = 0.996
 ```
+![Uploading image.png…]()
+
 
 
 # RWKV-v5-lora
