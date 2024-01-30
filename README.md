@@ -15,6 +15,10 @@ python3 train.py \
 # v4训练配置 RWKV-4-Doctor-7B-lora.pth
 ```
 数据：334MB 问诊对话
+interface = ":"
+user = "Patient"
+bot = "Doctor"
+数据格式：Patient: {content}\n\nDoctor:{content}\n\n
 单卡  
 GPU：4090 24G
 CPU：64G  
@@ -24,6 +28,17 @@ lora：
 ```
 效果展示
 ![Uploading image.png…]()
+# 推理配置 RWKV-4-Doctor-7B-lora.pth
+```
+interface = ":"
+user = "Patient"
+bot = "Doctor"
+GEN_TEMP = 1.0 # It could be a good idea to increase temp when top_p is low
+GEN_TOP_P = 0.2 # Reduce top_p (to 0.5, 0.2, 0.1 etc.) for better Q&A accuracy (and less diversity)
+GEN_alpha_presence = 0.0 # Presence Penalty
+GEN_alpha_frequency = 0.0 # Frequency Penalty
+GEN_penalty_decay = 0.996
+```
 
 
 # RWKV-v5-lora
