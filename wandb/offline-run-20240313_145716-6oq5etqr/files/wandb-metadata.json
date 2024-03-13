@@ -1,0 +1,255 @@
+{
+    "os": "Linux-6.5.0-25-generic-x86_64-with-glibc2.35",
+    "python": "3.10.13",
+    "heartbeatAt": "2024-03-13T06:57:16.666323",
+    "startedAt": "2024-03-13T06:57:16.581168",
+    "docker": null,
+    "cuda": null,
+    "args": [
+        "--load_model",
+        "/home/rwkv/JL/model/RWKV-x060-World-1B6-v2-20240208-ctx4096.pth",
+        "--proj_dir",
+        "/home/rwkv/JL/out_model",
+        "--data_file",
+        "/home/rwkv/JL/data/minipile",
+        "--data_type",
+        "binidx",
+        "--vocab_size",
+        "65536",
+        "--ctx_len",
+        "2048",
+        "--epoch_steps",
+        "8000",
+        "--epoch_count",
+        "100",
+        "--epoch_begin",
+        "0",
+        "--epoch_save",
+        "5",
+        "--micro_bsz",
+        "4",
+        "--n_layer",
+        "24",
+        "--n_embd",
+        "2048",
+        "--pre_ffn",
+        "0",
+        "--head_qk",
+        "0",
+        "--lr_init",
+        "3e-4",
+        "--lr_final",
+        "3e-4",
+        "--warmup_steps",
+        "0",
+        "--beta1",
+        "0.9",
+        "--beta2",
+        "0.99",
+        "--adam_eps",
+        "1e-8",
+        "--accelerator",
+        "gpu",
+        "--devices",
+        "1",
+        "--precision",
+        "bf16",
+        "--strategy",
+        "deepspeed_stage_1",
+        "--grad_cp",
+        "1",
+        "--my_testing",
+        "x060",
+        "--wandb",
+        "rwkv-fla",
+        "--lora_load",
+        "rwkv-0",
+        "--lora",
+        "--lora_r",
+        "64",
+        "--lora_alpha",
+        "128",
+        "--lora_dropout",
+        "0.01",
+        "--lora_parts=att,ffn,time,ln"
+    ],
+    "state": "running",
+    "program": "/home/rwkv/JL/RWKV-v5-lora/train.py",
+    "codePathLocal": "train.py",
+    "codePath": "train.py",
+    "git": {
+        "remote": "https://github.com/JL-er/RWKV-v5-lora.git",
+        "commit": "e44708fe4c4e1272a8f82e8e338ff8e1be1e9ee8"
+    },
+    "email": "997529190@qq.com",
+    "root": "/home/rwkv/JL/RWKV-v5-lora",
+    "host": "rwkv-Z790M-AORUS-ELITE-AX",
+    "username": "rwkv",
+    "executable": "/home/rwkv/miniconda3/bin/python",
+    "cpu_count": 20,
+    "cpu_count_logical": 28,
+    "cpu_freq": {
+        "current": 1435.0401071428573,
+        "min": 800.0,
+        "max": 5000.0
+    },
+    "cpu_freq_per_core": [
+        {
+            "current": 1753.342,
+            "min": 800.0,
+            "max": 5500.0
+        },
+        {
+            "current": 1625.885,
+            "min": 800.0,
+            "max": 5500.0
+        },
+        {
+            "current": 1626.418,
+            "min": 800.0,
+            "max": 5500.0
+        },
+        {
+            "current": 1618.241,
+            "min": 800.0,
+            "max": 5500.0
+        },
+        {
+            "current": 1670.112,
+            "min": 800.0,
+            "max": 5500.0
+        },
+        {
+            "current": 1747.276,
+            "min": 800.0,
+            "max": 5500.0
+        },
+        {
+            "current": 1617.166,
+            "min": 800.0,
+            "max": 5500.0
+        },
+        {
+            "current": 800.0,
+            "min": 800.0,
+            "max": 5500.0
+        },
+        {
+            "current": 1690.132,
+            "min": 800.0,
+            "max": 5600.0
+        },
+        {
+            "current": 800.0,
+            "min": 800.0,
+            "max": 5600.0
+        },
+        {
+            "current": 1608.731,
+            "min": 800.0,
+            "max": 5600.0
+        },
+        {
+            "current": 800.0,
+            "min": 800.0,
+            "max": 5600.0
+        },
+        {
+            "current": 1607.315,
+            "min": 800.0,
+            "max": 5500.0
+        },
+        {
+            "current": 800.0,
+            "min": 800.0,
+            "max": 5500.0
+        },
+        {
+            "current": 800.0,
+            "min": 800.0,
+            "max": 5500.0
+        },
+        {
+            "current": 800.0,
+            "min": 800.0,
+            "max": 5500.0
+        },
+        {
+            "current": 800.0,
+            "min": 800.0,
+            "max": 4300.0
+        },
+        {
+            "current": 800.0,
+            "min": 800.0,
+            "max": 4300.0
+        },
+        {
+            "current": 1811.147,
+            "min": 800.0,
+            "max": 4300.0
+        },
+        {
+            "current": 800.0,
+            "min": 800.0,
+            "max": 4300.0
+        },
+        {
+            "current": 800.0,
+            "min": 800.0,
+            "max": 4300.0
+        },
+        {
+            "current": 800.0,
+            "min": 800.0,
+            "max": 4300.0
+        },
+        {
+            "current": 800.0,
+            "min": 800.0,
+            "max": 4300.0
+        },
+        {
+            "current": 800.0,
+            "min": 800.0,
+            "max": 4300.0
+        },
+        {
+            "current": 800.0,
+            "min": 800.0,
+            "max": 4300.0
+        },
+        {
+            "current": 800.0,
+            "min": 800.0,
+            "max": 4300.0
+        },
+        {
+            "current": 800.0,
+            "min": 800.0,
+            "max": 4300.0
+        },
+        {
+            "current": 800.0,
+            "min": 800.0,
+            "max": 4300.0
+        }
+    ],
+    "disk": {
+        "/": {
+            "total": 916.2753829956055,
+            "used": 136.71405792236328
+        }
+    },
+    "gpu": "NVIDIA GeForce RTX 4090",
+    "gpu_count": 1,
+    "gpu_devices": [
+        {
+            "name": "NVIDIA GeForce RTX 4090",
+            "memory_total": 25757220864
+        }
+    ],
+    "memory": {
+        "total": 62.5532341003418
+    }
+}

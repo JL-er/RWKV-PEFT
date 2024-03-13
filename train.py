@@ -1,7 +1,10 @@
 ########################################################################################################
 # The RWKV Language Model - https://github.com/BlinkDL/RWKV-LM
 ########################################################################################################
+import os
 
+os.environ["WANDB_API_KEY"] = '35af18e9a9d3f399af1b83bb926803be09c140a6'
+os.environ["WANDB_MODE"] = "offline"
 import logging
 logging.basicConfig(level=logging.INFO)
 
@@ -124,6 +127,7 @@ if __name__ == "__main__":
     args.betas = (args.beta1, args.beta2)
     args.real_bsz = int(args.num_nodes) * int(args.devices) * args.micro_bsz
     os.environ["RWKV_MY_TESTING"] = args.my_testing
+    os.environ["RWKV_CTXLEN"] = str(args.ctx_len)
     os.environ["RWKV_HEAD_SIZE_A"] = str(args.head_size_a)
     if args.dim_att <= 0:
         args.dim_att = args.n_embd
@@ -255,6 +259,8 @@ if __name__ == "__main__":
     args.vocab_size = train_data.vocab_size
 
     from src.model import RWKV, LORA_CONFIG, LoraLinear
+    model = RWKV(args)
+
     if args.lora:
         assert args.lora_r > 0, "LoRA should have its `r` > 0"
         LORA_CONFIG["r"] = args.lora_r
@@ -263,9 +269,6 @@ if __name__ == "__main__":
         LORA_CONFIG["parts"] = set(str(args.lora_parts).split(','))
         enable_time_finetune = 'time' in LORA_CONFIG["parts"]
         enable_ln_finetune = 'ln' in LORA_CONFIG["parts"]
-    model = RWKV(args)
-    # only train lora parameters
-    if args.lora:
         model.requires_grad_(False)
         for name, module in model.named_modules():
            
@@ -313,13 +316,10 @@ if __name__ == "__main__":
         for k in model.state_dict():
             if k not in load_keys:
                 load_dict[k] = model.state_dict()[k]
-    # model.load_state_dict(load_dict)
-    
     model.load_state_dict(load_dict, strict=(not args.lora))
     if os.path.isfile(args.lora_load):
         model.load_state_dict(torch.load(args.lora_load, map_location="cpu"),
                               strict=False)
-
 
     if pl.__version__[0]=='2':
         trainer = Trainer(accelerator=args.accelerator,strategy=args.strategy,devices=args.devices,num_nodes=args.num_nodes,precision=args.precision,
