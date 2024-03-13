@@ -3,8 +3,6 @@
 ########################################################################################################
 import os
 
-os.environ["WANDB_API_KEY"] = '35af18e9a9d3f399af1b83bb926803be09c140a6'
-os.environ["WANDB_MODE"] = "offline"
 import logging
 logging.basicConfig(level=logging.INFO)
 
