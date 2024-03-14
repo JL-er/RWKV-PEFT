@@ -257,8 +257,6 @@ if __name__ == "__main__":
     args.vocab_size = train_data.vocab_size
 
     from src.model import RWKV, LORA_CONFIG, LoraLinear
-    model = RWKV(args)
-
     if args.lora:
         assert args.lora_r > 0, "LoRA should have its `r` > 0"
         LORA_CONFIG["r"] = args.lora_r
@@ -267,6 +265,9 @@ if __name__ == "__main__":
         LORA_CONFIG["parts"] = set(str(args.lora_parts).split(','))
         enable_time_finetune = 'time' in LORA_CONFIG["parts"]
         enable_ln_finetune = 'ln' in LORA_CONFIG["parts"]
+    model = RWKV(args)
+
+    if args.lora:
         model.requires_grad_(False)
         for name, module in model.named_modules():
            
