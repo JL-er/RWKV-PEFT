@@ -1,3 +1,19 @@
+# LISA
+LISA is faster and more memory-efficient than LoRA.
+In the context of the LISA algorithm, lisa_r determines how many layers are updated simultaneously, while lisa_k determines how often the algorithm re-selects layers for updating.
+
+```
+python train.py --load_model /home/rwkv/JL/model/RWKV-x060-World-1B6-v2-20240208-ctx4096.pth \
+--proj_dir /home/rwkv/JL/out_model/lisa-l2 --data_file /home/rwkv/JL/data/roleplay \
+--data_type binidx --vocab_size 65536 \
+--ctx_len 2048 --epoch_steps 1000 --epoch_count 100 --epoch_begin 0 --epoch_save 1 --micro_bsz 4 \
+--n_layer 24 --n_embd 2048 \
+--pre_ffn 0 --head_qk 0 --lr_init 1e-4 --lr_final 1e-4 --warmup_steps 0 --beta1 0.9 --beta2 0.99 --adam_eps 1e-8 \
+--accelerator gpu --devices 1 --precision bf16 --strategy deepspeed_stage_1 --grad_cp 1 \
+--my_testing "x060" \
+--LISA --lisa_r 2 --lisa_k 100
+```
+
 # RWKV-v6-lora
 只需要再v5指令基础上增加 --my_testing "x060"
 ```

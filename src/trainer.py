@@ -4,6 +4,8 @@ from torch.utils.data import DataLoader
 import pytorch_lightning as pl
 from pytorch_lightning.utilities import rank_zero_info, rank_zero_only
 from .model import LORA_CONFIG
+import re
+import numpy as np
 
 def my_save(args, trainer, dd, ff):
     if '14b-run1' in ff:
@@ -155,6 +157,23 @@ class train_callback(pl.Callback):
                         to_save_dict,
                         f"{args.proj_dir}/rwkv-final.pth",
                     )
+
+        if args.LISA and (batch_idx+1)%args.lisa_k==0:
+            pl_module.requires_grad_(False)
+            select_layers = np.random.choice(range(args.n_layer), args.lisa_r, replace=False)
+            
+            for name, module in pl_module.named_modules():
+                for pname, param in module.named_parameters():
+                    if 'emb' in pname or 'head' in pname or '.ln' in pname or 'time' in pname:
+                        param.requires_grad = True
+                    elif 'ln_out' in pname:
+                        param.requires_grad = True
+                    match = re.search(r'\d+', pname)
+                    if match:
+                        number = int(match.group())
+                        if number in select_layers:
+                            param.requires_grad  = True
+                break
         # if args.batch_save==batch_idx :
         #     to_save_dict = pl_module.state_dict()
         #     for name, state in to_save_dict.items():

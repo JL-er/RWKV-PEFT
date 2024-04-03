@@ -83,6 +83,11 @@ if __name__ == "__main__":
     parser.add_argument("--lora_dropout", default=0.01, type=float)
     parser.add_argument("--lora_parts", default="att,ln,time", type=str)
 
+    #LISA
+    parser.add_argument("--LISA", action="store_true")
+    parser.add_argument("--lisa_r", default=2, type=int)
+    parser.add_argument("--lisa_k", default=100, type=int)
+
     if pl.__version__[0]=='2':
         parser.add_argument("--accelerator", default="gpu", type=str)
         parser.add_argument("--strategy", default="auto", type=str)
@@ -267,10 +272,36 @@ if __name__ == "__main__":
         enable_ln_finetune = 'ln' in LORA_CONFIG["parts"]
     model = RWKV(args)
 
-    if args.lora:
+    if args.lora or args.LISA:
         model.requires_grad_(False)
+
+    if args.LISA:
+        import re
+        select_layers = np.random.choice(range(args.n_layer), args.lisa_r, replace=False)
         for name, module in model.named_modules():
-           
+            for pname, param in module.named_parameters():
+                if 'emb' in pname or 'head' in pname or '.ln' in pname or 'time' in pname :
+                    param.requires_grad = True
+                match = re.search(r'\d+', pname)
+                if match:
+                    number = int(match.group())
+                    if number in select_layers:
+                        param.requires_grad  = True
+            break
+    
+    elif args.lora:
+        
+        for name, module in model.named_modules():
+            if any(n.startswith("emb.") for n, _ in module.named_parameters()):
+                for pname, param in module.named_parameters():
+                    if args.emb and 'emb.weight'==pname:
+                        print(f'  EMB additionally training module {pname}')
+                        param.requires_grad = True
+            if any(n.startswith("head.") for n, _ in module.named_parameters()):
+                for pname, param in module.named_parameters():
+                    if args.emb and 'head.weight'==pname:
+                        print(f'  head additionally training module {pname}')
+                        param.requires_grad = True
             if any(n.startswith("lora_") for n, _ in module.named_parameters()):
                 print(f'  LoRA additionally training module {name}')
                 for pname, param in module.named_parameters():
