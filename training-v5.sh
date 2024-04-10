@@ -8,12 +8,12 @@ MODEL_PATH=model/RWKV-x060-World-1B6-v2.1-20240328-ctx4096.pth
 DATA_PATH=data/xuexue
 # 输出路径
 OUTPUT_PATH=output
-# 回合预热开始步数
-epoch_count=100
 # 回合步数
 EPOCH_STEPS=200
 # 上下文长度
 CTX_LEN=4096
+# 训练的回合数
+EPOCH_COUNT=100
 # 精度
 PRECISION=bf16
 # 初始学习率
@@ -36,8 +36,6 @@ STRATEGY=deepspeed_stage_2
 GRAD_CP=1
 
 # ------------------不常用训练参数----------------------
-# 训练的回合数
-EPOCH_COUNT=100
 # 开始训练的回合，可以用来恢复训练
 EPOCH_BEGIN=0
 # 词表大小
