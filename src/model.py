@@ -16,7 +16,7 @@ from pytorch_lightning.strategies import DeepSpeedStrategy
 if importlib.util.find_spec('deepspeed'):
     import deepspeed
     from deepspeed.ops.adam import DeepSpeedCPUAdam, FusedAdam
-
+from torch._lowrank import svd_lowrank
 
 LORA_CONFIG = {
     "r": 0,
@@ -38,15 +38,30 @@ class LoraLinear(nn.Module):
         self.lora_B = nn.Parameter(torch.empty(out_features, r))
         self.lora_dropout = nn.Dropout(dropout)
         self.scaling = alpha / r
-
+        self.r = r
         nn.init.kaiming_uniform_(self.weight, a=math.sqrt(5))
         nn.init.kaiming_uniform_(self.lora_A, a=math.sqrt(5))
         nn.init.zeros_(self.lora_B)
 
+    def pissa_init(self, svd_niter):
+
+        self.pissa = True
+        Ur, Sr, Vr = svd_lowrank(self.weight.data, self.r, niter=svd_niter)
+        Vhr = Vr.t()
+        lora_A = torch.diag(torch.sqrt(Sr)) @ Vhr
+        lora_B = Ur @ torch.diag(torch.sqrt(Sr))
+        self.lora_A.data = lora_A
+        self.lora_B.data = lora_B
+        self.weight.data = self.weight.data - lora_B @ lora_A
+
     def forward(self, x):
+        if self.pissa:
+            return (
+                F.linear(x, self.weight) + 
+                F.linear(F.linear(x, self.lora_A), self.lora_B))
         return (
             F.linear(x, self.weight) + self.scaling *
-            F.linear(F.linear(self.lora_dropout(x), self.lora_A), self.lora_B))
+            F.linear(F.linear(self.lora_dropout(x), self.lora_A), self.lora_B))  
 
 
 @functools.wraps(LoraLinear)
