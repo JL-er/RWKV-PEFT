@@ -364,7 +364,6 @@ if __name__ == "__main__":
                 init_dict[f'{name}.init_lora_A'] = m.lora_A.data
                 init_dict[f'{name}.init_lora_B'] = m.lora_B.data
         torch.save(init_dict, f'{args.proj_dir}/init_lora.pth')
-    assert 1==2
 
     if pl.__version__[0]=='2':
         trainer = Trainer(accelerator=args.accelerator,strategy=args.strategy,devices=args.devices,num_nodes=args.num_nodes,precision=args.precision,
