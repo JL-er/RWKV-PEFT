@@ -95,7 +95,7 @@ else if [ "$FINETUNE_MODE" == "lisa" ]; then
     --pre_ffn $PRE_FFN --head_qk $HEAD_QK --lr_init $LR_INIT --lr_final $LR_FINAL --warmup_steps $WARMUP_STEPS --beta1 $BETA1 --beta2 $BETA2 --adam_eps $ADAM_EPS \
     --accelerator gpu --devices $GPU_COUNT --precision $PRECISION --strategy $STRATEGY --grad_cp $GRAD_CP \
     --accumulate_grad_batches $MINI_BSZ \
-    --LISA --lisa_r $lisa_r --lisa_k $k
+    --LISA --lisa_r $lisa_r --lisa_k $lisa_k
 else if [ "$FINETUNE_MODE" == "pissa" ]; then
    python3 train.py --load_model $MODEL_PATH \
     --proj_dir $OUTPUT_PATH --data_file $DATA_PATH \

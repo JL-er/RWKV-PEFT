@@ -97,7 +97,7 @@ else if [ "$FINETUNE_MODE" == "lisa" ]; then
     --accelerator gpu --devices $GPU_COUNT --precision $PRECISION --strategy $STRATEGY --grad_cp $GRAD_CP \
     --accumulate_grad_batches $MINI_BSZ \
     --my_testing "x060" \
-    --LISA --lisa_r $lisa_r --lisa_k $k
+    --LISA --lisa_r $lisa_r --lisa_k $lisa_k
 else if [ "$FINETUNE_MODE" == "pissa" ]; then
    python3 train.py --load_model $MODEL_PATH \
     --proj_dir $OUTPUT_PATH --data_file $DATA_PATH \
