@@ -42,6 +42,7 @@ class LoraLinear(nn.Module):
         nn.init.kaiming_uniform_(self.weight, a=math.sqrt(5))
         nn.init.kaiming_uniform_(self.lora_A, a=math.sqrt(5))
         nn.init.zeros_(self.lora_B)
+        self.pissa = False
 
     def pissa_init(self, svd_niter):
 
