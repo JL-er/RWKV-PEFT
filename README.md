@@ -1,5 +1,5 @@
 # LISA
-LISA is faster and more memory-efficient than LoRA.  
+LISA is faster and more memory-efficient than LoRA.
 In the context of the LISA algorithm, lisa_r determines how many layers are updated simultaneously, while lisa_k determines how often the algorithm re-selects layers for updating.
 
 ```
