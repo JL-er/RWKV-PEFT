@@ -92,6 +92,9 @@ if __name__ == "__main__":
     parser.add_argument("--PISSA", action="store_true")
     parser.add_argument("--svd_niter", default=4, type=int)
 
+    #dataset
+    parser.add_argument("--dataset_get", default="get", type=str)
+
 
     if pl.__version__[0]=='2':
         parser.add_argument("--accelerator", default="gpu", type=str)
