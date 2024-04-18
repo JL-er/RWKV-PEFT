@@ -2,7 +2,8 @@
 # The RWKV Language Model - https://github.com/BlinkDL/RWKV-LM
 ########################################################################################################
 import os
-
+os.environ["WANDB_API_KEY"] = '35af18e9a9d3f399af1b83bb926803be09c140a6'
+os.environ["WANDB_MODE"] = "offline"
 import logging
 logging.basicConfig(level=logging.INFO)
 
@@ -92,8 +93,8 @@ if __name__ == "__main__":
     parser.add_argument("--PISSA", action="store_true")
     parser.add_argument("--svd_niter", default=4, type=int)
 
-    #dataset
-    parser.add_argument("--dataset_get", default="get", type=str)
+    #quant
+    parser.add_argument("--quant", default="none", type=str)
 
 
     if pl.__version__[0]=='2':
@@ -134,7 +135,7 @@ if __name__ == "__main__":
     args.num_sanity_val_steps = 0
     args.check_val_every_n_epoch = int(1e20)
     args.log_every_n_steps = int(1e20)
-    args.max_epochs = -1  # continue forever
+    args.max_epochs = args.epoch_count  # continue forever
     args.betas = (args.beta1, args.beta2)
     args.real_bsz = int(args.num_nodes) * int(args.devices) * args.micro_bsz
     os.environ["RWKV_MY_TESTING"] = args.my_testing
@@ -367,6 +368,14 @@ if __name__ == "__main__":
                 init_dict[f'{name}.init_lora_A'] = m.lora_A.data
                 init_dict[f'{name}.init_lora_B'] = m.lora_B.data
         torch.save(init_dict, f'{args.proj_dir}/init_lora.pth')
+    
+    if args.quant!='none':
+        rank_zero_info(f"########## Quant... ##########")
+        for name, m in model.named_modules():
+            if hasattr(m, "quant") and callable(getattr(m, "quant")):
+                m.quant(args.quant)
+
+
 
     if pl.__version__[0]=='2':
         trainer = Trainer(accelerator=args.accelerator,strategy=args.strategy,devices=args.devices,num_nodes=args.num_nodes,precision=args.precision,

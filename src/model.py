@@ -17,6 +17,7 @@ if importlib.util.find_spec('deepspeed'):
     import deepspeed
     from deepspeed.ops.adam import DeepSpeedCPUAdam, FusedAdam
 from torch._lowrank import svd_lowrank
+import bitsandbytes as bnb
 
 LORA_CONFIG = {
     "r": 0,
@@ -43,6 +44,7 @@ class LoraLinear(nn.Module):
         nn.init.kaiming_uniform_(self.lora_A, a=math.sqrt(5))
         nn.init.zeros_(self.lora_B)
         self.pissa = False
+        self.is_quant = False
 
     def pissa_init(self, svd_niter):
 
@@ -54,8 +56,44 @@ class LoraLinear(nn.Module):
         self.lora_A.data = lora_A
         self.lora_B.data = lora_B
         self.weight.data = self.weight.data - lora_B @ lora_A
+    def quant(self, quant_type):
+        self.is_quant = True
+        self.quant_type = quant_type
+        if self.quant_type=='bit4':
+            self.weight.data, self.qstate= bnb.functional.quantize_4bit((self.weight.data).to('cuda'))
+        elif self.quant_type=='nf4':
+            self.weight.data, self.qstate= bnb.functional.quantize_nf4((self.weight.data).to('cuda'))
+        elif self.quant_type=='fp4':
+            self.weight.data, self.qstate= bnb.functional.quantize_fp4((self.weight.data).to('cuda'))
 
     def forward(self, x):
+
+        if self.is_quant:
+            if self.quant_type=='bit4':
+                if self.pissa:
+                    return (
+                        F.linear(x, bnb.functional.dequantize_4bit(self.weight.data,quant_state=self.qstate).to(torch.bfloat16)) + 
+                        F.linear(F.linear(x, self.lora_A), self.lora_B))
+                return (
+                    F.linear(x, bnb.functional.dequantize_4bit(self.weight.data,quant_state=self.qstate).to(torch.bfloat16)) + self.scaling *
+                    F.linear(F.linear(self.lora_dropout(x), self.lora_A), self.lora_B)) 
+            elif self.quant_type=='nf4':
+                if self.pissa:
+                    return (
+                        F.linear(x, bnb.functional.dequantize_nf4(self.weight.data,quant_state=self.qstate).to(torch.bfloat16)) + 
+                        F.linear(F.linear(x, self.lora_A), self.lora_B))
+                return (
+                    F.linear(x, bnb.functional.dequantize_nf4(self.weight.data,quant_state=self.qstate).to(torch.bfloat16)) + self.scaling *
+                    F.linear(F.linear(self.lora_dropout(x), self.lora_A), self.lora_B)) 
+            elif self.quant_type=='fp4':
+                if self.pissa:
+                    return (
+                        F.linear(x, bnb.functional.dequantize_fp4(self.weight.data,quant_state=self.qstate).to(torch.bfloat16)) + 
+                        F.linear(F.linear(x, self.lora_A), self.lora_B))
+                return (
+                    F.linear(x, bnb.functional.dequantize_fp4(self.weight.data,quant_state=self.qstate).to(torch.bfloat16)) + self.scaling *
+                    F.linear(F.linear(self.lora_dropout(x), self.lora_A), self.lora_B))  
+
         if self.pissa:
             return (
                 F.linear(x, self.weight) + 
