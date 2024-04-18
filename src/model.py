@@ -69,7 +69,7 @@ class LoraLinear(nn.Module):
     def forward(self, x):
 
         if self.is_quant:
-            if self.quant_type=='bit4':
+            if self.quant_type=='4bit':
                 if self.pissa:
                     return (
                         F.linear(x, bnb.functional.dequantize_4bit(self.weight.data,quant_state=self.qstate).to(torch.bfloat16)) + 
