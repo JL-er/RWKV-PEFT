@@ -3,7 +3,7 @@ load_model='/home/rwkv/JL/model/rwkv-x060-7b-world-v2.1-36%trained-20240413-ctx4
 proj_dir='/home/rwkv/JL/out_model/nf4'
 data_file='/home/rwkv/JL/data/roleplay'
 
-QUANT='nf4'  #bit4 nf4 fp4 none
+QUANT='nf4'  #4bit nf4 fp4 none
 svd_niter=4  
 lora_r=64
 

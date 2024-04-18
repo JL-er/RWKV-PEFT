@@ -59,7 +59,7 @@ class LoraLinear(nn.Module):
     def quant(self, quant_type):
         self.is_quant = True
         self.quant_type = quant_type
-        if self.quant_type=='bit4':
+        if self.quant_type=='4bit':
             self.weight.data, self.qstate= bnb.functional.quantize_4bit((self.weight.data).to('cuda'))
         elif self.quant_type=='nf4':
             self.weight.data, self.qstate= bnb.functional.quantize_nf4((self.weight.data).to('cuda'))
