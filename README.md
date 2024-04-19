@@ -26,7 +26,7 @@ PISSA is better than LISA
 --lora_alpha 128 --lora_dropout 0.01 (These two parameters do not work.)
 
 ```
-python train.py --load_model /home/rwkv/JL/model/RWKV-x060-World-1B6-v2-20240208-ctx4096.pth \
+python train.py --load_model /home/rwkv/JL/model/RWKV-x060-World-1B6-v2.1-20240328-ctx4096.pth \
 --proj_dir /home/rwkv/JL/out_model/lisa-l2 --data_file /home/rwkv/JL/data/roleplay \
 --data_type binidx --vocab_size 65536 \
 --ctx_len 2048 --epoch_steps 1000 --epoch_count 100 --epoch_begin 0 --epoch_save 1 --micro_bsz 4 \
@@ -39,7 +39,7 @@ python train.py --load_model /home/rwkv/JL/model/RWKV-x060-World-1B6-v2-20240208
 ```
 PISSA merge (you need merge init_lora and rwkv-0)
 ```
-python merge_pissa.py --use-gpu /home/rwkv/JL/model/RWKV-x060-World-1B6-v2-20240208-ctx4096.pth /home/rwkv/JL/out_model/lora-1e-4/init_lora.pth /home/rwkv/JL/out_model/lora-1e-4/rwkv-0.pth  /home/rwkv/JL/model/pissa.pth
+python merge_pissa.py --use-gpu /home/rwkv/JL/model/RWKV-x060-World-1B6-v2.1-20240328-ctx4096.pth /home/rwkv/JL/out_model/lora-1e-4/init_lora.pth /home/rwkv/JL/out_model/lora-1e-4/rwkv-0.pth  /home/rwkv/JL/model/pissa.pth
 ```
 
 ### LISA
@@ -47,7 +47,7 @@ LISA is faster and more memory-efficient than LoRA.
 In the context of the LISA algorithm, lisa_r determines how many layers are updated simultaneously, while lisa_k determines how often the algorithm re-selects layers for updating.
 
 ```
-python train.py --load_model /home/rwkv/JL/model/RWKV-x060-World-1B6-v2-20240208-ctx4096.pth \
+python train.py --load_model /home/rwkv/JL/model/RWKV-x060-World-1B6-v2.1-20240328-ctx4096.pth \
 --proj_dir /home/rwkv/JL/out_model/lisa-l2 --data_file /home/rwkv/JL/data/roleplay \
 --data_type binidx --vocab_size 65536 \
 --ctx_len 2048 --epoch_steps 1000 --epoch_count 100 --epoch_begin 0 --epoch_save 1 --micro_bsz 4 \
@@ -61,7 +61,7 @@ python train.py --load_model /home/rwkv/JL/model/RWKV-x060-World-1B6-v2-20240208
 ### RWKV-v6-lora
 只需要再v5指令基础上增加 --my_testing "x060"
 ```
-python train.py --load_model /home/rwkv/JL/model/RWKV-x060-World-1B6-v2-20240208-ctx4096.pth \
+python train.py --load_model /home/rwkv/JL/model/RWKV-x060-World-1B6-v2.1-20240328-ctx4096.pth \
 --proj_dir /home/rwkv/JL/out_model --data_file /home/rwkv/JL/data/minipile \
 --data_type binidx --vocab_size 65536 \
 --ctx_len 2048 --epoch_steps 8000 --epoch_count 100 --epoch_begin 0 --epoch_save 5 --micro_bsz 4 \
