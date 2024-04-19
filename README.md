@@ -1,3 +1,9 @@
+
+<h1 align="center"> <p>RWKV-PEFT</p></h1>
+
+
+
+
 # QUANT Train
 You just need to add "--quant (4bit nf4 fp4)" to utilize quantization fine-tuning.
 You can also use "sh demo-pissa.sh" for a quick start.Then use "sh demo-pissa-merge.sh" for merging.
