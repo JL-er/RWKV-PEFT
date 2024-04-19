@@ -15,10 +15,12 @@ Consider the memory requirements for training the following models with an 4090 
 | RWKV6-1.6B | OOM GPU | 7.4GB GPU | 5.6GB GPU |
 | RWKV6-3B | OOM GPU |  |  |
 | RWKV6-7B | OOM GPU | 23.7GB GPU(bsz 8 OOM) | 14.9GB GPU(bsz 8 need 19.5GB) |
-# Quant Train
+# Usage
+sh demo-pissa.sh
+### Quant Train
 You just need to add "--quant (4bit nf4 fp4)" to utilize quantization fine-tuning.
 You can also use "sh demo-pissa.sh" for a quick start.Then use "sh demo-pissa-merge.sh" for merging.
-# Usage
+
 ### PISSA
 PISSA is better than LISA  
 --lora_alpha 128 --lora_dropout 0.01 (These two parameters do not work.)
