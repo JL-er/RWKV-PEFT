@@ -1,10 +1,21 @@
 
 <h1 align="center"> <p>RWKV-PEFT</p></h1>
 
+# Release
+- Quant(QPissa,QLora)
+- Pissa
+- Lisa
+- Lora
+### High performance on consumer hardware
 
+Consider the memory requirements for training the following models with an 4090 24GB GPU with 64GB of CPU RAM.(--strategy deepspeed_stage_1 --ctx_len 1024 --micro_bsz 1)
 
-
-# QUANT Train
+|   Model         | Full Finetuning | lora/pissa  | Qlora/Qpissa |
+| --------- | ---- | ---- | ---- |
+| RWKV6-1.6B | OOM GPU | 7.4GB GPU | 5.6GB GPU |
+| RWKV6-3B | OOM GPU |  |  |
+| RWKV6-7B | OOM GPU | 23.7GB GPU | 14.9GB GPU(bsz 8 need 19.5GB) |
+# Quant Train
 You just need to add "--quant (4bit nf4 fp4)" to utilize quantization fine-tuning.
 You can also use "sh demo-pissa.sh" for a quick start.Then use "sh demo-pissa-merge.sh" for merging.
 
