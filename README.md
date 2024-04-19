@@ -8,7 +8,7 @@
 - Lora
 ### High performance on consumer hardware
 
-Consider the memory requirements for training the following models with an 4090 24GB GPU with 64GB of CPU RAM.(--strategy deepspeed_stage_1 --ctx_len 1024 --micro_bsz 1)
+Consider the memory requirements for training the following models with an 4090 24GB GPU with 64GB of CPU RAM.(--strategy deepspeed_stage_1 --ctx_len 1024 --micro_bsz 1 --lora_r 64)
 
 |   Model         | Full Finetuning | lora/pissa  | Qlora/Qpissa |
 | --------- | ---- | ---- | ---- |
