@@ -14,12 +14,12 @@ Consider the memory requirements for training the following models with an 4090 
 | --------- | ---- | ---- | ---- |
 | RWKV6-1.6B | OOM GPU | 7.4GB GPU | 5.6GB GPU |
 | RWKV6-3B | OOM GPU |  |  |
-| RWKV6-7B | OOM GPU | 23.7GB GPU | 14.9GB GPU(bsz 8 need 19.5GB) |
+| RWKV6-7B | OOM GPU | 23.7GB GPU(bsz 8 OOM) | 14.9GB GPU(bsz 8 need 19.5GB) |
 # Quant Train
 You just need to add "--quant (4bit nf4 fp4)" to utilize quantization fine-tuning.
 You can also use "sh demo-pissa.sh" for a quick start.Then use "sh demo-pissa-merge.sh" for merging.
-
-# PISSA
+# Usage
+### PISSA
 PISSA is better than LISA  
 --lora_alpha 128 --lora_dropout 0.01 (These two parameters do not work.)
 
@@ -40,7 +40,7 @@ PISSA merge (you need merge init_lora and rwkv-0)
 python merge_pissa.py --use-gpu /home/rwkv/JL/model/RWKV-x060-World-1B6-v2-20240208-ctx4096.pth /home/rwkv/JL/out_model/lora-1e-4/init_lora.pth /home/rwkv/JL/out_model/lora-1e-4/rwkv-0.pth  /home/rwkv/JL/model/pissa.pth
 ```
 
-# LISA
+### LISA
 LISA is faster and more memory-efficient than LoRA.  
 In the context of the LISA algorithm, lisa_r determines how many layers are updated simultaneously, while lisa_k determines how often the algorithm re-selects layers for updating.
 
@@ -56,7 +56,7 @@ python train.py --load_model /home/rwkv/JL/model/RWKV-x060-World-1B6-v2-20240208
 --LISA --lisa_r 2 --lisa_k 100
 ```
 
-# RWKV-v6-lora
+### RWKV-v6-lora
 只需要再v5指令基础上增加 --my_testing "x060"
 ```
 python train.py --load_model /home/rwkv/JL/model/RWKV-x060-World-1B6-v2-20240208-ctx4096.pth \
@@ -70,12 +70,12 @@ python train.py --load_model /home/rwkv/JL/model/RWKV-x060-World-1B6-v2-20240208
 --wandb rwkv \
 --lora_load rwkv-0 --lora --lora_r 64 --lora_alpha 128 --lora_dropout 0.01 --lora_parts=att,ffn,time,ln
 ```
-# Merge lora
+### Merge lora
 ```
 python merge_lora.py --use-gpu 128 /home/asd/model/RWKV-5-World-1B5-v2-20231025-ctx4096.pth img595k/rwkv-0.pth /home/asd/model/RWKV-5-World-1.5B--lora.pth
 ```
 
-# RWKV-v5-lora
+### RWKV-v5-lora
 训练技巧：
   标准的全量微调方法： 将数据复制多遍（如果你想炼多个epoch），注意，其中的条目，必须每次用不同的随机排列！ 然后用我这里的 --my_pile_stage 3 --my_exit_tokens xxx --magic_prime xxx 技术，这样采样才是完美无重复的。 学习速率建议 --lr_init 1e-5 --lr_final 1e-5  
   my_exit_tokens = datalen，数据的精确 token 数，在载入数据时会显示 # magic_prime = the largest 3n+2 prime smaller than datalen/ctxlen-1 (= 1498226207/512-1 = 2926222.06 in this case) # use  
@@ -91,7 +91,7 @@ python train.py --load_model /home/asd/model/RWKV-5-World-1B5-v2-20231025-ctx409
 --accelerator gpu --devices 1 --precision bf16 --strategy deepspeed_stage_2 --grad_cp 1 \
 --lora_load rwkv-0 --lora --lora_r 64 --lora_alpha 128 --lora_dropout 0.01 --lora_parts=att,ffn,time,ln
 ```
-# RWKV-V4-lora
+### RWKV-V4-lora
 源代码地址：https://github.com/Blealtan/RWKV-LM-LoRA
 ```
 python3 train.py \
@@ -105,7 +105,7 @@ python3 train.py \
   --lora_load <lora checkpoint to continue training> \ # optional
   --lora_parts=att,ffn,time,ln # configure which parts to finetune
 ```
-# v4训练配置 RWKV-4-Doctor-7B-lora.pth
+### v4训练配置 RWKV-4-Doctor-7B-lora.pth
 ```
 数据：334MB 问诊对话
 数据格式：Patient: {content}\n\nDoctor:{content}\n\n
@@ -117,7 +117,7 @@ lora：
   --lora_r 64 --lora_alpha 128
 ```
 
-# 推理配置 RWKV-4-Doctor-7B-lora.pth
+### 推理配置 RWKV-4-Doctor-7B-lora.pth
 ```
 interface = ":"
 user = "Patient"
