@@ -1,5 +1,5 @@
 
-<h1 align="center"> <p>RWKV-PEFT</p></h1>
+<h1 align="center"> <p>🦚 RWKV-PEFT</p></h1>
 
 # Release
 - Quant(QPissa,QLora)
