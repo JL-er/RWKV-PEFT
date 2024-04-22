@@ -1,0 +1,3 @@
+pytorch-lightning==1.9.5
+bitsandbytes
+deepspeed
