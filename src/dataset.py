@@ -149,9 +149,12 @@ class MyDataset(Dataset):
 
             if args.data_type == "binidx":
                 if args.my_pile_version == 1:
-                    dix = data.get(idx=0, offset=i, length=req_len).astype(int)
                     if args.dataset_get == 'pad':
                         dix = data.pad(idx=idx, length=req_len).astype(int)
+                    elif args.dataset_get == 'only':
+                        dix = data.only(idx=idx, length=req_len).astype(int)
+                    else:
+                        dix = data.get(idx=0, offset=i, length=req_len).astype(int)
                 else:
                     # self.data : cutoff, chunk_count, data
                     for j in range(len(data)):
