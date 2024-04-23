@@ -357,7 +357,7 @@ class RWKV_Tmix_x060(MyModule):
             self.time_maa_g = nn.Parameter(1.0 - torch.pow(ddd, 0.5 * ratio_1_to_almost0))
 
             TIME_MIX_EXTRA_DIM = 32 # generate TIME_MIX for w,k,v,r,g
-            if '7b' in args.load_model:
+            if args.n_embd==4096:
                 TIME_MIX_EXTRA_DIM = TIME_MIX_EXTRA_DIM*2
             self.time_maa_w1 = nn.Parameter(torch.zeros(args.n_embd, TIME_MIX_EXTRA_DIM*5).uniform_(-1e-4, 1e-4))
             self.time_maa_w2 = nn.Parameter(torch.zeros(5, TIME_MIX_EXTRA_DIM, args.n_embd).uniform_(-1e-4, 1e-4))
@@ -369,7 +369,7 @@ class RWKV_Tmix_x060(MyModule):
             self.time_decay = nn.Parameter(decay_speed.reshape(1,1,args.dim_att))
 
             TIME_DECAY_EXTRA_DIM = 64
-            if '7b' in args.load_model:
+            if args.n_embd==4096:
                 TIME_DECAY_EXTRA_DIM = TIME_DECAY_EXTRA_DIM*2
             self.time_decay_w1 = nn.Parameter(torch.zeros(args.n_embd, TIME_DECAY_EXTRA_DIM).uniform_(-1e-4, 1e-4))
             self.time_decay_w2 = nn.Parameter(torch.zeros(TIME_DECAY_EXTRA_DIM, args.dim_att).uniform_(-1e-4, 1e-4))
