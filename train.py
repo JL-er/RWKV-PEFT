@@ -303,6 +303,21 @@ if __name__ == "__main__":
     elif args.lora:
         
         for name, module in model.named_modules():
+            if len(args.load_model) == 0:
+                if any(n.startswith("emb.") for n, _ in module.named_parameters()):
+                    for pname, param in module.named_parameters():
+                        if 'emb.weight'==pname:
+                            print(f'  EMB additionally training module {pname}')
+                            param.requires_grad = True
+                if any(n.startswith("head.") for n, _ in module.named_parameters()):
+                    for pname, param in module.named_parameters():
+                        if 'head.weight'==pname:
+                            print(f'  head additionally training module {pname}')
+                            param.requires_grad = True
+                if 'ln' in name:
+                    print(f'  LoRA additionally training module {name}')
+                    for param in module.parameters():
+                        param.requires_grad = True
             if any(n.startswith("emb.") for n, _ in module.named_parameters()):
                 for pname, param in module.named_parameters():
                     if args.emb and 'emb.weight'==pname:

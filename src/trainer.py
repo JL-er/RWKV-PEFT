@@ -224,8 +224,9 @@ class train_callback(pl.Callback):
                     enable_ln_finetune = 'ln' in LORA_CONFIG["parts"]
                     lora_dict = {}
                     for name, state in to_save_dict.items():
-                        if 'img' in name:
-                            lora_dict[name] = state
+                        if len(args.load_model) == 0:
+                            if 'emb' in name or 'head' in name or 'ln' in name:
+                                lora_dict[name] = state
                         if ('.lora_' in name
                                 or (enable_time_finetune and '.time_' in name)
                                 or (enable_ln_finetune and '.ln' in name)):
