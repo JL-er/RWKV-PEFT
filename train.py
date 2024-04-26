@@ -96,7 +96,7 @@ if __name__ == "__main__":
     parser.add_argument("--quant", default="none", type=str)
 
     #dataset
-    parser.add_argument("--dataset_get", default="get", type=str)
+    parser.add_argument("--dataload", default="get", type=str)
 
 
     if pl.__version__[0]=='2':
@@ -138,6 +138,8 @@ if __name__ == "__main__":
     args.check_val_every_n_epoch = int(1e20)
     args.log_every_n_steps = int(1e20)
     args.max_epochs = -1  # continue forever
+    if args.dataload!='get':
+        args.max_epochs = args.epoch_count
     args.betas = (args.beta1, args.beta2)
     args.real_bsz = int(args.num_nodes) * int(args.devices) * args.micro_bsz
     os.environ["RWKV_MY_TESTING"] = args.my_testing

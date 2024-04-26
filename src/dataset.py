@@ -149,9 +149,9 @@ class MyDataset(Dataset):
 
             if args.data_type == "binidx":
                 if args.my_pile_version == 1:
-                    if args.dataset_get == 'pad':
+                    if args.dataload == 'pad':
                         dix = data.pad(idx=idx, length=req_len).astype(int)
-                    elif args.dataset_get == 'only':
+                    elif args.dataload == 'only':
                         dix = data.only(idx=idx, length=req_len).astype(int)
                     else:
                         dix = data.get(idx=0, offset=i, length=req_len).astype(int)
