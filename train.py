@@ -2,7 +2,8 @@
 # The RWKV Language Model - https://github.com/BlinkDL/RWKV-LM
 ########################################################################################################
 import os
-
+os.environ["WANDB_API_KEY"] = '35af18e9a9d3f399af1b83bb926803be09c140a6'
+os.environ["WANDB_MODE"] = "offline"
 import logging
 logging.basicConfig(level=logging.INFO)
 
@@ -70,7 +71,7 @@ if __name__ == "__main__":
     parser.add_argument("--magic_prime", default=0, type=int)
     parser.add_argument("--my_qa_mask", default=0, type=int)
     parser.add_argument("--my_random_steps", default=0, type=int)
-    parser.add_argument("--my_testing", default='', type=str)
+    parser.add_argument("--my_testing", default='x052', type=str)
     parser.add_argument("--my_exit", default=99999999, type=int)
     parser.add_argument("--my_exit_tokens", default=0, type=int)
 
@@ -97,6 +98,9 @@ if __name__ == "__main__":
 
     #dataset
     parser.add_argument("--dataload", default="get", type=str)
+
+    #state tuning
+    parser.add_argument("--state_tune", action="store_true")
 
 
     if pl.__version__[0]=='2':
@@ -145,6 +149,8 @@ if __name__ == "__main__":
     os.environ["RWKV_MY_TESTING"] = args.my_testing
     os.environ["RWKV_CTXLEN"] = str(args.ctx_len)
     os.environ["RWKV_HEAD_SIZE_A"] = str(args.head_size_a)
+    ######state tuning
+    os.environ["RWKV_TRAIN_TYPE"]='states' if args.state_tune else ''
     if args.dim_att <= 0:
         args.dim_att = args.n_embd
     if args.dim_ffn <= 0:
@@ -284,9 +290,17 @@ if __name__ == "__main__":
         enable_time_finetune = 'time' in LORA_CONFIG["parts"]
         enable_ln_finetune = 'ln' in LORA_CONFIG["parts"]
     model = RWKV(args)
-
-    if args.lora or args.LISA:
+    freeze=False
+    if args.lora or args.LISA or args.state_tune:
         model.requires_grad_(False)
+        freeze=True
+    
+    if args.state_tune:
+        for name, module in model.named_modules():
+            for pname, param in module.named_parameters():
+                if 'state' in pname :
+                    param.requires_grad = True
+            break
 
     if args.LISA:
         import re
@@ -374,7 +388,7 @@ if __name__ == "__main__":
         for k in model.state_dict():
             if k not in load_keys:
                 load_dict[k] = model.state_dict()[k]
-    model.load_state_dict(load_dict, strict=(not args.lora))
+    model.load_state_dict(load_dict, strict=(not freeze))
     if os.path.isfile(args.lora_load):
         model.load_state_dict(torch.load(args.lora_load, map_location="cpu"),
                               strict=False)

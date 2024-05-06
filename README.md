@@ -2,6 +2,7 @@
 <h1 align="center"> <p>🦚 RWKV-PEFT</p></h1>
 
 # Release
+- State tuning
 - Quant(QPissa,QLora)
 - Pissa
 - Lisa
@@ -17,7 +18,22 @@ Consider the memory requirements for training the following models with an 4090 
 | RWKV6-3B | OOM GPU | 12.1GB GPU | 8.2GB GPU |
 | RWKV6-7B | OOM GPU | 23.7GB GPU(bsz 8 OOM) | 14.9GB GPU(bsz 8 need 19.5GB) |
 # Usage
-sh demo-pissa.sh
+sh demo/demo-xxxx.sh
+### State Tuning
+add "--state_tune " to utilize quantization State Tuning.  
+This project's state tuning currently only supports training the state. You can refer to the state tuning in the demo for configuration. When saving weights, only the state is retained, so you need to use the state merge from the demo for merging. The advantage is that the saved weight files are very small. Any user who uses the same base model as you trained can merge and experience the same training results.
+```
+python train.py --load_model /home/rwkv/JL/model/RWKV-x060-World-1B6-v2.1-20240328-ctx4096.pth \
+--proj_dir /home/rwkv/JL/out_model/state --data_file /home/rwkv/JL/data/roleplay \
+--data_type binidx --vocab_size 65536 \
+--ctx_len 2048 --epoch_steps 1000 --epoch_count 100 --epoch_begin 0 --epoch_save 1 --micro_bsz 4 \
+--n_layer 24 --n_embd 2048 \
+--pre_ffn 0 --head_qk 0 --lr_init 1e-4 --lr_final 1e-4 --warmup_steps 0 --beta1 0.9 --beta2 0.99 --adam_eps 1e-8 \
+--accelerator gpu --devices 1 --precision bf16 --strategy deepspeed_stage_1 --grad_cp 1 \
+--my_testing "x060" \
+--state_tune
+```
+
 ### Quant Train
 You just need to add "--quant (4bit nf4 fp4)" to utilize quantization fine-tuning.
 You can also use "sh demo-pissa.sh" for a quick start.Then use "sh demo-pissa-merge.sh" for merging.

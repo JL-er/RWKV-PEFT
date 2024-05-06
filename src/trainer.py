@@ -218,6 +218,14 @@ class train_callback(pl.Callback):
                     for name, state in to_save_dict.items():
                         if 'img' in name:
                             to_save_dict[name] = state
+                
+                if args.state_tune:
+                    lora_dict = {}
+                    for name, state in to_save_dict.items():
+                        if 'state' in name:
+                            lora_dict[name] = state
+                    to_save_dict = lora_dict
+
 
                 if args.lora:
                     enable_time_finetune = 'time' in LORA_CONFIG["parts"]
