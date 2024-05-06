@@ -12,11 +12,11 @@
 
 Consider the memory requirements for training the following models with an 4090 24GB GPU with 64GB of CPU RAM.(--strategy deepspeed_stage_1 --ctx_len 1024 --micro_bsz 1 --lora_r 64)
 
-|   Model         | Full Finetuning | lora/pissa  | Qlora/Qpissa |
-| --------- | ---- | ---- | ---- |
-| RWKV6-1.6B | OOM GPU | 7.4GB GPU | 5.6GB GPU |
-| RWKV6-3B | OOM GPU | 12.1GB GPU | 8.2GB GPU |
-| RWKV6-7B | OOM GPU | 23.7GB GPU(bsz 8 OOM) | 14.9GB GPU(bsz 8 need 19.5GB) |
+|   Model         | Full Finetuning | lora/pissa  | Qlora/Qpissa | State tuning |
+| --------- | ---- | ---- | ---- | ---- |
+| RWKV6-1.6B | OOM GPU | 7.4GB GPU | 5.6GB GPU | 6.4GB GPU |
+| RWKV6-3B | OOM GPU | 12.1GB GPU | 8.2GB GPU | 9.4GB GPU |
+| RWKV6-7B | OOM GPU | 23.7GB GPU(bsz 8 OOM) | 14.9GB GPU(bsz 8 need 19.5GB) | 18.1GB GPU |
 # Usage
 sh demo/demo-xxxx.sh
 ### State Tuning

@@ -1,12 +1,12 @@
-load_model='/home/rwkv/JL/model/RWKV-x060-World-1B6-v2-20240208-ctx4096.pth'
+load_model='/home/rwkv/JL/model/rwkv-x060-7b-world-v2.1-36%trained-20240413-ctx4k.pth'
 proj_dir='/home/rwkv/JL/out_model/state'
-data_file='/home/rwkv/JL/data/state_text_document'
+data_file='/home/rwkv/JL/data/roleplay'
 
 
-n_layer=24
-n_embd=2048
+n_layer=32
+n_embd=4096
 
-micro_bsz=8
+micro_bsz=1
 epoch_save=1
 epoch_steps=1000
 ctx_len=1024
