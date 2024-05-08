@@ -7,7 +7,7 @@ QUANT='nf4' #follow train
 TYPE='lora'
 Lora_alpha=128
 
-python merge.py --base_model $base_model \
+python merge/merge.py --base_model $base_model \
 --lora_init $lora_init \
 --lora_checkpoint $lora_checkpoint \
 --output $output \

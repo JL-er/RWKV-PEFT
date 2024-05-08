@@ -7,7 +7,7 @@ output='/home/rwkv/JL/model/end-world.pth'
 QUANT='nf4' #follow train
 TYPE='pissa'
 
-python merge.py --base_model $base_model \
+python merge/merge.py --base_model $base_model \
 --lora_init $lora_init \
 --lora_checkpoint $lora_checkpoint \
 --output $output \
