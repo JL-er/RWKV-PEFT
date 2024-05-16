@@ -21,6 +21,8 @@ Consider the memory requirements for training the following models with an 4090 
 | RWKV6-7B | OOM GPU | 23.7GB GPU(bsz 8 OOM) | 14.9GB GPU(bsz 8 need 19.5GB) | 18.1GB GPU |
 # Usage
 sh demo/demo-xxxx.sh
+### --train_type
+"--quant (infctx state)"
 ### infctx train
 "--train_type infctx --chunk_ctx 512" 
 "chunk_ctx" represents the chunk length, while "ctx_len" stands for the total length of the data.
