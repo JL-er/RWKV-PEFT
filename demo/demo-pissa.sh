@@ -25,8 +25,7 @@ python train.py --load_model $load_model \
 --my_testing "x060" \
 --lora_load rwkv-0 --lora --lora_r $lora_r --lora_alpha 128 --lora_dropout 0.01 --lora_parts=att,ffn,time,ln \
 --PISSA --svd_niter $svd_niter \
-# --quant $QUANT
-#--dataload pad
+--dataload pad \
 
 ###remove load_model
 # python train.py --proj_dir $proj_dir --data_file $data_file \

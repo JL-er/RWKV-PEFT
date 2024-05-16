@@ -5,7 +5,7 @@ typedef at::BFloat16 bf16;
 
 template <typename F>
 __global__ void kernel_forward(const int B, const int T, const int C, const int H,
-                               const F *__restrict__ const _r, const F *__restrict__ const _k, const F *__restrict__ const _v, const F *__restrict__ _w, const F *__restrict__ _u,const F *__restrict__ _s,
+                               const F *__restrict__ const _r, const F *__restrict__ const _k, const F *__restrict__ const _v, const F *__restrict__ _w, const F *__restrict__ _u, F *__restrict__ _s,
                                F *__restrict__ const _y)
 {
     const int b = blockIdx.x / H;
@@ -62,9 +62,9 @@ __global__ void kernel_forward(const int B, const int T, const int C, const int 
         }
         _y[t] = F(y);
     }
-    // #pragma unroll
-    // for (int j = 0; j < _N_; j++)
-    //     _s[j] = F(state[j]);
+    #pragma unroll
+    for (int j = 0; j < _N_; j++)
+        _s[j] = F(state[j]);
 }
 
 template <typename F>

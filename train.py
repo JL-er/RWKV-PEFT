@@ -102,6 +102,11 @@ if __name__ == "__main__":
     parser.add_argument("--state_tune", action="store_true")
 
 
+    parser.add_argument("--chunk_ctx", default=512, type=int)
+    #fla
+    parser.add_argument("--fla", action="store_true")
+    parser.add_argument("--train_type", default="none", type=str)
+
     if pl.__version__[0]=='2':
         parser.add_argument("--accelerator", default="gpu", type=str)
         parser.add_argument("--strategy", default="auto", type=str)
@@ -149,7 +154,13 @@ if __name__ == "__main__":
     os.environ["RWKV_CTXLEN"] = str(args.ctx_len)
     os.environ["RWKV_HEAD_SIZE_A"] = str(args.head_size_a)
     ######state tuning
-    os.environ["RWKV_TRAIN_TYPE"]='states' if args.state_tune else ''
+    os.environ["RWKV_TRAIN_TYPE"]=''
+    if args.train_type=='state':
+        os.environ["RWKV_TRAIN_TYPE"]='states'
+    elif args.train_type=='infctx':
+        os.environ["RWKV_TRAIN_TYPE"]='infctx'
+
+    os.environ["WKV"]='fla' if args.fla else ''
     if args.dim_att <= 0:
         args.dim_att = args.n_embd
     if args.dim_ffn <= 0:
@@ -290,11 +301,11 @@ if __name__ == "__main__":
         enable_ln_finetune = 'ln' in LORA_CONFIG["parts"]
     model = RWKV(args)
     freeze=False
-    if args.lora or args.LISA or args.state_tune:
+    if args.lora or args.LISA or args.train_type=='state':
         model.requires_grad_(False)
         freeze=True
     
-    if args.state_tune:
+    if args.state_tune or args.train_type=='state':
         for name, module in model.named_modules():
             for pname, param in module.named_parameters():
                 if 'state' in pname :
