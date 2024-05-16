@@ -18,7 +18,7 @@ if importlib.util.find_spec('deepspeed'):
     from deepspeed.ops.adam import DeepSpeedCPUAdam, FusedAdam
 from torch._lowrank import svd_lowrank
 import bitsandbytes as bnb
-from .infctx_moudle import *
+from .infctx_module import *
 from einops import rearrange
 from fla.ops.rwkv6 import chunk_rwkv6, fused_recurrent_rwkv6
 
