@@ -39,6 +39,7 @@ python train.py --load_model /home/rwkv/JL/model/RWKV-x060-World-1B6-v2.1-202403
 --train_type infctx --chunk_ctx 512 --fla
 ```
 ### fla
+pip install triton==2.2.0
 add "--fla" to utilize."FLA" doesn't need to be compiled, make sure Triton is installed before using it.
 https://github.com/sustcsonglin/flash-linear-attention.git
 ### State Tuning
