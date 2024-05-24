@@ -20,17 +20,7 @@ def my_save(args, trainer, dd, ff):
         torch.save(dd, fff)
         subprocess.Popen(f" aws s3 mv {fff} s3://rwkv-world/{aa}-{fn} --quiet", shell=True)
     else:
-        if 'deepspeed_stage_3' in args.strategy:
-            trainer.save_checkpoint(ff, weights_only=True)
-        else:
-            if args.train_type == 'states':
-                ddd = {}
-                for k, v in dd.items():
-                    if 'time_sta' in k:
-                        ddd[k] = v.clone()
-                torch.save(ddd, ff)
-            else:
-                torch.save(dd, ff)
+        torch.save(dd, ff)
 
 class train_callback(pl.Callback):
     def __init__(self, args):
