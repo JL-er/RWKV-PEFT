@@ -1,5 +1,5 @@
 
-load_model='/home/rwkv/JL/model/RWKV-x060-World-1B6-v2-20240208-ctx4096.pth'
+load_model='/home/rwkv/JL/model/RWKV-x060-World-1B6-v2.1-20240328-ctx4096.pth'
 proj_dir='/home/rwkv/JL/out_model/nf4'
 data_file='/home/rwkv/JL/data/end_text_document'
 
@@ -25,7 +25,7 @@ python train.py --load_model $load_model \
 --my_testing "x060" \
 --lora_load rwkv-0 --lora --lora_r $lora_r --lora_alpha 128 --lora_dropout 0.01 --lora_parts=att,ffn,time,ln \
 --PISSA --svd_niter $svd_niter \
---dataload pad \
+--dataload pad
 
 ###remove load_model
 # python train.py --proj_dir $proj_dir --data_file $data_file \

@@ -147,7 +147,7 @@ if os.environ["WKV"] == 'fla':
                 r = rearrange(r, 'b l (h d) -> b h l d', h = H)
                 k = rearrange(k, 'b l (h d) -> b h l d', h = H)
                 v = rearrange(v, 'b l (h d) -> b h l d', h = H)
-                w = rearrange(-torch.exp(w), 'b l (h d) -> b h l d', h = H).clamp(-4, 0)
+                w = rearrange(-torch.exp(w), 'b l (h d) -> b h l d', h = H)
                 o, state = chunk_rwkv6(r, k, v, w, u=u, initial_state=s, output_final_state=True)
                 x = rearrange(o, 'b h l d -> b l (h d)')
                 return x, state
@@ -156,7 +156,7 @@ if os.environ["WKV"] == 'fla':
                 r = rearrange(r, 'b l (h d) -> b h l d', h = H)
                 k = rearrange(k, 'b l (h d) -> b h l d', h = H)
                 v = rearrange(v, 'b l (h d) -> b h l d', h = H)
-                w = rearrange(-torch.exp(w), 'b l (h d) -> b h l d', h = H).clamp(-4, 0)
+                w = rearrange(-torch.exp(w), 'b l (h d) -> b h l d', h = H)
                 o,_ = chunk_rwkv6(r, k, v, w, u=u, initial_state=s, output_final_state=False)
                 x = rearrange(o, 'b h l d -> b l (h d)')
                 return x
@@ -165,7 +165,7 @@ if os.environ["WKV"] == 'fla':
                 r = rearrange(r, 'b l (h d) -> b h l d', h = H)
                 k = rearrange(k, 'b l (h d) -> b h l d', h = H)
                 v = rearrange(v, 'b l (h d) -> b h l d', h = H)
-                w = rearrange(-torch.exp(w), 'b l (h d) -> b h l d', h = H).clamp(-4, 0)
+                w = rearrange(-torch.exp(w), 'b l (h d) -> b h l d', h = H)
                 o,_ = chunk_rwkv6(r, k, v, w, u=u, initial_state=None, output_final_state=False)
                 x = rearrange(o, 'b h l d -> b l (h d)')
                 return x
