@@ -399,7 +399,7 @@ if __name__ == "__main__":
     #     for k in model.state_dict():
     #         if k not in load_keys:
     #             load_dict[k] = model.state_dict()[k]
-    model.load_state_dict(torch.load(args.load_model), strict=(not freeze))
+    model.load_state_dict(torch.load(args.load_model, map_location="cpu"), strict=(not freeze))
     if os.path.isfile(args.lora_load):
         model.load_state_dict(torch.load(args.lora_load, map_location="cpu"),
                               strict=False)
