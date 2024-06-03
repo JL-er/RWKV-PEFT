@@ -374,31 +374,32 @@ if __name__ == "__main__":
         args.load_model = init_weight_name
 
     rank_zero_info(f"########## Loading {args.load_model}... ##########")
-    try:
-        load_dict = torch.load(args.load_model, map_location="cpu")
-        load_keys = list(load_dict.keys())
-        for k in load_keys:
-            if k.startswith('_forward_module.'):
-                load_dict[k.replace('_forward_module.','')] = load_dict[k]
-                del load_dict[k]
-    except:
-        rank_zero_info(f"Bad checkpoint {args.load_model}")
-        if args.my_pile_stage >= 2:  # try again using another checkpoint
-            max_p = args.my_pile_prev_p
-            if max_p == -1:
-                args.load_model = f"{args.proj_dir}/rwkv-init.pth"
-            else:
-                args.load_model = f"{args.proj_dir}/rwkv-{max_p}.pth"
-            args.epoch_begin = max_p + 1
-            rank_zero_info(f"Trying {args.load_model}")
-            load_dict = torch.load(args.load_model, map_location="cpu")
+    # try:
+    #     load_dict = torch.load(args.load_model, map_location="cpu")
+    #     load_keys = list(load_dict.keys())
+    #     for k in load_keys:
+    #         if k.startswith('_forward_module.'):
+    #             assert 1==2
+    #             load_dict[k.replace('_forward_module.','')] = load_dict[k]
+    #             del load_dict[k]
+    # except:
+    #     rank_zero_info(f"Bad checkpoint {args.load_model}")
+    #     if args.my_pile_stage >= 2:  # try again using another checkpoint
+    #         max_p = args.my_pile_prev_p
+    #         if max_p == -1:
+    #             args.load_model = f"{args.proj_dir}/rwkv-init.pth"
+    #         else:
+    #             args.load_model = f"{args.proj_dir}/rwkv-{max_p}.pth"
+    #         args.epoch_begin = max_p + 1
+    #         rank_zero_info(f"Trying {args.load_model}")
+    #         load_dict = torch.load(args.load_model, map_location="cpu")
 
-    if args.load_partial == 1:
-        load_keys = load_dict.keys()
-        for k in model.state_dict():
-            if k not in load_keys:
-                load_dict[k] = model.state_dict()[k]
-    model.load_state_dict(load_dict, strict=(not freeze))
+    # if args.load_partial == 1:
+    #     load_keys = load_dict.keys()
+    #     for k in model.state_dict():
+    #         if k not in load_keys:
+    #             load_dict[k] = model.state_dict()[k]
+    model.load_state_dict(torch.load(args.load_model), strict=(not freeze))
     if os.path.isfile(args.lora_load):
         model.load_state_dict(torch.load(args.lora_load, map_location="cpu"),
                               strict=False)

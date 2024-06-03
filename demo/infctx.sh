@@ -1,15 +1,15 @@
 load_model='/home/rwkv/JL/model/RWKV-x060-World-1B6-v2.1-20240328-ctx4096.pth'
-proj_dir='/home/rwkv/JL/out_model/infctx'
-data_file='/home/rwkv/JL/data/roleplay'
+proj_dir='/home/rwkv/JL/out_model/long'
+data_file='/home/rwkv/JL/data/long_text_document'
 
 
 n_layer=24
 n_embd=2048
 
-micro_bsz=8
-epoch_save=5
+micro_bsz=1
+epoch_save=1
 epoch_steps=1000
-ctx_len=16384
+ctx_len=8192
 chunk_ctx=2048
 
 
@@ -22,4 +22,6 @@ python train.py --load_model $load_model \
 --accelerator gpu --devices 1 --precision bf16 --strategy deepspeed_stage_1 --grad_cp 1 \
 --lora_load rwkv-0 --lora --lora_r 64 --lora_alpha 128 --lora_dropout 0.01 --lora_parts=att,ffn,time,ln \
 --my_testing "x060"  --dataload pad \
---train_type infctx --chunk_ctx $chunk_ctx --fla --wandb infctx
+--PISSA --svd_niter 4 \
+--wandb long
+--train_type infctx --chunk_ctx $chunk_ctx --fla
