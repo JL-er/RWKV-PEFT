@@ -1,5 +1,5 @@
-load_model='/home/rwkv/JL/model/RWKV-x060-World-7B-v2.1-20240507-ctx4096.pth'
-proj_dir='/home/rwkv/JL/out_model/nf4'
+load_model='/home/rwkv/JL/model/RWKV-x060-World-1B6-v2.1-20240328-ctx4096.pth'
+proj_dir='/home/rwkv/JL/out_model/play'
 data_file='/home/rwkv/JL/data/roleplay'
 
 QUANT='nf4'  #4bit nf4 fp4 none
@@ -7,10 +7,10 @@ QUANT='nf4'  #4bit nf4 fp4 none
 lora_r=64
 lora_alpha=128
 
-n_layer=32
-n_embd=4096
+n_layer=24
+n_embd=2048
 
-micro_bsz=1
+micro_bsz=8
 epoch_save=1
 epoch_steps=1000
 ctx_len=1024

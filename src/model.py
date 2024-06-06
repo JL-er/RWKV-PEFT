@@ -148,7 +148,7 @@ if os.environ["WKV"] == 'fla':
                 k = rearrange(k, 'b l (h d) -> b h l d', h = H)
                 v = rearrange(v, 'b l (h d) -> b h l d', h = H)
                 w = rearrange(-torch.exp(w), 'b l (h d) -> b h l d', h = H)
-                o, state = chunk_rwkv6(r, k, v, w, u=u, initial_state=s, output_final_state=True)
+                o, state = chunk_rwkv6(r, k, v, w, u=u, scale=1., initial_state=s, output_final_state=True)
                 x = rearrange(o, 'b h l d -> b l (h d)')
                 return x, state
         elif os.environ["RWKV_TRAIN_TYPE"] == 'states':
@@ -157,8 +157,8 @@ if os.environ["WKV"] == 'fla':
                 k = rearrange(k, 'b l (h d) -> b h l d', h = H)
                 v = rearrange(v, 'b l (h d) -> b h l d', h = H)
                 w = rearrange(-torch.exp(w), 'b l (h d) -> b h l d', h = H)
-                s = s.expand(B,*s.shape)
-                o,_ = chunk_rwkv6(r, k, v, w, u=u, initial_state=s, output_final_state=False)
+                s = s.transpose(1, 2).expand(B,*s.shape)
+                o,_ = chunk_rwkv6(r, k, v, w, u=u, scale=1., initial_state=s, output_final_state=False)
                 x = rearrange(o, 'b h l d -> b l (h d)')
                 return x
         else:
@@ -167,7 +167,7 @@ if os.environ["WKV"] == 'fla':
                 k = rearrange(k, 'b l (h d) -> b h l d', h = H)
                 v = rearrange(v, 'b l (h d) -> b h l d', h = H)
                 w = rearrange(-torch.exp(w), 'b l (h d) -> b h l d', h = H)
-                o,_ = chunk_rwkv6(r, k, v, w, u=u, initial_state=None, output_final_state=False)
+                o,_ = chunk_rwkv6(r, k, v, w, u=u, scale=1., initial_state=None, output_final_state=False)
                 x = rearrange(o, 'b h l d -> b l (h d)')
                 return x
 

@@ -1,16 +1,16 @@
 load_model='/home/rwkv/JL/model/RWKV-x060-World-1B6-v2.1-20240328-ctx4096.pth'
 proj_dir='/home/rwkv/JL/out_model/long'
-data_file='/home/rwkv/JL/data/long_text_document'
+data_file='/home/rwkv/JL/data/bad_text_document'
 
 
 n_layer=24
 n_embd=2048
 
-micro_bsz=8
+micro_bsz=1
 epoch_save=1
 epoch_steps=1000
 ctx_len=4096
-chunk_ctx=2048
+chunk_ctx=512
 
 
 python train.py --load_model $load_model \
