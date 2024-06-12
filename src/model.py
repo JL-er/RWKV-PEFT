@@ -1,7 +1,6 @@
 ########################################################################################################
 # The RWKV Language Model - https://github.com/BlinkDL/RWKV-LM
 ########################################################################################################
-import functools
 from torch.utils.checkpoint import checkpoint as torch_checkpoint
 
 import os, math, gc, importlib
@@ -16,110 +15,10 @@ from pytorch_lightning.strategies import DeepSpeedStrategy
 if importlib.util.find_spec('deepspeed'):
     import deepspeed
     from deepspeed.ops.adam import DeepSpeedCPUAdam, FusedAdam
-from torch._lowrank import svd_lowrank
-import bitsandbytes as bnb
 from .infctx_module import *
 from einops import rearrange
 from fla.ops.rwkv6 import chunk_rwkv6, fused_recurrent_rwkv6
-
-LORA_CONFIG = {
-    "r": 0,
-    "alpha": 0,
-    "dropout": 0,
-    "parts": {"att", "ln", "time", "ffn"},
-}
-class LoraLinear(nn.Module):
-
-    def __init__(self, in_features: int, out_features: int, bias: bool):
-        super().__init__()
-
-        self.weight = nn.Parameter(torch.empty((out_features, in_features)))
-        assert bias == False, "Biased LoraLinear not supported"
-
-        r, alpha, dropout = LORA_CONFIG["r"], LORA_CONFIG[
-            "alpha"], LORA_CONFIG["dropout"]
-        self.lora_A = nn.Parameter(torch.empty(r, in_features))
-        self.lora_B = nn.Parameter(torch.empty(out_features, r))
-        self.lora_dropout = nn.Dropout(dropout)
-        self.scaling = alpha / r
-        self.r = r
-        nn.init.kaiming_uniform_(self.weight, a=math.sqrt(5))
-        nn.init.kaiming_uniform_(self.lora_A, a=math.sqrt(5))
-        nn.init.zeros_(self.lora_B)
-        self.pissa = False
-        self.is_quant = False
-
-    def pissa_init(self, svd_niter):
-
-        self.pissa = True
-        Ur, Sr, Vr = svd_lowrank(self.weight.data, self.r, niter=svd_niter)
-        Vhr = Vr.t()
-        lora_A = torch.diag(torch.sqrt(Sr)) @ Vhr
-        lora_B = Ur @ torch.diag(torch.sqrt(Sr))
-        self.lora_A.data = lora_A
-        self.lora_B.data = lora_B
-        self.weight.data = self.weight.data - lora_B @ lora_A
-    def quant(self, quant_type):
-        self.is_quant = True
-        self.quant_type = quant_type
-        if self.quant_type=='4bit':
-            self.weight.data, self.qstate= bnb.functional.quantize_4bit((self.weight.data).to('cuda'))
-        elif self.quant_type=='nf4':
-            self.weight.data, self.qstate= bnb.functional.quantize_nf4((self.weight.data).to('cuda'))
-        elif self.quant_type=='fp4':
-            self.weight.data, self.qstate= bnb.functional.quantize_fp4((self.weight.data).to('cuda'))
-
-    def forward(self, x):
-
-        if self.is_quant:
-            if self.quant_type=='4bit':
-                if self.pissa:
-                    return (
-                        F.linear(x, bnb.functional.dequantize_4bit(self.weight.data,quant_state=self.qstate).to(torch.bfloat16)) + 
-                        F.linear(F.linear(x, self.lora_A), self.lora_B))
-                return (
-                    F.linear(x, bnb.functional.dequantize_4bit(self.weight.data,quant_state=self.qstate).to(torch.bfloat16)) + self.scaling *
-                    F.linear(F.linear(self.lora_dropout(x), self.lora_A), self.lora_B)) 
-            elif self.quant_type=='nf4':
-                if self.pissa:
-                    return (
-                        F.linear(x, bnb.functional.dequantize_nf4(self.weight.data,quant_state=self.qstate).to(torch.bfloat16)) + 
-                        F.linear(F.linear(x, self.lora_A), self.lora_B))
-                return (
-                    F.linear(x, bnb.functional.dequantize_nf4(self.weight.data,quant_state=self.qstate).to(torch.bfloat16)) + self.scaling *
-                    F.linear(F.linear(self.lora_dropout(x), self.lora_A), self.lora_B)) 
-            elif self.quant_type=='fp4':
-                if self.pissa:
-                    return (
-                        F.linear(x, bnb.functional.dequantize_fp4(self.weight.data,quant_state=self.qstate).to(torch.bfloat16)) + 
-                        F.linear(F.linear(x, self.lora_A), self.lora_B))
-                return (
-                    F.linear(x, bnb.functional.dequantize_fp4(self.weight.data,quant_state=self.qstate).to(torch.bfloat16)) + self.scaling *
-                    F.linear(F.linear(self.lora_dropout(x), self.lora_A), self.lora_B))  
-
-        if self.pissa:
-            return (
-                F.linear(x, self.weight) + 
-                F.linear(F.linear(x, self.lora_A), self.lora_B))
-        return (
-            F.linear(x, self.weight) + self.scaling *
-            F.linear(F.linear(self.lora_dropout(x), self.lora_A), self.lora_B))  
-
-
-@functools.wraps(LoraLinear)
-def make_linear_att(*args, **kwargs):
-    if "att" in LORA_CONFIG["parts"] and LORA_CONFIG["r"] > 0:
-        return LoraLinear(*args, **kwargs)
-    else:
-        return nn.Linear(*args, **kwargs)
-
-
-@functools.wraps(LoraLinear)
-def make_linear_ffn(*args, **kwargs):
-    if "ffn" in LORA_CONFIG["parts"] and LORA_CONFIG["r"] > 0:
-        return LoraLinear(*args, **kwargs)
-    else:
-        return nn.Linear(*args, **kwargs)
+from .rwkvLinear import make_linear_att, make_linear_ffn, LORA_CONFIG
 
 try:
     print('RWKV_MY_TESTING', os.environ["RWKV_MY_TESTING"])
@@ -631,12 +530,12 @@ class RWKV_Tmix_x060_state(MyModule):
             self.time_state = nn.Parameter(torch.zeros(self.n_head, self.head_size, self.head_size))
 
         self.time_shift = nn.ZeroPad2d((0, 0, 1, -1))
-        self.receptance = nn.Linear(args.n_embd, args.dim_att, bias=False)
-        self.key = nn.Linear(args.n_embd, args.dim_att, bias=False)
+        self.receptance = make_linear_att(args.n_embd, args.dim_att, bias=False)
+        self.key = make_linear_att(args.n_embd, args.dim_att, bias=False)
 
-        self.value = nn.Linear(args.n_embd, args.dim_att, bias=False)
-        self.output = nn.Linear(args.dim_att, args.n_embd, bias=False)
-        self.gate = nn.Linear(args.n_embd, args.dim_att, bias=False)
+        self.value = make_linear_att(args.n_embd, args.dim_att, bias=False)
+        self.output = make_linear_att(args.dim_att, args.n_embd, bias=False)
+        self.gate = make_linear_att(args.n_embd, args.dim_att, bias=False)
         self.ln_x = nn.GroupNorm(self.n_head, args.dim_att, eps=(1e-5)*(args.head_size_divisor**2))
 
     @MyFunction
@@ -828,12 +727,12 @@ class RWKV_Tmix_x060_infctx(MyModule):
             #self.time_state = nn.Parameter(torch.zeros(self.n_head, self.head_size, self.head_size))
 
         self.time_shift = nn.ZeroPad2d((0, 0, 1, -1))
-        self.receptance = nn.Linear(args.n_embd, args.dim_att, bias=False)
-        self.key = nn.Linear(args.n_embd, args.dim_att, bias=False)
+        self.receptance = make_linear_att(args.n_embd, args.dim_att, bias=False)
+        self.key = make_linear_att(args.n_embd, args.dim_att, bias=False)
 
-        self.value = nn.Linear(args.n_embd, args.dim_att, bias=False)
-        self.output = nn.Linear(args.dim_att, args.n_embd, bias=False)
-        self.gate = nn.Linear(args.n_embd, args.dim_att, bias=False)
+        self.value = make_linear_att(args.n_embd, args.dim_att, bias=False)
+        self.output = make_linear_att(args.dim_att, args.n_embd, bias=False)
+        self.gate = make_linear_att(args.n_embd, args.dim_att, bias=False)
         self.ln_x = nn.GroupNorm(self.n_head, args.dim_att, eps=(1e-5)*(args.head_size_divisor**2))
 
     @MyFunction

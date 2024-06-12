@@ -3,9 +3,9 @@
 
 # Release
 - infctx
-- fla
+- fla --fla
 - State tuning
-- Quant(QPissa,QLora)
+- Quant(QPissa,QLora) --quant int8/nf4
 - Pissa
 - Lisa
 - Lora
@@ -19,6 +19,17 @@ Consider the memory requirements for training the following models with an 4090 
 | RWKV6-1.6B | OOM GPU | 7.4GB GPU | 5.6GB GPU | 6.4GB GPU |
 | RWKV6-3B | OOM GPU | 12.1GB GPU | 8.2GB GPU | 9.4GB GPU |
 | RWKV6-7B | OOM GPU | 23.7GB GPU(bsz 8 OOM) | 14.9GB GPU(bsz 8 need 19.5GB) | 18.1GB GPU |
+#### Quant State Tuning
+- strategy deepspeed_stage_1
+- ctx_len 1024
+- micro_bsz 1
+- 4090 24G
+|   Model         | bf16 | int8  | nf4/fp4/4bit |
+| --------- | ---- | ---- | ---- |
+| RWKV6-1.6B | xxGB GPU | xxGB GPU | xxGB GPU |
+| RWKV6-3B | xxGB GPU | xxGB GPU | xxGB GPU |
+| RWKV6-7B | 17.8GB GPU | 11.9GB GPU | 8.5GB GPU |
+| RWKV6-14B | xxGB GPU | xxGB GPU | xxGB GPU |
 # Usage
 sh demo/demo-xxxx.sh
 ### --train_type
@@ -58,7 +69,7 @@ python train.py --load_model /home/rwkv/JL/model/RWKV-x060-World-1B6-v2.1-202403
 ```
 
 ### Quant Train
-You just need to add "--quant (4bit nf4 fp4)" to utilize quantization fine-tuning.
+You just need to add "--quant (int8 4bit nf4 fp4)" to utilize quantization fine-tuning.
 You can also use "sh demo-pissa.sh" for a quick start.Then use "sh demo-pissa-merge.sh" for merging.
 
 ### PISSA

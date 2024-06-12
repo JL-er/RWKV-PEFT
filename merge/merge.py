@@ -65,6 +65,9 @@ with torch.no_grad():
                     elif quant == 'fp4':
                         qw,qs = bnb.functional.quantize_fp4(w[k]- w_init_lora[init_lora_B] @ w_init_lora[init_lora_A])
                         w[k] = (bnb.functional.dequantize_fp4(qw,quant_state=qs)).to(dtype=torch.bfloat16)
+                    elif quant == 'int8':
+                        qw,qs = bnb.functional.quantize(w[k]- w_init_lora[init_lora_B] @ w_init_lora[init_lora_A])
+                        w[k] = (bnb.functional.dequantize(qw,quant_state=qs)).to(dtype=torch.bfloat16)
                     else:
                         w[k] = (w[k]- w_init_lora[init_lora_B] @ w_init_lora[init_lora_A]).to(dtype=torch.bfloat16)
                     w[k] +=  w[lora_B] @ w[lora_A]
@@ -78,6 +81,9 @@ with torch.no_grad():
                     elif quant=='fp4':
                         qw,qs = bnb.functional.quantize_fp4(w[k])
                         w[k] = (bnb.functional.dequantize_fp4(qw,quant_state=qs)).to(dtype=torch.bfloat16)
+                    elif quant=='int8':
+                        qw,qs = bnb.functional.quantize(w[k])
+                        w[k] = (bnb.functional.dequantize(qw,quant_state=qs)).to(dtype=torch.bfloat16)
                     w[k] += w[lora_B] @ w[lora_A] * (lora_alpha / lora_r)
                 output_w[k] = w[k].to(device='cpu', copy=True)
                 del w[k]
