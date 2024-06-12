@@ -24,6 +24,7 @@ Consider the memory requirements for training the following models with an 4090 
 - ctx_len 1024
 - micro_bsz 1
 - 4090 24G
+
 |   Model         | bf16 | int8  | nf4/fp4/4bit |
 | --------- | ---- | ---- | ---- |
 | RWKV6-1.6B | xxGB GPU | xxGB GPU | xxGB GPU |
