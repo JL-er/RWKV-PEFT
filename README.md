@@ -27,8 +27,8 @@ Consider the memory requirements for training the following models with an 4090 
 
 |   Model         | bf16 | int8  | nf4/fp4/4bit |
 | --------- | ---- | ---- | ---- |
-| RWKV6-1.6B | xxGB GPU | xxGB GPU | xxGB GPU |
-| RWKV6-3B | xxGB GPU | xxGB GPU | xxGB GPU |
+| RWKV6-1.6B | 6.1GB GPU | 4.7GB GPU | 4.1GB GPU |
+| RWKV6-3B | 9.1GB GPU | 6.5GB GPU | 5.2GB GPU |
 | RWKV6-7B | 17.8GB GPU | 11.9GB GPU | 8.5GB GPU |
 | RWKV6-14B | xxGB GPU | xxGB GPU | xxGB GPU |
 # Usage

@@ -1,17 +1,17 @@
-load_model='/home/rwkv/JL/model/RWKV-x060-World-7B-v2.1-20240507-ctx4096.pth'
+load_model='/home/rwkv/JL/model/RWKV-x060-World-1B6-v2.1-20240328-ctx4096.pth'
 proj_dir='/home/rwkv/JL/out_model/roleplay'
 data_file='/home/rwkv/JL/data/roleplay'
 
 
-n_layer=32
-n_embd=4096
+n_layer=24
+n_embd=2048
 
-micro_bsz=8
+micro_bsz=1
 epoch_save=1
 epoch_steps=800
 ctx_len=1024
 
-QUANT='int8' 
+QUANT='nf4' 
 
 python train.py --load_model $load_model \
 --proj_dir $proj_dir --data_file $data_file \
@@ -21,4 +21,4 @@ python train.py --load_model $load_model \
 --pre_ffn 0 --head_qk 0 --lr_init 1 --lr_final 1e-2 --warmup_steps 10 --beta1 0.9 --beta2 0.99 --adam_eps 1e-8 \
 --accelerator gpu --devices 1 --precision bf16 --strategy deepspeed_stage_1 --grad_cp 1 \
 --my_testing "x060" \
---train_type "state"  --dataload pad --quant $QUANT --wandb state --fla --accumulate_grad_batches 8
+--train_type "state"  --dataload pad --quant $QUANT
