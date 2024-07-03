@@ -91,6 +91,7 @@ if __name__ == "__main__":
     #PISSA
     parser.add_argument("--PISSA", action="store_true")
     parser.add_argument("--svd_niter", default=4, type=int)
+    parser.add_argument("--pissa_load", default="", type=str)
 
     #quant
     parser.add_argument("--quant", default="none", type=str)
@@ -402,7 +403,11 @@ if __name__ == "__main__":
     if os.path.isfile(args.lora_load):
         model.load_state_dict(torch.load(args.lora_load, map_location="cpu"),
                               strict=False)
-    if args.PISSA:
+        
+    if os.path.isfile(args.pissa_load):
+        model.load_state_dict(torch.load(args.pissa_load, map_location="cpu"),
+                              strict=False)
+    if args.PISSA and 'state' not in args.train_type:
         init_dict = {}
         rank_zero_info(f"########## Init PISSA... ##########")
         for name, m in model.named_modules():
