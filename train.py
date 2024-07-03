@@ -400,14 +400,8 @@ if __name__ == "__main__":
     #         if k not in load_keys:
     #             load_dict[k] = model.state_dict()[k]
     model.load_state_dict(torch.load(args.load_model, map_location="cpu"), strict=(not freeze))
-    if os.path.isfile(args.lora_load):
-        model.load_state_dict(torch.load(args.lora_load, map_location="cpu"),
-                              strict=False)
-        
-    if os.path.isfile(args.pissa_load):
-        model.load_state_dict(torch.load(args.pissa_load, map_location="cpu"),
-                              strict=False)
-    if args.PISSA and 'state' not in args.train_type:
+
+    if args.PISSA:
         init_dict = {}
         rank_zero_info(f"########## Init PISSA... ##########")
         for name, m in model.named_modules():
@@ -416,6 +410,13 @@ if __name__ == "__main__":
                 init_dict[f'{name}.init_lora_A'] = m.lora_A.data
                 init_dict[f'{name}.init_lora_B'] = m.lora_B.data
         torch.save(init_dict, f'{args.proj_dir}/init_lora.pth')
+    if os.path.isfile(args.lora_load):
+        model.load_state_dict(torch.load(args.lora_load, map_location="cpu"),
+                              strict=False)
+        
+    if os.path.isfile(args.pissa_load):
+        model.load_state_dict(torch.load(args.pissa_load, map_location="cpu"),
+                              strict=False)
     
     if args.quant!='none':
         rank_zero_info(f"########## Quant... ##########")
