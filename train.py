@@ -313,8 +313,7 @@ if __name__ == "__main__":
                 if 'state' in pname :
                     param.requires_grad = True
             break
-
-    if args.LISA:
+    elif args.LISA:
         import re
         select_layers = np.random.choice(range(args.n_layer), args.lisa_r, replace=False)
         for name, module in model.named_modules():
@@ -327,9 +326,7 @@ if __name__ == "__main__":
                     if number in select_layers:
                         param.requires_grad  = True
             break
-    
     elif args.lora:
-        
         for name, module in model.named_modules():
             if len(args.load_model) == 0:
                 if any(n.startswith("emb.") for n, _ in module.named_parameters()):
@@ -419,8 +416,7 @@ if __name__ == "__main__":
         rank_zero_info(f"########## Quant... ##########")
         for name, m in model.named_modules():
             if hasattr(m, "quant") and callable(getattr(m, "quant")):
-                m.quant(args.quant)
-
+                    m.quant(args.quant)
 
 
     if pl.__version__[0]=='2':
