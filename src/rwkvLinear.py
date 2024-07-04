@@ -58,6 +58,11 @@ class LoraLinear(nn.Module):
         self.pissa = False
         self.is_quant = False
 
+    def pissa_load(self, init_A, init_B):
+        self.pissa = True
+        self.weight.data = self.weight.data - init_B @ init_A
+
+
     def pissa_init(self, svd_niter):
 
         self.pissa = True

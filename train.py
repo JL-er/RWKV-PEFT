@@ -92,6 +92,7 @@ if __name__ == "__main__":
     parser.add_argument("--PISSA", action="store_true")
     parser.add_argument("--svd_niter", default=4, type=int)
     parser.add_argument("--pissa_load", default="", type=str)
+    parser.add_argument("--pissa_init", default="", type=str)
 
     #quant
     parser.add_argument("--quant", default="none", type=str)
@@ -401,7 +402,7 @@ if __name__ == "__main__":
     #             load_dict[k] = model.state_dict()[k]
     model.load_state_dict(torch.load(args.load_model, map_location="cpu"), strict=(not freeze))
 
-    if args.PISSA:
+    if args.PISSA and not os.path.isfile(args.pissa_load):
         init_dict = {}
         rank_zero_info(f"########## Init PISSA... ##########")
         for name, m in model.named_modules():
@@ -409,14 +410,19 @@ if __name__ == "__main__":
                 m.pissa_init(args.svd_niter)
                 init_dict[f'{name}.init_lora_A'] = m.lora_A.data
                 init_dict[f'{name}.init_lora_B'] = m.lora_B.data
-        torch.save(init_dict, f'{args.proj_dir}/init_lora.pth')
+        torch.save(init_dict, f'{args.proj_dir}/init_pissa.pth')
     if os.path.isfile(args.lora_load):
         model.load_state_dict(torch.load(args.lora_load, map_location="cpu"),
                               strict=False)
         
     if os.path.isfile(args.pissa_load):
         model.load_state_dict(torch.load(args.pissa_load, map_location="cpu"),
-                              strict=False)
+                            strict=False)
+        pissa_init = torch.load(args.pissa_init, map_location="cpu")
+        rank_zero_info(f"########## Load PISSA... ##########")
+        for name, m in model.named_modules():
+            if hasattr(m, "pissa_load") and callable(getattr(m, "pissa_load")):
+                m.pissa_load(pissa_init[f'{name}.init_lora_A'], pissa_init[f'{name}.init_lora_B'])
     
     if args.quant!='none':
         rank_zero_info(f"########## Quant... ##########")
