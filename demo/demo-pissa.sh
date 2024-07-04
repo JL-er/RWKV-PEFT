@@ -28,7 +28,7 @@ python train.py --load_model $load_model \
 --dataload pad --quant $QUANT
 
 ###continue train
---pissa_load '/home/rwkv/JL/out_model/nf4/rwkv-0.pth' --pissa_init '/home/rwkv/JL/out_model/nf4/init_pissa.pth'
+--pissa_load 'rwkv-0.pth' --pissa_init 'init_pissa.pth'
 
 ###remove load_model
 # python train.py --proj_dir $proj_dir --data_file $data_file \
