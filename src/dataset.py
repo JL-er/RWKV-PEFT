@@ -9,7 +9,8 @@ from torch.utils.data import Dataset
 from pytorch_lightning.utilities import rank_zero_info
 from .binidx import MMapIndexedDataset
 from .utils import MaybeIsPrime
-
+from rwkv.utils import PIPELINE
+pipeline = PIPELINE('rwkv6', "rwkv_vocab_v20230424")
 
 class MyDataset(Dataset):
     def __init__(self, args):
@@ -150,7 +151,7 @@ class MyDataset(Dataset):
             if args.data_type == "binidx":
                 if args.my_pile_version == 1:
                     if args.dataload == 'pad':
-                        dix = data.pad(idx=idx, length=req_len).astype(int)
+                        dix, min_len = data.pad(idx=idx, length=req_len)
                     elif args.dataload == 'only':
                         dix = data.only(idx=idx, length=req_len).astype(int)
                     else:
@@ -201,5 +202,34 @@ class MyDataset(Dataset):
 
             if args.my_qa_mask == 1:
                 return x, y, z
+            if args.loss_mask:
+                t1 = pipeline.encode('User:')
+                t2 = pipeline.encode('Assistant:')
+                mask = self.create_mask(dix, t1, t2, min_len)
+                return x, y, mask
+                
 
             return x, y
+        
+    def create_mask(self, seq, token1, token2, min_len):
+        # 找到所有特殊标记的索引
+        indices1 = []
+        for i in range(min_len - len(token1) + 1):
+            if np.array_equal(seq[i:i + len(token1)], token1):
+                indices1.append(i)
+        indices2 = []
+
+        for i in range(min_len - len(token2) + 1):
+            if np.array_equal(seq[i:i + len(token2)], token2):
+                indices2.append(i)
+        mask = torch.zeros(seq.shape)
+        #assert len(indices2)!=0 and len(indices1)!=0
+        select = 0
+        for i in range(min_len):
+            if i in indices1:
+                select = 0
+            elif i in indices2:
+                select = 1
+            mask[i] = select
+        return mask[1:]
+

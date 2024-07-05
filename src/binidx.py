@@ -260,7 +260,7 @@ class MMapIndexedDataset(torch.utils.data.Dataset):
                 self._bin_buffer, dtype=self._index.dtype, count=length-size, offset=ptr0
             )
             np_array = np.append(np_array, np_array0)
-        return np_array
+        return np_array.astype(int), min(size,length)
     
     def only(self, idx, length=None):
         ptr, size = self._index[idx]

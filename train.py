@@ -109,6 +109,9 @@ if __name__ == "__main__":
     parser.add_argument("--fla", action="store_true")
     parser.add_argument("--train_type", default="none", type=str)
 
+    #loss_mask
+    parser.add_argument("--loss_mask", action="store_true")
+
     if pl.__version__[0]=='2':
         parser.add_argument("--accelerator", default="gpu", type=str)
         parser.add_argument("--strategy", default="auto", type=str)
@@ -402,7 +405,7 @@ if __name__ == "__main__":
     #             load_dict[k] = model.state_dict()[k]
     model.load_state_dict(torch.load(args.load_model, map_location="cpu"), strict=(not freeze))
 
-    if args.PISSA and not os.path.isfile(args.pissa_load):
+    if args.PISSA and args.pissa_init=="":
         init_dict = {}
         rank_zero_info(f"########## Init PISSA... ##########")
         for name, m in model.named_modules():
