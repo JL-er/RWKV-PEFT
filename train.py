@@ -110,7 +110,11 @@ if __name__ == "__main__":
     parser.add_argument("--train_type", default="none", type=str)
 
     #loss_mask
-    parser.add_argument("--loss_mask", action="store_true")
+    parser.add_argument("--loss_mask", default="none", type=str)
+
+    #new optim
+    parser.add_argument("--optim", default="none", type=str)
+
 
     if pl.__version__[0]=='2':
         parser.add_argument("--accelerator", default="gpu", type=str)

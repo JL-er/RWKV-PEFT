@@ -2,6 +2,8 @@
 # The RWKV Language Model - https://github.com/BlinkDL/RWKV-LM
 ########################################################################################################
 from torch.utils.checkpoint import checkpoint as torch_checkpoint
+from torch.profiler import profile, record_function, ProfilerActivity
+from adam_mini import Adam_mini
 
 import os, math, gc, importlib
 import torch
@@ -1064,10 +1066,14 @@ class RWKV(pl.LightningModule):
 
         if args.weight_decay > 0:
             optim_groups += [{"params": [param_dict[n] for n in lr_decay], "weight_decay": args.weight_decay, "my_lr_scale": 1.0}]
+            if args.optim=='adam_mini':
+                return Adam_mini(self, lr=self.args.lr_init, betas=self.args.betas, eps=self.args.adam_eps, weight_decay=0, model_sharding=True, n_feature=args.n_embd, n_head=args.n_embd//64, lora_r=8)
             if self.deepspeed_offload:
                 return DeepSpeedCPUAdam(optim_groups, lr=self.args.lr_init, betas=self.args.betas, eps=self.args.adam_eps, bias_correction=True, adamw_mode=True, amsgrad=False)
             return FusedAdam(optim_groups, lr=self.args.lr_init, betas=self.args.betas, eps=self.args.adam_eps, bias_correction=True, adam_w_mode=True, amsgrad=False)
         else:
+            if args.optim=='adam_mini':
+                return Adam_mini(self, lr=self.args.lr_init, betas=self.args.betas, eps=self.args.adam_eps, weight_decay=0, model_sharding=True, n_feature=args.n_embd, n_head=args.n_embd//64, lora_r=8)
             if self.deepspeed_offload:
                 return DeepSpeedCPUAdam(optim_groups, lr=self.args.lr_init, betas=self.args.betas, eps=self.args.adam_eps, bias_correction=True, adamw_mode=False, weight_decay=0, amsgrad=False)
             return FusedAdam(optim_groups, lr=self.args.lr_init, betas=self.args.betas, eps=self.args.adam_eps, bias_correction=True, adam_w_mode=False, weight_decay=0, amsgrad=False)
@@ -1241,7 +1247,7 @@ class RWKV(pl.LightningModule):
 
         def training_step(self, batch, batch_idx):
             args = self.args
-            if args.loss_mask:
+            if args.loss_mask!='none':
                 idx, targets, mask = batch
                 mask = mask.view(-1)
                 sum_mask = torch.sum(mask).item()
@@ -1250,8 +1256,10 @@ class RWKV(pl.LightningModule):
                 loss = torch.sum(loss * mask) / sum_mask
             elif args.my_qa_mask != 1:
                 idx, targets = batch
+
                 logits = self(idx)
                 loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1))
+
                 # if '0' in os.environ["RWKV_MY_TESTING"]:
                 #     print('logits', logits)
                 #     torch.set_printoptions(threshold=10000)

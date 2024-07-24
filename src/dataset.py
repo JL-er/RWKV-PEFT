@@ -202,10 +202,16 @@ class MyDataset(Dataset):
 
             if args.my_qa_mask == 1:
                 return x, y, z
-            if args.loss_mask:
+            if args.loss_mask=='qa':
+
                 t1 = pipeline.encode('User:')
                 t2 = pipeline.encode('Assistant:')
                 mask = self.create_mask(dix, t1, t2, min_len)
+                return x, y, mask
+            
+            if args.loss_mask=='pad':
+                mask = torch.zeros(req_len-1)
+                mask[:min_len] = 1
                 return x, y, mask
                 
 
