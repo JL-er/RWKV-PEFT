@@ -24,7 +24,7 @@ python train.py --load_model $load_model \
 --accelerator gpu --devices 1 --precision bf16 --strategy deepspeed_stage_1 --grad_cp 1 \
 --my_testing "x060" \
 --lora --lora_r $lora_r --lora_alpha $lora_alpha --lora_dropout 0.01 --lora_parts=att,ffn,time,ln \
---dataload pad --wandb finetune --loss_mask pad
+--dataload pad --loss_mask pad --quant $QUANT
 # --quant $QUANT
 ##continue train
 # --lora_load rwkv-0 

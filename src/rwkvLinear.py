@@ -26,7 +26,7 @@ def rwkv_dequantize(quant_type, weight, qstate):
         deweight= bnb.functional.dequantize_fp4(weight.data,quant_state=qstate)
     elif quant_type=='int8':
         deweight= bnb.functional.dequantize(weight.data,state=qstate)
-    return deweight
+    return deweight.to(torch.bfloat16)
 
 
         
@@ -83,7 +83,7 @@ class LoraLinear(nn.Module):
         if self.is_quant:
             if self.pissa:
                 return (
-                    F.linear(x, rwkv_dequantize(self.quant_type, self.weight.data, self.qstate).to(torch.bfloat16)) + 
+                    F.linear(x, rwkv_dequantize(self.quant_type, self.weight.data, self.qstate)) + 
                     F.linear(F.linear(x, self.lora_A), self.lora_B))
             return (
                 F.linear(x, rwkv_dequantize(self.quant_type, self.weight.data, self.qstate)) + self.scaling *
@@ -114,7 +114,7 @@ class QuantLinear(nn.Module):
     def forward(self, x):
 
         if self.is_quant:
-            return F.linear(x, rwkv_dequantize(self.quant_type, self.weight.data, self.qstate).to(torch.bfloat16))
+            return F.linear(x, rwkv_dequantize(self.quant_type, self.weight.data, self.qstate))
         else:
             return F.linear(x, self.weight)
         
