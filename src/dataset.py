@@ -106,6 +106,9 @@ class MyDataset(Dataset):
         epoch = self.real_epoch
         world_size = self.world_size
         # print(f"epoch {epoch} idx {idx} rank {rank}/{world_size}")
+        devices = int(args.devices)
+        if devices>1:
+            idx = idx*devices+rank
 
         if args.data_type == "uint16":
             i = np.random.randint(0, self.data_size-1)
