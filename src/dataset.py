@@ -214,7 +214,7 @@ class MyDataset(Dataset):
             
             if args.loss_mask=='pad':
                 mask = torch.zeros(req_len-1)
-                mask[:min_len] = 1
+                mask[:min_len-1] = 1
                 return x, y, mask
                 
 

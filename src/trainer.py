@@ -140,10 +140,19 @@ class train_callback(pl.Callback):
             # self.log("s", real_step, prog_bar=True, on_step=True)
 
             if len(args.wandb) > 0:
-                lll = {"loss": trainer.my_loss, "lr": trainer.my_lr, "wd": trainer.my_wd, "Gtokens": real_step * token_per_step / 1e9}
-                if kt_s > 0:
-                    lll["kt/s"] = kt_s
-                trainer.my_wandb.log(lll, step=int(real_step))
+                if trainer.accumulate_grad_batches!=None:
+                    args.avg_loss += trainer.my_loss/trainer.accumulate_grad_batches
+                    if (batch_idx+1)%trainer.accumulate_grad_batches==0:
+                        lll = {"loss": args.avg_loss, "lr": trainer.my_lr, "wd": trainer.my_wd, "Gtokens": real_step * token_per_step / 1e9}
+                        if kt_s > 0:
+                            lll["kt/s"] = kt_s
+                        trainer.my_wandb.log(lll, step=int(real_step))
+                        args.avg_loss = 0
+                else:
+                    lll = {"loss": trainer.my_loss, "lr": trainer.my_lr, "wd": trainer.my_wd, "Gtokens": real_step * token_per_step / 1e9}
+                    if kt_s > 0:
+                        lll["kt/s"] = kt_s
+                    trainer.my_wandb.log(lll, step=int(real_step))
         if (trainer.is_global_zero) or ('deepspeed_stage_3' in args.strategy): # save pth
             if args.magic_prime > 0:
                 expand_factor = 2 if args.my_qa_mask > 0 else 1
