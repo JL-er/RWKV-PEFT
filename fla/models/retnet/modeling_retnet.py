@@ -17,7 +17,7 @@ from transformers.utils import logging
 
 from fla.layers.multiscale_retention import MultiScaleRetention
 from fla.models.retnet.configuration_retnet import RetNetConfig
-from fla.models.utils import RecurrentCache
+from fla.models.utils import Cache
 from fla.modules import FusedCrossEntropyLoss, RMSNorm
 from fla.modules.activations import swiglu_linear
 
@@ -220,8 +220,8 @@ class RetNetModel(RetNetPreTrainedModel):
         if use_cache:
             if past_key_values is None:
                 past_key_values = [layer.attn.init_state(batch_size) for layer in self.layers]
-            if not isinstance(past_key_values, RecurrentCache):
-                past_key_values = RecurrentCache.from_legacy_cache(past_key_values)
+            if not isinstance(past_key_values, Cache):
+                past_key_values = Cache.from_legacy_cache(past_key_values)
 
         if self.gradient_checkpointing and self.training:
             if use_cache:
@@ -263,14 +263,11 @@ class RetNetModel(RetNetPreTrainedModel):
         if output_hidden_states:
             all_hidden_states += (hidden_states,)
 
-        next_cache = None
-        if use_cache:
-            next_cache = past_key_values.to_legacy_cache()
         if not return_dict:
-            return tuple(x for x in [hidden_states, next_cache, all_hidden_states, all_attns] if x is not None)
+            return tuple(i for i in [hidden_states, past_key_values, all_hidden_states, all_attns] if i is not None)
         return BaseModelOutputWithPast(
             last_hidden_state=hidden_states,
-            past_key_values=next_cache,
+            past_key_values=past_key_values,
             hidden_states=all_hidden_states,
             attentions=all_attns
         )
@@ -332,8 +329,8 @@ class RetNetForCausalLM(RetNetPreTrainedModel):
     ):
         # only last token for `inputs_ids` if the `past_key_values` is passed along.
         if past_key_values is not None:
-            if not isinstance(past_key_values, RecurrentCache):
-                past_key_values = RecurrentCache.from_legacy_cache(past_key_values, input_ids.shape[1] - 1)
+            if not isinstance(past_key_values, Cache):
+                past_key_values = Cache.from_legacy_cache(past_key_values, input_ids.shape[1] - 1)
             input_ids, attention_mask = input_ids[:, -1:], attention_mask[:, -1:]
 
         # if `inputs_embeds` are passed, we only want to use them in the 1st generation step

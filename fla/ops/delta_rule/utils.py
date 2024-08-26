@@ -4,11 +4,10 @@ import torch
 import triton
 import triton.language as tl
 from einops import rearrange
-from torch.cuda.amp import custom_bwd, custom_fwd
 
-from fla.utils import contiguous
+
 from fla.ops.delta_rule.wy_fast import prepare_wy_repr as prepare_wy_repr2
-
+from fla.utils import autocast_custom_bwd, autocast_custom_fwd, contiguous
 
 
 # Inspired by "THE WY REPRESENTATION FOR PRODUCTS OF HOUSEHOLDER MATRICES" https://epubs.siam.org/doi/pdf/10.1137/0908009
@@ -72,7 +71,7 @@ def fwd_prepare_wy_repr_kernel(
     b_w = tl.dot(b_A, b_kb, allow_tf32=False)
     b_u = tl.dot(b_A, b_v, allow_tf32=False)
 
-    p_o = o + i_bh * T * K + (i_t * BT + tl.arange(0, BT)[:,  None]) * K + tl.arange(0, BK)[None, :]
+    p_o = o + i_bh * T * K + (i_t * BT + tl.arange(0, BT)[:, None]) * K + tl.arange(0, BK)[None, :]
     tl.store(p_o, b_w.to(p_o.dtype.element_ty), mask=mask_bk)
     p_o2 = o2 + i_bh * T * V + (i_t * BT + tl.arange(0, BT)[:, None]) * V + tl.arange(0, BV)[None, :]
     tl.store(p_o2, b_u.to(p_o2.dtype.element_ty), mask=mask_bv)
@@ -189,23 +188,25 @@ def bwd_prepare_wy_repr(k, v, beta, o_cumdecay, v_new, do, do2, chunk_size):
     )
     return dk, dv, dbeta
 
+
 class WYRepresentationPrepration(torch.autograd.Function):
-    @staticmethod
     @contiguous
-    @custom_fwd
+    @autocast_custom_fwd
+    @staticmethod
     def forward(ctx, k, v, beta, chunk_size):
         o_cumdecay, v_new = fwd_prepare_wy_repr(k, v, beta, chunk_size)
         ctx.chunk_size = chunk_size
         ctx.save_for_backward(k.to(v), v, beta, o_cumdecay, v_new)
         return o_cumdecay, v_new
 
-    @staticmethod
     @contiguous
-    @custom_bwd
+    @autocast_custom_bwd
+    @staticmethod
     def backward(ctx, do, do2):
         k, v, beta, o_cumdecay, v_new = ctx.saved_tensors
         dk, dv, dbeta = bwd_prepare_wy_repr(k, v, beta, o_cumdecay, v_new, do, do2, ctx.chunk_size)
         return dk, dv, dbeta, None
+
 
 prepare_wy_repr = WYRepresentationPrepration.apply
 
@@ -247,7 +248,7 @@ if __name__ == "__main__":
     b = 4
     h = 8
     k = torch.nn.functional.normalize(torch.randn(b, h, seq_len, 256), dim=-1, p=2)
-    v = torch.randn(b, h, seq_len, 256) 
+    v = torch.randn(b, h, seq_len, 256)
     beta = torch.rand(b, h, seq_len).sigmoid()
     require_grad = True
     k, v, beta = map(lambda x: x.cuda().requires_grad_(require_grad), (k, v, beta))
@@ -262,7 +263,6 @@ if __name__ == "__main__":
     print((o1 - o3).abs().max())
     print((o2 - o4).abs().max())
 
-
     for i in range(30):
         o1, o2 = prepare_wy_repr(k, v, beta, 32)
         (o1 * do + o2 * do2).sum().backward()
@@ -271,7 +271,7 @@ if __name__ == "__main__":
 
     print("Done warmup.")
 
-    import time 
+    import time
     torch.cuda.synchronize()
     start = time.time()
 
@@ -282,7 +282,6 @@ if __name__ == "__main__":
     torch.cuda.synchronize()
     print(time.time() - start)
 
-
     torch.cuda.synchronize()
     start = time.time()
 
@@ -292,6 +291,3 @@ if __name__ == "__main__":
 
     torch.cuda.synchronize()
     print(time.time() - start)
-
-
-    

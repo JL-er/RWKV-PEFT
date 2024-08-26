@@ -6,18 +6,25 @@ from typing import Tuple
 import torch
 import triton
 import triton.language as tl
-from torch.cuda.amp import custom_bwd, custom_fwd
 
-from fla.utils import contiguous
+from fla.utils import autocast_custom_bwd, autocast_custom_fwd, contiguous
 
 
+@triton.autotune(
+    configs=[
+        triton.Config({}, num_warps=1),
+        triton.Config({}, num_warps=2),
+        triton.Config({}, num_warps=4)
+    ],
+    key=["BT", "BK", "BV"],
+)
 @triton.jit
 def chunk_retention_fwd_kernel_h(
     k,
     v,
     h,
-    initial_state,  # initial state of the chunk [B, H, D_head_K, D_head_V]
-    final_state,  # final state of the chunk [B, H, D_head_K, D_head_V]
+    h0,  # initial state of the chunk [B, H, K, V]
+    ht,  # final state of the chunk [B, H, K, V]
     s_qk_h,
     s_qk_t,
     s_qk_d,
@@ -47,7 +54,7 @@ def chunk_retention_fwd_kernel_h(
     b_h = tl.zeros([BK, BV], dtype=tl.float32)
 
     if USE_INITIAL_STATE:
-        p_h0 = tl.make_block_ptr(initial_state + i_bh * K * V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
+        p_h0 = tl.make_block_ptr(h0 + i_bh * K * V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
         b_h = tl.load(p_h0, boundary_check=(0, 1)).to(tl.float32)
 
     for i_t in range(NT):
@@ -67,10 +74,18 @@ def chunk_retention_fwd_kernel_h(
         b_h = d_b * b_h + tl.dot(b_k, (b_v * d_i[:, None]).to(b_k.dtype), allow_tf32=False)
 
     if STORE_FINAL_STATE:
-        p_ht = tl.make_block_ptr(final_state + i_bh * K * V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
+        p_ht = tl.make_block_ptr(ht + i_bh * K * V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
         tl.store(p_ht, b_h.to(p_ht.dtype.element_ty), boundary_check=(0, 1))
 
 
+@triton.autotune(
+    configs=[
+        triton.Config({}, num_warps=1),
+        triton.Config({}, num_warps=2),
+        triton.Config({}, num_warps=4)
+    ],
+    key=["BT", "BK", "BV"],
+)
 @triton.jit
 def chunk_retention_fwd_kernel_o(
     q,
@@ -127,6 +142,14 @@ def chunk_retention_fwd_kernel_o(
     tl.store(p_o, b_o.to(p_o.dtype.element_ty), boundary_check=(0, 1))
 
 
+@triton.autotune(
+    configs=[
+        triton.Config({}, num_warps=1),
+        triton.Config({}, num_warps=2),
+        triton.Config({}, num_warps=4)
+    ],
+    key=["BT", "BK", "BV"],
+)
 @triton.jit
 def chunk_retention_bwd_kernel_dh(
     q,
@@ -173,6 +196,14 @@ def chunk_retention_bwd_kernel_dh(
         b_dh = d_b * b_dh + tl.dot(b_q, (b_do * d_i[:, None]).to(b_q.dtype), allow_tf32=False)
 
 
+@triton.autotune(
+    configs=[
+        triton.Config({}, num_warps=1),
+        triton.Config({}, num_warps=2),
+        triton.Config({}, num_warps=4)
+    ],
+    key=["BT", "BK", "BV"],
+)
 @triton.jit
 def chunk_retention_bwd_kernel_dqkv(
     q,
@@ -257,98 +288,114 @@ def chunk_retention_bwd_kernel_dqkv(
     tl.store(p_dk, b_dk.to(p_dk.dtype.element_ty), boundary_check=(0, 1))
 
 
+def chunk_fwd_h_fn(k, v, BT, initial_state, output_final_state):
+    B, H, T, K, V = *k.shape, v.shape[-1]
+    final_state = None
+    if output_final_state:
+        final_state = k.new_empty(B, H, K, V, dtype=torch.float32)
+
+    BK, BV = min(64, triton.next_power_of_2(K)), min(64, triton.next_power_of_2(V))
+    NT, NK, NV = triton.cdiv(T, BT), triton.cdiv(K, BK), triton.cdiv(V, BV)
+    h = k.new_empty(B, H, NT * K, V)
+    grid = (NK, NV, B * H)
+    chunk_retention_fwd_kernel_h[grid](
+        k, v, h, initial_state, final_state,
+        k.stride(1), k.stride(2), k.stride(3),
+        v.stride(1), v.stride(2), v.stride(3),
+        h.stride(1), h.stride(2),
+        H=H, T=T, K=K, V=V, BT=BT, BK=BK, BV=BV, NT=NT,
+        USE_INITIAL_STATE=initial_state is not None,
+        STORE_FINAL_STATE=output_final_state
+    )
+    return h, final_state
+
+
+def chunk_fwd_o_fn(h, q, k, v, BT, scale):
+    B, H, T, K, V = *k.shape, v.shape[-1]
+    o = torch.empty_like(v)
+    BK = min(triton.next_power_of_2(K), 64)
+    BV = min(triton.next_power_of_2(V), 64)
+    NV = triton.cdiv(V, BV)
+    NT = triton.cdiv(T, BT)
+    grid = (NV, NT, B * H)
+    chunk_retention_fwd_kernel_o[grid](
+        q, k, v, h, o,
+        q.stride(1), q.stride(2), q.stride(3),
+        v.stride(1), v.stride(2), v.stride(3),
+        h.stride(1), h.stride(2),
+        scale,
+        H=H, T=T, K=K, V=V, BT=BT, BK=BK, BV=BV
+    )
+    return o
+
+
+def chunk_bwd_dh_fn(do, q, k, v, BT, scale):
+    B, H, T, K, V = *k.shape, v.shape[-1]
+    BT = 64
+    BK = min(triton.next_power_of_2(K), 64)
+    BV = min(triton.next_power_of_2(V), 64)
+    NT, NK, NV = triton.cdiv(T, BT), triton.cdiv(K, BK), triton.cdiv(V, BV)
+    dh = k.new_empty(B, H, NT * K, V)
+    grid = (NK, NV, B * H)
+    chunk_retention_bwd_kernel_dh[grid](
+        q, do, dh,
+        q.stride(1), q.stride(2), q.stride(3),
+        v.stride(1), v.stride(2), v.stride(3),
+        dh.stride(1), dh.stride(2),
+        scale,
+        H=H, T=T, K=K, V=V, BT=BT, BK=BK, BV=BV, NT=NT
+    )
+    return dh
+
+
+def chunk_bwd_dqkv_fn(do, q, k, v, h, dh, scale):
+    B, H, T, K, V = *k.shape, v.shape[-1]
+    BT = 64
+    BK = min(triton.next_power_of_2(K), 64)
+    BV = min(triton.next_power_of_2(V), 64)
+    NT, NK = triton.cdiv(T, BT), triton.cdiv(K, BK)
+    grid = (NK, NT, B * H)
+    dq = torch.empty_like(q)
+    dk = torch.empty_like(k)
+    dv = v.new_empty(NK, *v.shape)
+    chunk_retention_bwd_kernel_dqkv[grid](
+        q, k, v, h, do, dh, dq, dk, dv,
+        q.stride(1), q.stride(2), q.stride(3),
+        v.stride(1), v.stride(2), v.stride(3),
+        h.stride(1), h.stride(2),
+        scale,
+        H=H, T=T, K=K, V=V, BT=BT, BK=BK, BV=BV, NT=NT
+    )
+    dv = dv.sum(0)
+    return dq, dk, dv
+
+
 class ChunkRetentionFunction(torch.autograd.Function):
 
     @staticmethod
-    @custom_fwd
     @contiguous
-    def forward(ctx, q, k, v, initial_state, output_final_state):
-        B, H, T, K, V = *q.shape, v.shape[-1]
+    @autocast_custom_fwd
+    def forward(ctx, q, k, v, initial_state, output_final_state, scale, checkpoint_level):
         BT = 64
-        BK, BV = min(64, triton.next_power_of_2(K)), min(64, triton.next_power_of_2(V))
-        NT, NK, NV = triton.cdiv(T, BT), triton.cdiv(K, BK), triton.cdiv(V, BV)
-        num_stages = 1
-        num_warps = 4 if BK == 64 else 2
-        scale = K ** -0.5
-
-        final_state = None
-        if output_final_state:
-            final_state = q.new_empty(B, H, K, V, dtype=torch.float32, requires_grad=False)
-
-        h = q.new_empty(B, H, NT * K, V)
-        grid = (NK, NV, B * H)
-        chunk_retention_fwd_kernel_h[grid](
-            k, v, h, initial_state, final_state,
-            q.stride(1), q.stride(2), q.stride(3),
-            v.stride(1), v.stride(2), v.stride(3),
-            h.stride(1), h.stride(2),
-            H=H, T=T, K=K, V=V, BT=BT, BK=BK, BV=BV, NT=NT,
-            USE_INITIAL_STATE=initial_state is not None,
-            STORE_FINAL_STATE=output_final_state,
-            num_warps=num_warps,
-            num_stages=num_stages
-        )
-        grid = (NV, NT, B * H)
-        o = torch.empty_like(v)
-        chunk_retention_fwd_kernel_o[grid](
-            q, k, v, h, o,
-            q.stride(1), q.stride(2), q.stride(3),
-            v.stride(1), v.stride(2), v.stride(3),
-            h.stride(1), h.stride(2),
-            scale,
-            H=H, T=T, K=K, V=V, BT=BT, BK=BK, BV=BV,
-            num_warps=num_warps,
-            num_stages=num_stages
-        )
-
-        ctx.save_for_backward(q, k, v, h)
+        h, final_state = chunk_fwd_h_fn(k, v, BT, initial_state, output_final_state)
+        o = chunk_fwd_o_fn(h, q, k, v, BT, scale)
+        if checkpoint_level == 1:
+            h = None
+        ctx.save_for_backward(q, k, v, h, initial_state)
+        ctx.BT, ctx.scale = BT, scale
         return o.to(q.dtype), final_state
 
     @staticmethod
-    @custom_bwd
     @contiguous
+    @autocast_custom_bwd
     def backward(ctx, do, d_ht=None):
-        q, k, v, h = ctx.saved_tensors
-
-        B, H, T, K, V = *q.shape, v.shape[-1]
-        BT = 64
-        BK, BV = min(64, triton.next_power_of_2(K)), min(64, triton.next_power_of_2(V))
-        NT, NK, NV = triton.cdiv(T, BT), triton.cdiv(K, BK), triton.cdiv(V, BV)
-        num_stages = 1
-        num_warps = 4 if BK == 64 else 2
-        scale = K ** -0.5
-
-        dh = q.new_empty(B, H, NT * K, V)
-        grid = (NK, NV, B * H)
-        chunk_retention_bwd_kernel_dh[grid](
-            q, do, dh,
-            q.stride(1), q.stride(2), q.stride(3),
-            v.stride(1), v.stride(2), v.stride(3),
-            dh.stride(1), dh.stride(2),
-            scale,
-            H=H, T=T, K=K, V=V, BT=BT, BK=BK, BV=BV, NT=NT,
-            num_warps=num_warps,
-            num_stages=num_stages
-        )
-
-        grid = (NK, NT, B * H)
-        dq = torch.empty_like(q)
-        dk = torch.empty_like(k)
-        dv = v.new_empty(NK, *v.shape)
-        num_stages = 1
-        num_warps = 4 if BK == 64 else 2
-        chunk_retention_bwd_kernel_dqkv[grid](
-            q, k, v, h, do, dh, dq, dk, dv,
-            q.stride(1), q.stride(2), q.stride(3),
-            v.stride(1), v.stride(2), v.stride(3),
-            dh.stride(1), dh.stride(2),
-            scale,
-            H=H, T=T, K=K, V=V, BT=BT, BK=BK, BV=BV, NT=NT,
-            num_warps=num_warps,
-            num_stages=num_stages
-        )
-        dv = dv.sum(0)
-        return dq.to(q.dtype), dk.to(k.dtype), dv.to(v.dtype), None, None
+        BT, scale = ctx.BT, ctx.scale
+        q, k, v, h, initial_state = ctx.saved_tensors
+        if h is None:
+            h, _ = chunk_fwd_h_fn(k, v, BT, initial_state, False)
+        dh = chunk_bwd_dh_fn(do, q, k, v, BT, scale)
+        dq, dk, dv = chunk_bwd_dqkv_fn(do, q, k, v, h, dh, scale)
+        return dq.to(q.dtype), dk.to(k.dtype), dv.to(v.dtype), None, None, None, None
 
 
 def chunk_retention(
@@ -356,9 +403,36 @@ def chunk_retention(
     k: torch.Tensor,
     v: torch.Tensor,
     initial_state: torch.Tensor = None,
-    output_final_state: bool = False
+    output_final_state: bool = False,
+    scale: float = None,
+    checkpoint_level: int = 1
 ) -> Tuple[torch.Tensor, torch.Tensor]:
-    if initial_state is not None:
-        initial_state = initial_state.detach()
-    o, final_state = ChunkRetentionFunction.apply(q, k, v, initial_state, output_final_state)
+    r"""
+    Args:
+        q (torch.Tensor):
+            queries of shape `(B, H, T, K)`
+        k (torch.Tensor):
+            keys of shape `(B, H, T, K)`
+        v (torch.Tensor):
+            values of shape `(B, H, T, V)`
+        scale (Optional[int]):
+            Scale factor for the RetNet attention scores.
+            If not provided, it will default to `1 / sqrt(K)`. Default: `None`.
+        initial_state (Optional[torch.Tensor]):
+            Initial state of shape `(B, H, K, V)`. Default: `None`.
+        output_final_state (Optional[bool]):
+            Whether to output the final state of shape `(B, H, K, V)`. Default: `False`.
+        checkpoint_level (Optional[int]):
+            Checkpointing level; higher values will save more memories and do more recomputations during backward.
+            Default: `1` (recommended):
+            - Level `0`: no memory saved, no recomputation.
+            - Level `1`: recompute the chunk-level hidden state `h` during backward pass.
+    """
+    assert checkpoint_level in [0, 1], "checkpoint_level must be 0, 1"
+    assert q.dim() == k.dim() == v.dim() == 4, "q, k, v must have 4 dimensions (b, h, l, d)"
+    assert q.dtype == k.dtype == v.dtype, "q, k, v must have the same dtype"
+    if scale is None:
+        scale = q.size(-1) ** -0.5
+    o, final_state = ChunkRetentionFunction.apply(
+        q, k, v, initial_state, output_final_state, scale, checkpoint_level)
     return o, final_state

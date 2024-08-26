@@ -3,24 +3,30 @@
 from __future__ import annotations
 
 import warnings
-from typing import Optional, Tuple
+from typing import TYPE_CHECKING, Optional, Tuple
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from einops import rearrange, repeat
-from transformers.cache_utils import Cache
+from einops import rearrange
 
-from fla.modules import (FusedRMSNormSwishGateLinear, RMSNormLinear,
+from fla.modules import (FusedRMSNormSwishGateLinear, RMSNorm, RMSNormLinear,
                          RotaryEmbedding, ShortConvolution)
-from fla.modules.activations import ACT2FN, swiglu_linear, swish
+from fla.modules.activations import swiglu_linear, swish
+from fla.modules.feature_map import (ReLUFeatureMap, SwishFeatureMap,
+                                     T2RFeatureMap)
 from fla.ops.abc.chunk_gate import chunk_gated_abc
+from fla.ops.abc.recurrent_fuse import fused_recurrent_gated_abc
+
+if TYPE_CHECKING:
+    from fla.models.utils import Cache
 
 
-class GatedABCAttention(nn.Module):
+class GatedSlotAttention(nn.Module):
 
     def __init__(
         self,
+        mode: str = 'chunk',
         hidden_size: int = 1024,
         expand_k: float = 1.,
         expand_v: float = 1.,
@@ -29,9 +35,9 @@ class GatedABCAttention(nn.Module):
         use_short_conv: bool = False,
         conv_size: int = 4,
         conv_bias: bool = False,
-        share_conv_kernel: bool = True,
         num_slots: Optional[int] = None,
         elementwise_affine: Optional[bool] = True,
+        norm_first: bool = True,
         norm_eps: float = 1e-5,
         gate_low_rank_dim: Optional[int] = None,
         gate_logit_normalizer: int = 16,
@@ -41,9 +47,10 @@ class GatedABCAttention(nn.Module):
         use_norm: bool = True,
         layer_idx: Optional[int] = None,
         **kwargs
-    ) -> GatedABCAttention:
+    ) -> GatedSlotAttention:
         super().__init__()
 
+        self.mode = mode
         self.hidden_size = hidden_size
         self.expand_k = expand_k
         self.expand_v = expand_v
@@ -60,14 +67,12 @@ class GatedABCAttention(nn.Module):
         self.use_short_conv = use_short_conv
         self.conv_size = conv_size
         self.conv_bias = conv_bias
-        self.share_conv_kernel = share_conv_kernel
 
         if gate_low_rank_dim is None:
             gate_low_rank_dim = self.hidden_size // 16
         self.gate_low_rank_dim = gate_low_rank_dim
         self.gate_logit_normalizer = gate_logit_normalizer
 
-        self.feature_map = feature_map
         self.use_rope = use_rope
         self.use_output_gate = use_output_gate
         self.use_norm = use_norm
@@ -75,6 +80,7 @@ class GatedABCAttention(nn.Module):
         if num_slots is None:
             num_slots = self.head_k_dim
         self.num_slots = num_slots
+        self.norm_first = norm_first
 
         self.layer_idx = layer_idx
 
@@ -84,6 +90,18 @@ class GatedABCAttention(nn.Module):
                 "to errors during the forward call, if caching is used. Please make sure to provide a `layer_idx` "
                 "when creating this class."
             )
+
+        if norm_first:
+            self.norm = RMSNorm(self.hidden_size, eps=norm_eps)
+        self.register_module('feature_map', None)
+        if feature_map == 'swish':
+            self.feature_map = SwishFeatureMap()
+        elif feature_map == 'relu':
+            self.feature_map = ReLUFeatureMap()
+        elif feature_map == 't2r':
+            self.feature_map = T2RFeatureMap(self.head_k_dim, self.head_k_dim)
+        else:
+            raise NotImplementedError(f"Feature map `{feature_map}` is not supported now.")
 
         self.q_proj = nn.Linear(self.hidden_size, self.key_dim, bias=False)
         self.k_proj = nn.Linear(self.hidden_size, self.key_dim_per_group, bias=False)
@@ -95,18 +113,15 @@ class GatedABCAttention(nn.Module):
 
         if use_short_conv:
             self.conv_size = conv_size
-            if share_conv_kernel:
-                self.h_conv1d = ShortConvolution(hidden_size, conv_size, activation='silu')
-            else:
-                self.q_conv1d = ShortConvolution(self.key_dim, conv_size, activation='silu')
-                self.k_conv1d = ShortConvolution(self.key_dim_per_group, conv_size, activation='silu')
-                self.v_conv1d = ShortConvolution(self.value_dim_per_group, conv_size, activation='silu')
+            self.q_conv1d = ShortConvolution(self.key_dim, conv_size, activation='silu')
+            self.k_conv1d = ShortConvolution(self.key_dim_per_group, conv_size, activation='silu')
+            self.v_conv1d = ShortConvolution(self.value_dim_per_group, conv_size, activation='silu')
 
         if self.use_norm:
             if self.use_output_gate:
-                self.g_norm = FusedRMSNormSwishGateLinear(self.hidden_size, elementwise_affine, norm_eps)
+                self.g_norm = FusedRMSNormSwishGateLinear(self.hidden_size, elementwise_affine, eps=norm_eps)
             else:
-                self.g_norm = RMSNormLinear(self.hidden_size, elementwise_affine, norm_eps)
+                self.g_norm = RMSNormLinear(self.hidden_size, elementwise_affine, eps=norm_eps)
         self.o_proj = nn.Linear(self.value_dim, self.hidden_size, bias=False)
 
         if self.use_rope:
@@ -133,26 +148,23 @@ class GatedABCAttention(nn.Module):
         lower_bound: Optional[torch.Tensor] = None,
         **kwargs
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Cache]]:
+        # launching the triton kernel for just one token will actually be slower
+        mode = 'fused_recurrent' if hidden_states.shape[1] == 1 else self.mode
+
+        if self.norm_first:
+            hidden_states = self.norm(hidden_states)
 
         last_state = past_key_values[self.layer_idx] if use_cache else None
         if self.use_short_conv:
-            conv_state = last_state[0] if use_cache else None
-            if self.share_conv_kernel:
-                # conv state is updated inplace
-                hidden_states = self.h_conv1d(hidden_states, attention_mask, conv_state)
-                q = self.q_proj(hidden_states)
-                k = self.k_proj(hidden_states)
-                v = self.v_proj(hidden_states)
-            else:
-                conv_state_q = last_state[0] if use_cache else None
-                conv_state_k = last_state[1] if use_cache else None
-                conv_state_v = last_state[2] if use_cache else None
-                q = self.q_proj(hidden_states)
-                k = self.k_proj(hidden_states)
-                v = self.v_proj(hidden_states)
-                q = self.q_conv1d(q, attention_mask, conv_state_q)
-                k = self.k_conv1d(k, attention_mask, conv_state_k)
-                v = self.v_conv1d(v, attention_mask, conv_state_v)
+            conv_state_q = last_state[0] if use_cache else None
+            conv_state_k = last_state[1] if use_cache else None
+            conv_state_v = last_state[2] if use_cache else None
+            q = self.q_proj(hidden_states)
+            k = self.k_proj(hidden_states)
+            v = self.v_proj(hidden_states)
+            q = self.q_conv1d(q, attention_mask, conv_state_q)
+            k = self.k_conv1d(k, attention_mask, conv_state_k)
+            v = self.v_conv1d(v, attention_mask, conv_state_v)
         else:
             q = self.q_proj(hidden_states)
             k = self.k_proj(hidden_states)
@@ -170,19 +182,14 @@ class GatedABCAttention(nn.Module):
             k = rearrange(k, 'b n h d -> b h n d', h=self.num_kv_heads)
         else:
             q = rearrange(q, 'b n (h d) -> b h n d', h=self.num_heads)
-            if self.num_kv_groups > 1:
-                k = repeat(k, 'b n (h d) -> b (h g) n d', h=self.num_kv_heads, g=self.num_kv_groups)
-            else:
-                k = rearrange(k, 'b n (h d) -> b h n d', h=self.num_kv_heads)
-        if self.num_kv_groups > 1:
-            v = repeat(v, 'b n (h d) -> b (h g) n d', h=self.num_kv_heads, g=self.num_kv_groups)
-            f = repeat(f, 'b n (h m) -> b (h g) n m', h=self.num_kv_heads, g=self.num_kv_groups)
-        else:
-            v = rearrange(v, 'b n (h d) -> b h n d', h=self.num_kv_heads)
-            f = rearrange(f, 'b n (h m) -> b h n m', h=self.num_kv_heads)
+            k = rearrange(k, 'b n (h d) -> b h n d', h=self.num_kv_heads)
+        v = rearrange(v, 'b n (h d) -> b h n d', h=self.num_kv_heads)
+        f = rearrange(f, 'b n (h m) -> b h n m', h=self.num_kv_heads)
 
         if self.feature_map is not None:
-            q, k, v = map(lambda x: ACT2FN[self.feature_map](x), (q, k, v))
+            q, k = map(lambda x: self.feature_map(x), (q, k))
+        v = swish(v)
+
         f = F.logsigmoid(f) / self.gate_logit_normalizer
         s = (1 - f.exp()).to(f.dtype)
         # dealing with left-padding
@@ -191,15 +198,22 @@ class GatedABCAttention(nn.Module):
             v = v.mul_(attention_mask.view(attention_mask.shape[0], 1, -1, 1))
 
         recurrent_state = last_state[-2:] if use_cache else None
-        o, recurrent_state = chunk_gated_abc(q, k, v, s, f,
-                                             initial_state=recurrent_state,
-                                             output_final_state=use_cache)
+        if mode == 'fused_recurrent':
+            o, recurrent_state = fused_recurrent_gated_abc(q, k, v, s, f,
+                                                           initial_state=recurrent_state,
+                                                           output_final_state=use_cache,
+                                                           scale=1.)
+        elif mode == 'chunk':
+            o, recurrent_state = chunk_gated_abc(q, k, v, s, f,
+                                                 initial_state=recurrent_state,
+                                                 output_final_state=use_cache,
+                                                 scale=1.)
+        else:
+            raise NotImplementedError(f"Not supported mode `{mode}`.")
+
         if past_key_values is not None:
             if self.use_short_conv:
-                if self.share_conv_kernel:
-                    last_state = (conv_state,) + recurrent_state
-                else:
-                    last_state = (conv_state_q, conv_state_k, conv_state_v) + recurrent_state
+                last_state = (conv_state_q, conv_state_k, conv_state_v) + recurrent_state
             else:
                 last_state = recurrent_state
             past_key_values.update(last_state, self.layer_idx, q.shape[2])
@@ -220,14 +234,11 @@ class GatedABCAttention(nn.Module):
         param = next(self.parameters())
         state = tuple()
         if self.use_short_conv:
-            if self.share_conv_kernel:
-                state += (param.new_zeros(batch_size, self.hidden_size, self.conv_size),)
-            else:
-                state += (param.new_zeros(batch_size, self.key_dim, self.conv_size),
-                          param.new_zeros(batch_size, self.key_dim, self.conv_size),
-                          param.new_zeros(batch_size, self.value_dim, self.conv_size))
-        state += (param.new_zeros(batch_size, self.num_heads, self.head_k_dim, self.num_slots),
-                  param.new_zeros(batch_size, self.num_heads, self.num_slots, self.head_v_dim))
+            state += (param.new_zeros(batch_size, self.key_dim, self.conv_size),
+                      param.new_zeros(batch_size, self.key_dim, self.conv_size),
+                      param.new_zeros(batch_size, self.value_dim, self.conv_size))
+        state += (param.new_zeros(batch_size, self.num_kv_heads, self.head_k_dim, self.num_slots),
+                  param.new_zeros(batch_size, self.num_kv_heads, self.num_slots, self.head_v_dim))
         return state
 
     def state_size(self, sequence_length: int = 2048):

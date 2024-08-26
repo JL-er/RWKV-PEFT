@@ -161,8 +161,8 @@ class FusedRecurrentHGRNFunction(torch.autograd.Function):
         g, o, initial_state = ctx.saved_tensors
         B, H, T, D = do.shape
 
-        dx = torch.empty_like(o)
-        dg = torch.empty_like(g)
+        dx = torch.empty_like(o, dtype=torch.float)
+        dg = torch.empty_like(g, dtype=torch.float)
         def grid(meta): return (triton.cdiv(D, meta['BD']), B * H)
         fused_recurrent_hgrn_bwd_kernel[grid](
             g, o, dx, dg, do, initial_state,
@@ -179,7 +179,4 @@ def fused_recurrent_hgrn(
     initial_state: torch.Tensor = None,
     output_final_state: bool = False
 ) -> Tuple[torch.Tensor, torch.Tensor]:
-    if initial_state is not None:
-        initial_state = initial_state.detach()
-    o, final_state = FusedRecurrentHGRNFunction.apply(x, g, initial_state, output_final_state)
-    return o, final_state
+    return FusedRecurrentHGRNFunction.apply(x, g, initial_state, output_final_state)
