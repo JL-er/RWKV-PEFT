@@ -222,27 +222,25 @@ class MyDataset(Dataset):
         
     def create_mask(self, seq, token1, token2, min_len):
         # 找到所有特殊标记的索引
-        if np.array_equal(seq[0:len(token1)], token1):
-            indices1 = []
-            for i in range(min_len - len(token1) + 1):
-                if np.array_equal(seq[i:i + len(token1)], token1):
-                    indices1.append(i)
-            indices2 = []
+        indices1 = []
+        for i in range(min_len - len(token1) + 1):
+            if np.array_equal(seq[i:i + len(token1)], token1):
+                indices1.append(i)
+        indices2 = []
 
-            for i in range(min_len - len(token2) + 1):
-                if np.array_equal(seq[i:i + len(token2)], token2):
-                    indices2.append(i)
-            mask = torch.zeros(seq.shape)
-            #assert len(indices2)!=0 and len(indices1)!=0
-            select = 0
-            for i in range(min_len):
-                if i in indices1:
-                    select = 0
-                elif i in indices2:
-                    select = 1
-                mask[i] = select
-        else:
-            mask = torch.zeros(seq.shape)
+        for i in range(min_len - len(token2) + 1):
+            if np.array_equal(seq[i:i + len(token2)], token2):
+                indices2.append(i)
+        mask = torch.zeros(seq.shape)
+        #assert len(indices2)!=0 and len(indices1)!=0
+        select = 0
+        for i in range(min_len):
+            if i in indices1:
+                select = 0
+            elif i in indices2:
+                select = 1
+            mask[i] = select
+        if torch.sum(mask)==0:
             mask[:min_len-1] = 1
         return mask[1:]
 
