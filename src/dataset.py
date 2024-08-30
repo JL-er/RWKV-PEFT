@@ -240,5 +240,7 @@ class MyDataset(Dataset):
             elif i in indices2:
                 select = 1
             mask[i] = select
+        if torch.sum(mask)==0:
+            mask[:min_len-1] = 1
         return mask[1:]
 

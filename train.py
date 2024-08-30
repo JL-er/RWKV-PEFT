@@ -410,7 +410,7 @@ if __name__ == "__main__":
     model.load_state_dict(torch.load(args.load_model, map_location="cpu"), strict=(not freeze))
 
     ####multi-GPU training
-    if os.path.isfile(f'{args.proj_dir}/init_pissa.pth') and args.devices>1 and args.pissa_load=="":
+    if os.path.isfile(f'{args.proj_dir}/init_pissa.pth') and int(args.devices)>1 and args.pissa_load=="":
         pissa_init = torch.load(f'{args.proj_dir}/init_pissa.pth', map_location="cpu")
         rank_zero_info(f"########## Load PISSA... ##########")
         for name, m in model.named_modules():
