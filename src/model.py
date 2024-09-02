@@ -889,8 +889,10 @@ class Block(nn.Module):
                 if self.layer_id == 0 and args.pre_ffn > 0:
                     x = self.drop0(x + self.ffnPre(self.ln1(x)))
                 else:
-                    x = self.drop0(x + self.att(self.ln1(x)))
-                x = self.drop1(x + self.ffn(self.ln2(x)))
+                    att_out, att_state = self.att(self.ln1(x), last_state.time_mix_state)
+                    x = self.drop0(x + att_out)
+                ffn_out, fnn_state = self.ffn(self.ln2(x), last_state.channel_mix_state)
+                x = self.drop1(x + ffn_out)
 
             if args.tiny_att_dim > 0 and self.layer_id == args.tiny_att_layer:
                 xx = self.tiny_ln(x)
