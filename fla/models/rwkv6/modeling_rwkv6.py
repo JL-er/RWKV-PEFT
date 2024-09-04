@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 import warnings
-from typing import List, Optional, Tuple, Union
+from typing import Optional, Tuple, Union
 
 import torch
 import torch.nn as nn
@@ -16,9 +16,9 @@ from transformers.utils import logging
 
 from fla.layers.rwkv6 import LerpLinear, RWKV6Attention
 from fla.models.rwkv6.configuration_rwkv6 import RWKV6Config
-from fla.models.utils import RecurrentCache
+from fla.models.utils import Cache
 from fla.modules import FusedCrossEntropyLoss, LayerNorm
-from fla.modules.activations import ACT2FN, swiglu_linear
+from fla.modules.activations import ACT2FN
 
 logger = logging.get_logger(__name__)
 
@@ -47,57 +47,39 @@ class RWKV6FeedForward(nn.Module):
         self.time_shift = nn.ZeroPad2d((0, 0, 1, -1))
 
         self.key = LerpLinear(hidden_size, intermediate_size)
-        self.value = nn.Linear(intermediate_size, hidden_size)
+        self.value = nn.Linear(intermediate_size, hidden_size, bias=False)
         self.receptance = LerpLinear(hidden_size, hidden_size)
         self.act_fn = ACT2FN[hidden_act]
 
         self.layer_idx = layer_idx
 
-    def forward(self, x: torch.Tensor, state: Optional[torch.Tensor] = None) -> torch.Tensor:
-        if state is not None:
-            raise NotImplementedError("Past state is not yet supported in `RWKV6FeedForward`.")
-        shifted = self.time_shift(x)
-        if len(shifted.shape) == 2:
-            shifted = shifted.unsqueeze(1)
+    def forward(
+        self,
+        x: torch.Tensor,
+        attention_mask: Optional[torch.Tensor] = None,
+        state: Optional[Cache] = None
+    ) -> torch.Tensor:
+        if attention_mask is not None:
+            x = x.mul_(attention_mask.unsqueeze(-1))
+        if x.shape[1] == 1 and state is not None:
+            shifted = state[self.layer_idx][-1].unsqueeze(1)
+        else:
+            shifted = self.time_shift(x)
+            if state is not None:
+                shifted[:, 0] = state[self.layer_idx][-1]
         delta = shifted - x
         key = self.act_fn(self.key(x, delta))
         value = self.value(key)
         receptance = self.receptance(x, delta)
-        return receptance.sigmoid() * value
 
+        if state is not None:
+            state[self.layer_idx][-1] = x[:, -1]
+        return receptance.sigmoid() * value, state
 
-class RWKV6GLU(nn.Module):
-
-    def __init__(
-        self,
-        hidden_size: int,
-        hidden_ratio: Optional[int] = None,
-        intermediate_size: Optional[int] = None,
-        hidden_act: str = 'swish',
-        layer_idx: int = None
-    ) -> RWKV6GLU:
-        super().__init__()
-
-        self.hidden_size = hidden_size
-        # the final number of params is `hidden_ratio * hidden_size^2`
-        # `intermediate_size` is chosen to be a multiple of 256 closest to `2/3 * hidden_size * hidden_ratio`
-        if hidden_ratio is None:
-            hidden_ratio = 4
-        if intermediate_size is None:
-            intermediate_size = int(hidden_size * hidden_ratio * 2 / 3)
-            intermediate_size = 256 * ((intermediate_size + 256 - 1) // 256)
-        self.hidden_ratio = hidden_ratio
-        self.intermediate_size = intermediate_size
-        self.layer_idx = layer_idx
-
-        self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size * 2, bias=False)
-        self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias=False)
-        self.act_fn = ACT2FN[hidden_act]
-
-    def forward(self, x):
-        y = self.gate_proj(x)
-        gate, y = y.chunk(2, -1)
-        return swiglu_linear(gate, y, self.down_proj.weight, self.down_proj.bias)
+    def init_state(self, batch_size: Optional[int] = None) -> Tuple[torch.Tensor]:
+        param = next(self.parameters())
+        state = [param.new_zeros(batch_size, self.hidden_size)]
+        return state
 
 
 class RWKV6Block(nn.Module):
@@ -105,7 +87,12 @@ class RWKV6Block(nn.Module):
         super().__init__()
         self.hidden_size = config.hidden_size
 
-        self.attn_norm = LayerNorm(hidden_size=config.hidden_size, eps=config.eps)
+        self.config = config
+        self.layer_idx = layer_idx
+
+        if config.norm_first and layer_idx == 0:
+            self.pre_norm = LayerNorm(hidden_size=config.hidden_size, bias=config.norm_bias, eps=config.norm_eps)
+        self.attn_norm = LayerNorm(hidden_size=config.hidden_size, bias=config.norm_bias, eps=config.norm_eps)
         self.attn = RWKV6Attention(
             mode=config.attn_mode,
             hidden_size=config.hidden_size,
@@ -114,12 +101,12 @@ class RWKV6Block(nn.Module):
             num_heads=config.num_heads,
             proj_low_rank_dim=config.proj_low_rank_dim,
             gate_low_rank_dim=config.gate_low_rank_dim,
-            eps=config.eps,
+            norm_eps=config.norm_eps,
             fuse_norm=config.fuse_norm,
             layer_idx=layer_idx
         )
-        self.ffn_norm = LayerNorm(hidden_size=config.hidden_size, eps=config.eps)
-        self.ffn = (RWKV6GLU if config.use_glu else RWKV6FeedForward)(
+        self.ffn_norm = LayerNorm(hidden_size=config.hidden_size, bias=config.norm_bias, eps=config.norm_eps)
+        self.ffn = RWKV6FeedForward(
             hidden_size=config.hidden_size,
             hidden_ratio=config.hidden_ratio,
             intermediate_size=config.intermediate_size,
@@ -131,13 +118,13 @@ class RWKV6Block(nn.Module):
         self,
         hidden_states: torch.Tensor,
         attention_mask: Optional[torch.Tensor] = None,
-        past_key_values: Optional[Tuple[List[torch.Tensor]]] = None,
+        past_key_values: Optional[Cache] = None,
         use_cache: Optional[bool] = False,
         output_attentions: Optional[bool] = False,
         **kwargs,
     ) -> Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
-        residual = hidden_states
-        hidden_states = self.attn_norm(hidden_states)
+        residual = self.pre_norm(hidden_states) if hasattr(self, 'pre_norm') else hidden_states
+        hidden_states = self.attn_norm(residual)
         hidden_states, attentions, past_key_values = self.attn(
             hidden_states=hidden_states,
             attention_mask=attention_mask,
@@ -146,12 +133,20 @@ class RWKV6Block(nn.Module):
             output_attentions=output_attentions
         )
         hidden_states, residual = self.ffn_norm(hidden_states, residual, True)
-        hidden_states = self.ffn(hidden_states)
+        hidden_states, past_key_values = self.ffn(hidden_states, attention_mask, past_key_values)
         hidden_states = residual + hidden_states
 
         outputs = (hidden_states, attentions, past_key_values)
 
         return outputs
+
+    def init_state(self, **kwargs) -> Tuple[torch.Tensor]:
+        state = []
+        if callable(getattr(self.attn, 'init_state', None)):
+            state += self.attn.init_state(**kwargs)
+        if callable(getattr(self.ffn, 'init_state', None)):
+            state += self.ffn.init_state(**kwargs)
+        return state
 
 
 class RWKV6PreTrainedModel(PreTrainedModel):
@@ -208,7 +203,7 @@ class RWKV6Model(RWKV6PreTrainedModel):
 
         self.embeddings = nn.Embedding(config.vocab_size, config.hidden_size, self.padding_idx)
         self.layers = nn.ModuleList([RWKV6Block(config, layer_idx) for layer_idx in range(config.num_hidden_layers)])
-        self.norm = LayerNorm(config.hidden_size, eps=config.eps)
+        self.norm = LayerNorm(config.hidden_size, bias=config.norm_bias, eps=config.norm_eps)
 
         self.gradient_checkpointing = False
 
@@ -225,7 +220,7 @@ class RWKV6Model(RWKV6PreTrainedModel):
         input_ids: Optional[torch.LongTensor] = None,
         attention_mask: Optional[torch.Tensor] = None,  # noqa
         inputs_embeds: Optional[torch.FloatTensor] = None,
-        past_key_values: Optional[Tuple[List[torch.Tensor]]] = None,
+        past_key_values: Optional[Cache] = None,
         use_cache: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
@@ -255,9 +250,9 @@ class RWKV6Model(RWKV6PreTrainedModel):
 
         if use_cache:
             if past_key_values is None:
-                past_key_values = [layer.attn.init_state(batch_size) for layer in self.layers]
-            if not isinstance(past_key_values, RecurrentCache):
-                past_key_values = RecurrentCache.from_legacy_cache(past_key_values)
+                past_key_values = [layer.init_state(batch_size=batch_size) for layer in self.layers]
+            if not isinstance(past_key_values, Cache):
+                past_key_values = Cache.from_legacy_cache(past_key_values)
 
         if self.gradient_checkpointing and self.training:
             if use_cache:
@@ -299,14 +294,11 @@ class RWKV6Model(RWKV6PreTrainedModel):
         if output_hidden_states:
             all_hidden_states += (hidden_states,)
 
-        next_cache = None
-        if use_cache:
-            next_cache = past_key_values.to_legacy_cache()
         if not return_dict:
-            return tuple(x for x in [hidden_states, next_cache, all_hidden_states, all_attns] if x is not None)
+            return tuple(i for i in [hidden_states, past_key_values, all_hidden_states, all_attns] if i is not None)
         return BaseModelOutputWithPast(
             last_hidden_state=hidden_states,
-            past_key_values=next_cache,
+            past_key_values=past_key_values,
             hidden_states=all_hidden_states,
             attentions=all_attns
         )
@@ -360,15 +352,15 @@ class RWKV6ForCausalLM(RWKV6PreTrainedModel):
     def prepare_inputs_for_generation(
         self,
         input_ids: torch.LongTensor = None,
-        past_key_values: Optional[Tuple[List[torch.Tensor]]] = None,
+        past_key_values: Optional[Cache] = None,
         attention_mask: Optional[torch.Tensor] = None,
         inputs_embeds: Optional[torch.Tensor] = None,
         **kwargs
     ):
         # only last token for `inputs_ids` if the `past_key_values` is passed along.
         if past_key_values is not None:
-            if not isinstance(past_key_values, RecurrentCache):
-                past_key_values = RecurrentCache.from_legacy_cache(past_key_values, input_ids.shape[1] - 1)
+            if not isinstance(past_key_values, Cache):
+                past_key_values = Cache.from_legacy_cache(past_key_values, input_ids.shape[1] - 1)
             input_ids, attention_mask = input_ids[:, -1:], attention_mask[:, -1:]
         # if `inputs_embeds` are passed, we only want to use them in the 1st generation step
         if inputs_embeds is not None and past_key_values is None:
@@ -392,7 +384,7 @@ class RWKV6ForCausalLM(RWKV6PreTrainedModel):
         input_ids: torch.LongTensor = None,
         attention_mask: Optional[torch.Tensor] = None,
         inputs_embeds: Optional[torch.Tensor] = None,
-        past_key_values: Optional[Tuple[List[torch.Tensor]]] = None,
+        past_key_values: Optional[Cache] = None,
         labels: Optional[torch.LongTensor] = None,
         use_cache: Optional[bool] = None,
         output_attentions: Optional[bool] = None,

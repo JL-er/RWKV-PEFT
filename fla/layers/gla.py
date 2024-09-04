@@ -3,17 +3,19 @@
 
 from __future__ import annotations
 
-from typing import Optional, Tuple
+from typing import TYPE_CHECKING, Optional, Tuple
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from einops import rearrange, repeat
-from transformers.cache_utils import Cache
 
 from fla.modules import FusedRMSNormSwishGate, RMSNorm, ShortConvolution
 from fla.modules.activations import ACT2FN
 from fla.ops.gla import chunk_gla, fused_chunk_gla, fused_recurrent_gla
+
+if TYPE_CHECKING:
+    from fla.models.utils import Cache
 
 
 class GatedLinearAttention(nn.Module):
@@ -43,8 +45,6 @@ class GatedLinearAttention(nn.Module):
             The kernel size of the short convolution, only used when `use_short_conv` is `True`. Default: 4.
         conv_bias (bool, Optional):
             Whether to use bias in the short convolution, only used when `use_short_conv` is `True`. Default: `False`.
-        share_conv_kernel (bool, Optional):
-            Whether to apply convolutions berfore q/k/v mapping, only taking effects when `use_short_conv`. Default: `True`.
         use_output_gate (bool, Optional):
             Whether to use output gate. Default: `True`.
         gate_fn (str, Optional):
@@ -77,7 +77,6 @@ class GatedLinearAttention(nn.Module):
         use_short_conv: bool = False,
         conv_size: int = 4,
         conv_bias: bool = False,
-        share_conv_kernel: bool = True,
         use_output_gate: bool = True,
         gate_fn: str = 'swish',
         elementwise_affine: Optional[bool] = True,
@@ -102,7 +101,6 @@ class GatedLinearAttention(nn.Module):
         self.use_short_conv = use_short_conv
         self.conv_size = conv_size
         self.conv_bias = conv_bias
-        self.share_conv_kernel = share_conv_kernel
         self.use_output_gate = use_output_gate
 
         self.key_dim = int(hidden_size * expand_k)
@@ -127,12 +125,9 @@ class GatedLinearAttention(nn.Module):
 
         if use_short_conv:
             self.conv_size = conv_size
-            if share_conv_kernel:
-                self.h_conv1d = ShortConvolution(hidden_size, conv_size, activation='silu')
-            else:
-                self.q_conv1d = ShortConvolution(self.key_dim, conv_size, activation='silu')
-                self.k_conv1d = ShortConvolution(self.key_dim_per_group, conv_size, activation='silu')
-                self.v_conv1d = ShortConvolution(self.value_dim_per_group, conv_size, activation='silu')
+            self.q_conv1d = ShortConvolution(self.key_dim, conv_size, activation='silu')
+            self.k_conv1d = ShortConvolution(self.key_dim_per_group, conv_size, activation='silu')
+            self.v_conv1d = ShortConvolution(self.value_dim_per_group, conv_size, activation='silu')
 
         self.gk_proj = nn.Sequential(nn.Linear(hidden_size, gate_low_rank_dim, bias=False),
                                      nn.Linear(gate_low_rank_dim, self.key_dim_per_group, bias=True))
@@ -143,7 +138,7 @@ class GatedLinearAttention(nn.Module):
             self.fuse_norm_and_gate = True
         else:
             self.fuse_norm_and_gate = False
-            self.g_norm = RMSNorm(self.head_v_dim, elementwise_affine, norm_eps)
+            self.g_norm = RMSNorm(hidden_size=self.head_v_dim, elementwise_affine=elementwise_affine, eps=norm_eps)
             self.gate_fn = ACT2FN[gate_fn]
 
         self.gate_logit_normalizer = gate_logit_normalizer
@@ -173,23 +168,15 @@ class GatedLinearAttention(nn.Module):
 
         last_state = past_key_values[self.layer_idx] if use_cache else None
         if self.use_short_conv:
-            conv_state = last_state[0] if use_cache else None
-            if self.share_conv_kernel:
-                # conv state is updated inplace
-                hidden_states = self.h_conv1d(hidden_states, attention_mask, conv_state)
-                q = self.q_proj(hidden_states)
-                k = self.k_proj(hidden_states)
-                v = self.v_proj(hidden_states)
-            else:
-                conv_state_q = last_state[0] if use_cache else None
-                conv_state_k = last_state[1] if use_cache else None
-                conv_state_v = last_state[2] if use_cache else None
-                q = self.q_proj(hidden_states)
-                k = self.k_proj(hidden_states)
-                v = self.v_proj(hidden_states)
-                q = self.q_conv1d(q, attention_mask, conv_state_q)
-                k = self.k_conv1d(k, attention_mask, conv_state_k)
-                v = self.v_conv1d(v, attention_mask, conv_state_v)
+            conv_state_q = last_state[0] if use_cache else None
+            conv_state_k = last_state[1] if use_cache else None
+            conv_state_v = last_state[2] if use_cache else None
+            q = self.q_proj(hidden_states)
+            k = self.k_proj(hidden_states)
+            v = self.v_proj(hidden_states)
+            q = self.q_conv1d(q, attention_mask, conv_state_q)
+            k = self.k_conv1d(k, attention_mask, conv_state_k)
+            v = self.v_conv1d(v, attention_mask, conv_state_v)
         else:
             q = self.q_proj(hidden_states)
             k = self.k_proj(hidden_states)
@@ -223,10 +210,7 @@ class GatedLinearAttention(nn.Module):
 
         if past_key_values is not None:
             if self.use_short_conv:
-                if self.share_conv_kernel:
-                    last_state = (conv_state, recurrent_state)
-                else:
-                    last_state = (conv_state_q, conv_state_k, conv_state_v, recurrent_state)
+                last_state = (conv_state_q, conv_state_k, conv_state_v, recurrent_state)
             else:
                 last_state = (recurrent_state,)
             past_key_values.update(last_state, self.layer_idx, q.shape[2])
@@ -251,12 +235,9 @@ class GatedLinearAttention(nn.Module):
         param = next(self.parameters())
         state = tuple()
         if self.use_short_conv:
-            if self.share_conv_kernel:
-                state += (param.new_zeros(batch_size, self.hidden_size, self.conv_size),)
-            else:
-                state += (param.new_zeros(batch_size, self.key_dim, self.conv_size),
-                          param.new_zeros(batch_size, self.key_dim, self.conv_size),
-                          param.new_zeros(batch_size, self.value_dim, self.conv_size))
+            state += (param.new_zeros(batch_size, self.key_dim, self.conv_size),
+                      param.new_zeros(batch_size, self.key_dim, self.conv_size),
+                      param.new_zeros(batch_size, self.value_dim, self.conv_size))
         state += (param.new_zeros(batch_size, self.num_heads, self.head_qk_dim, self.head_v_dim),)
         return state
 
