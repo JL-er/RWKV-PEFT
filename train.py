@@ -115,6 +115,9 @@ if __name__ == "__main__":
     #new optim
     parser.add_argument("--optim", default="none", type=str)
 
+        #acc_grad_batchs
+    parser.add_argument("--avg_loss", default=0, type=int)
+
 
     if pl.__version__[0]=='2':
         parser.add_argument("--accelerator", default="gpu", type=str)
