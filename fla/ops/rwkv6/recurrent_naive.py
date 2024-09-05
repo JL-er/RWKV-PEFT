@@ -53,8 +53,8 @@ def naive_recurrent_rwkv6_bwd(
     u: torch.Tensor,
     o: torch.Tensor,
     do: torch.Tensor,
+    dh_t: Optional[torch.Tensor] = None,
     initial_state: Optional[torch.Tensor] = None,
-    output_final_state: bool = False
 ):
     q, k, v, w, u, o, do = (x.to(dtype=torch.float32) for x in (q, k, v, w, u, o, do))
     B, H, T, K, V = q.shape[0], q.shape[1], q.shape[2], q.shape[3], v.shape[-1]
@@ -79,6 +79,8 @@ def naive_recurrent_rwkv6_bwd(
 
     du = torch.zeros_like(u)
     dh = torch.zeros_like(h)
+    if dh_t is not None:
+        dh += dh_t
     dk = torch.zeros_like(k)
     dk_aux = torch.zeros_like(k)
     dv = torch.zeros_like(v)
@@ -124,8 +126,8 @@ class NativeRecurrentRWKV6Function(torch.autograd.Function):
     @autocast_custom_bwd
     def backward(ctx, do, dht):
         q, k, v, w, u, o, initial_state = ctx.saved_tensors
-        dq, dk, dv, dw, du, dh = naive_recurrent_rwkv6_bwd(q, k, v, w, u, o, do, initial_state)
-        dh = None if initial_state is None else dh
+        dq, dk, dv, dw, du, dh = naive_recurrent_rwkv6_bwd(q, k, v, w, u, o, do, dht, initial_state)
+        dh = dh if initial_state is not None else None
         return dq, dk, dv, dw, du, None, dh, None, None
 
 

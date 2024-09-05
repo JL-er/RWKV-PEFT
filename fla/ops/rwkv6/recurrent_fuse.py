@@ -208,10 +208,15 @@ def fused_recurrent_rwkv6_bwd_kernel_dkv(
     p_dk_aux = dk_aux + (i_bh + i_v * B * H) * s_k_h + i_k * BK + tl.arange(0, BK) + ((T - 1) * K if not REVERSE else 0)
     p_dv = dv + (i_bh + i_k * B * H) * s_v_h + i_v * BV + tl.arange(0, BV) + ((T - 1) * V if not REVERSE else 0)
     p_w = w + i_bh * s_k_h + i_k * BK + tl.arange(0, BK) + ((T - 1) * K if not REVERSE else 0)
-    b_dh = tl.zeros([BK, BV], dtype=tl.float32)
+
     mask_bk = i_k * BK + tl.arange(0, BK) < K
     mask_bv = i_v * BV + tl.arange(0, BV) < V
     mask_kv = mask_bk[:, None] & mask_bv[None, :]
+    if USE_INITIAL_STATE:
+        p_dh0 = dh0 + i_bh * K * V + (i_k * BK + tl.arange(0, BK)[:, None]) * V + (i_v * BV + tl.arange(0, BV)[None, :])
+        b_dh = tl.load(p_dh0, mask=mask_kv, other=0).to(tl.float32)
+    else:
+        b_dh = tl.zeros([BV, BK], dtype=tl.float32)
 
     p_u = u + i_bh * K + tl.arange(0, BK) + i_k * BK
     b_u = tl.load(p_u, mask=mask_bk, other=0).to(tl.float32)
@@ -243,7 +248,6 @@ def fused_recurrent_rwkv6_bwd_kernel_dkv(
         p_dv += V if REVERSE else -V
 
     if USE_INITIAL_STATE:
-        p_dh0 = dh0 + i_bh * K * V + (i_k * BK + tl.arange(0, BK)[:, None]) * V + (i_v * BV + tl.arange(0, BV)[None, :])
         tl.store(p_dh0, b_dh.to(p_dh0.dtype.element_ty), mask=mask_kv)
 
 
@@ -291,7 +295,7 @@ class FusedRecurrentRWKV6Function(torch.autograd.Function):
     @staticmethod
     @contiguous
     @autocast_custom_bwd
-    def backward(ctx, do, d_final_state=None):
+    def backward(ctx, do, dht=None):
         q, k, v, w, u, initial_state, o = ctx.saved_tensors
         B, H, T, K, V = *q.shape, v.shape[-1]
         scale = ctx.scale
@@ -324,7 +328,7 @@ class FusedRecurrentRWKV6Function(torch.autograd.Function):
         dk = q.new_empty(NV, B, H, T, K, dtype=torch.float32)
         dk_aux = q.new_empty(NV, B, H, T, K, dtype=torch.float32)
         dv = q.new_empty(NK, B, H, T, V, dtype=torch.float32)
-        dh0 = initial_state.new_empty(B, H, K, V) if initial_state is not None else None
+        dh0 = (torch.zeros_like(initial_state) + (dht if dht is not None else 0.)) if initial_state is not None else dht
         grid = (NV, NK, B * H)
         fused_recurrent_rwkv6_bwd_kernel_dkv[grid](
             q, k, v, w, u, do, dk, dk_aux, dv, dh0,
@@ -346,7 +350,7 @@ class FusedRecurrentRWKV6Function(torch.autograd.Function):
         dw = chunk_global_reversed_cumsum(dw).to(w)
 
         du = ((do * v).sum(-1)[..., None] * k * q * scale).sum(-2).to(u)
-        return dq, dk, dv, dw, du, None, dh0, None, None, None
+        return dq, dk, dv, dw, du, None, dh0 if initial_state is not None else None, None, None, None
 
 
 def fused_recurrent_rwkv6(
