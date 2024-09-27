@@ -3,7 +3,7 @@
 ########################################################################################################
 from torch.utils.checkpoint import checkpoint as torch_checkpoint
 from torch.profiler import profile, record_function, ProfilerActivity
-from adam_mini import Adam_mini
+#from adam_mini import Adam_mini
 
 import os, math, gc, importlib
 import torch
@@ -1208,7 +1208,7 @@ class RWKV(pl.LightningModule):
             if args.tiny_att_dim > 0:
                 for block in self.blocks:
                     if args.grad_cp == 1:
-                        if args.lora or args.state_tune or args.train_type == 'state':
+                        if args.state_tune or args.train_type == 'state' or args.peft !='none':
                             x = torch_checkpoint(block, x, x_emb, use_reentrant=False)
                         else:
                             x = deepspeed.checkpointing.checkpoint(block, x, x_emb)
@@ -1217,7 +1217,7 @@ class RWKV(pl.LightningModule):
             else:
                 for block in self.blocks:
                     if args.grad_cp == 1:
-                        if args.lora or args.state_tune or args.train_type == 'state':
+                        if args.state_tune or args.train_type == 'state' or args.peft !='none':
                             x = torch_checkpoint(block, x, x_emb ,use_reentrant=False)
                         else:
                             x = deepspeed.checkpointing.checkpoint(block, x)

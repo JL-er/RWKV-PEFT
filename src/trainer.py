@@ -3,7 +3,7 @@ import torch
 from torch.utils.data import DataLoader
 import pytorch_lightning as pl
 from pytorch_lightning.utilities import rank_zero_info, rank_zero_only
-from .model import LORA_CONFIG
+from .rwkvLinear import LORA_CONFIG, BONE_CONFIG
 import re
 import numpy as np
 
@@ -164,22 +164,22 @@ class train_callback(pl.Callback):
                         f"{args.proj_dir}/rwkv-final.pth",
                     )
 
-        if args.LISA and (batch_idx+1)%args.lisa_k==0:
-            pl_module.requires_grad_(False)
-            select_layers = np.random.choice(range(args.n_layer), args.lisa_r, replace=False)
+        # if args.LISA and (batch_idx+1)%args.lisa_k==0:
+        #     pl_module.requires_grad_(False)
+        #     select_layers = np.random.choice(range(args.n_layer), args.lisa_r, replace=False)
             
-            for name, module in pl_module.named_modules():
-                for pname, param in module.named_parameters():
-                    if 'emb' in pname or 'head' in pname or '.ln' in pname or 'time' in pname:
-                        param.requires_grad = True
-                    elif 'ln_out' in pname:
-                        param.requires_grad = True
-                    match = re.search(r'\d+', pname)
-                    if match:
-                        number = int(match.group())
-                        if number in select_layers:
-                            param.requires_grad  = True
-                break
+        #     for name, module in pl_module.named_modules():
+        #         for pname, param in module.named_parameters():
+        #             if 'emb' in pname or 'head' in pname or '.ln' in pname or 'time' in pname:
+        #                 param.requires_grad = True
+        #             elif 'ln_out' in pname:
+        #                 param.requires_grad = True
+        #             match = re.search(r'\d+', pname)
+        #             if match:
+        #                 number = int(match.group())
+        #                 if number in select_layers:
+        #                     param.requires_grad  = True
+        #         break
         # if args.batch_save==batch_idx :
         #     to_save_dict = pl_module.state_dict()
         #     for name, state in to_save_dict.items():
@@ -220,34 +220,39 @@ class train_callback(pl.Callback):
                 else:
                     to_save_dict = pl_module.state_dict()
 
-                if args.data_type=='img' and not args.lora:
-                    for name, state in to_save_dict.items():
-                        if 'img' in name:
-                            to_save_dict[name] = state
-                
                 if args.state_tune or args.train_type=='state':
-                    lora_dict = {}
+                    peft_dict = {}
                     for name, state in to_save_dict.items():
                         if 'state' in name:
-                            lora_dict[name] = state
-                    to_save_dict = lora_dict
+                            peft_dict[name] = state
+                    to_save_dict = peft_dict
 
-
-                if args.lora:
-                    enable_time_finetune = 'time' in LORA_CONFIG["parts"]
-                    enable_ln_finetune = 'ln' in LORA_CONFIG["parts"]
-                    lora_dict = {}
+                if args.peft!='none':
+                    peft_dict = {}
                     for name, state in to_save_dict.items():
                         if len(args.load_model) == 0:
                             if 'emb' in name or 'head' in name or 'ln' in name:
-                                lora_dict[name] = state
-                        if args.emb and  'emb' in name:
-                            lora_dict[name] = state
-                        if ('.lora_' in name
-                                or (enable_time_finetune and '.time_' in name)
-                                or (enable_ln_finetune and '.ln' in name)):
-                            lora_dict[name] = state
-                    to_save_dict = lora_dict
+                                peft_dict[name] = state
+                        for part in args.train_parts:
+                            if part in name:
+                                peft_dict[name] = state
+                        if args.peft=='pissa' and ('lora' in name):
+                            peft_dict[name] = state
+                        elif args.peft in name:
+                            peft_dict[name] = state
+                    # if args.peft=='lora' or args.peft=='pissa':
+                    #     for name, state in to_save_dict.items():
+                           
+                    #         if ('.lora_' in name):
+                    #             peft_dict[name] = state
+                    # if args.peft=='bone':
+                    #     for name, state in to_save_dict.items():
+                    #         if len(args.load_model) == 0:
+                    #             if 'emb' in name or 'head' in name or 'ln' in name:
+                    #                 peft_dict[name] = state
+                    #         if ('.gbmm' in name):
+                    #             peft_dict[name] = state
+                    to_save_dict = peft_dict
 
                 try:
                     my_save(

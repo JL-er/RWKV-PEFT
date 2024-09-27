@@ -4,6 +4,9 @@ import bitsandbytes as bnb
 from torch.nn import functional as F
 from torch._lowrank import svd_lowrank
 import functools
+from einops import rearrange
+from torch.utils.checkpoint import checkpoint as torch_checkpoint
+#from .blaff import flash_bone
 
 def rwkv_quantize(quant_type, weight):
     if quant_type=='4bit':
@@ -34,8 +37,13 @@ LORA_CONFIG = {
     "r": 0,
     "alpha": 0,
     "dropout": 0,
-    "parts": {"att", "ln", "time", "ffn"},
+    "parts": {"att","ffn"},
     "quant": False,
+}
+
+BONE_CONFIG = {
+    "r": 0,
+    "parts": {"att", "ffn"},
 }
 class LoraLinear(nn.Module):
 
@@ -118,11 +126,74 @@ class QuantLinear(nn.Module):
         else:
             return F.linear(x, self.weight)
         
+        
 
+# class BoneLinear(nn.Module):
+#     def __init__(self, in_features: int, out_features: int, bias: bool):
+#         super().__init__()
+#         self.weight = nn.Parameter(torch.empty((out_features, in_features)))
+#         assert bias == False, "Biased QuantLinear not supported"
+#         self.r = BONE_CONFIG["r"]
+#         self.bone = nn.Parameter(torch.zeros(out_features, self.r))
+#         self.in_features = in_features
+#         self.out_features = out_features
+
+#     def forward(self, x):
+#         w = rearrange(self.weight, '(a r1) (b r2) -> b a r1 r2', r1 = self.r, r2 = self.r)@self.bone.reshape(self.out_features//self.r, self.r, -1)+self.bone.reshape(self.out_features//self.r, self.r, -1)
+#         w = rearrange(w, 'b a r1 r2 ->(a r1) (b r2) ')
+#         return F.linear(x,self.weight+w)
+
+class BoneLinear(nn.Module):
+    def __init__(self, in_features: int, out_features: int, bias: bool):
+        super().__init__()
+        self.weight = nn.Parameter(torch.empty((out_features, in_features)))
+        assert bias == False, "Biased QuantLinear not supported"
+        self.r = BONE_CONFIG["r"]
+        self.bone = nn.Parameter(torch.zeros(in_features//self.r, self.r, self.r))
+
+    def forward(self, x):
+        w = rearrange(self.weight, '(a r1) (b r2) -> a b r1 r2', r1 = self.r, r2 = self.r)@self.bone+self.bone
+        w = rearrange(w, 'a b r1 r2 ->(a r1) (b r2) ')
+        
+        return F.linear(x,self.weight+w)
+    
+#     def forward(self, x):
+#         def fn_bone(W, b, x, r):
+#             w = rearrange(W, '(a r1) (b r2) -> a b r1 r2', r1 = r, r2 = r)@b+b
+#             w = rearrange(w, 'a b r1 r2 ->(a r1) (b r2) ')
+#             return F.linear(x , W+w)
+#         return torch_checkpoint(fn_bone, self.weight,  self.bone, x, self.r, use_reentrant=False)
+
+# class BoneLinear(nn.Module):
+#     def __init__(self, in_features: int, out_features: int, bias: bool):
+#         super().__init__()
+#         self.weight = nn.Parameter(torch.empty((out_features, in_features)))
+#         assert bias == False, "Biased QuantLinear not supported"
+#         self.r = BONE_CONFIG["r"]
+#         self.bone = nn.Parameter(torch.zeros(out_features//self.r, self.r, self.r))
+
+#     # def forward(self, x):
+#     #     w = rearrange(self.weight, '(a r1) (b r2) -> b a r1 r2', r1 = self.r, r2 = self.r)@self.bone+self.bone
+#     #     w = rearrange(w, 'b a r1 r2 ->(a r1) (b r2) ')
+        
+#     #     return F.linear(x,self.weight+w)
+    
+#     def forward(self, x):
+#         def fn_bone(W, b, x, r):
+#             w = rearrange(W, '(a r1) (b r2) -> b a r1 r2', r1 = r, r2 = r)@b+b
+#             w = rearrange(w, 'b a r1 r2 ->(a r1) (b r2) ')
+#             return F.linear(x , W+w)
+#         return torch_checkpoint(fn_bone, self.weight,  self.bone, x, self.r, use_reentrant=False)
+
+
+
+    
 @functools.wraps(LoraLinear)
 def make_linear_att(*args, **kwargs):
     if "att" in LORA_CONFIG["parts"] and LORA_CONFIG["r"] > 0:
         return LoraLinear(*args, **kwargs)
+    elif "att" in BONE_CONFIG["parts"] and BONE_CONFIG["r"] > 0:
+        return BoneLinear(*args, **kwargs)
     elif LORA_CONFIG["quant"]:
         return QuantLinear(*args, **kwargs)
     else:
@@ -133,6 +204,8 @@ def make_linear_att(*args, **kwargs):
 def make_linear_ffn(*args, **kwargs):
     if "ffn" in LORA_CONFIG["parts"] and LORA_CONFIG["r"] > 0:
         return LoraLinear(*args, **kwargs)
+    elif "att" in BONE_CONFIG["parts"] and BONE_CONFIG["r"] > 0:
+        return BoneLinear(*args, **kwargs)
     elif LORA_CONFIG["quant"]:
         return QuantLinear(*args, **kwargs)
     else:

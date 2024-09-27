@@ -3,3 +3,4 @@ bitsandbytes
 deepspeed
 einops
 triton==2.2.0
+rwkv-fla
