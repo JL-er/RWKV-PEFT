@@ -26,6 +26,12 @@ sh scripts/run_lora.sh
 ```
 --peft lora --lora_config $lora_config
 ```
+- train_parts  
+更自由的选择训练部分，如"emb","head","time","ln"
+例如：
+```
+--train_parts ["time", "ln"]
+```
 - Quant  
 在使用peft或state tuning时可使用Quant量化权重以减少显存占用
 ```
