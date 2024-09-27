@@ -48,7 +48,7 @@ sh scripts/run_lora.sh
 参数peft中包含多个方法，详细查看简介，选择所需的方法后要配置相应的config
 例如：
 ```
---peft bone --bone_config $lora_config
+--peft bone --bone_config $bone_config
 ```
 - train_parts  
 更自由的选择训练部分，如"emb","head","time","ln".如果只对k,v部分训练只需要设置[]即可
