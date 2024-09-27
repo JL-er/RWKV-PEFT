@@ -20,7 +20,7 @@ pip install requirements.txt
 sh scripts/run_lora.sh
 ```
 # 具体使用
-- peft
+- peft  
 参数peft中包含多个方法，详细查看简介，选择所需的方法后要配置相应的config
 例如：
 ```
