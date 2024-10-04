@@ -71,6 +71,9 @@ chunk_ctx根据显存适当调整，chunk_ctx是从ctx_len切片得到所以保�
 ```
 - State tuning  
 RWKV特有的微调方法，训练开销极低
+```
+--train_type "state" --fla
+```
 - dataload  
 支持不同的数据采样，默认使用get(RWKV-LM)这是一种随机采样，将所有数据视作一条数据根据ctx_len随机切片便于并行
 pad、only都是为了从每条数据起始开始采样
