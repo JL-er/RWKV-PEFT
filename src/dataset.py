@@ -102,9 +102,9 @@ class MyDataset(Dataset):
 
     def __getitem__(self, idx):
         args = self.args
-        rank = self.global_rank
-        epoch = self.real_epoch
-        world_size = self.world_size
+        rank = 0#self.trainer.global_rank temporary 0
+        epoch = 0#self.real_epoch temporary 0
+        world_size = 0#self.world_size temporart 0
         # print(f"epoch {epoch} idx {idx} rank {rank}/{world_size}")
         devices = int(args.devices)
         if devices>1:

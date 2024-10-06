@@ -2,3 +2,4 @@ __pycache__/
 wandb/
 src/__pycache__/
 demo/
+fla/
