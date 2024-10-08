@@ -64,6 +64,18 @@ with torch.no_grad():
                 w[k] = w[k].to(device=device)
                 w[gbmm] = w[gbmm].to(device=device)
                 b,r,_ = w[gbmm].shape
+                if quant=='4bit':
+                    qw,qs = bnb.functional.quantize_4bit(w[k])
+                    w[k] = (bnb.functional.dequantize_4bit(qw,quant_state=qs)).to(dtype=torch.bfloat16)
+                elif quant=='nf4':
+                    qw,qs = bnb.functional.quantize_nf4(w[k])
+                    w[k] = (bnb.functional.dequantize_nf4(qw,quant_state=qs)).to(dtype=torch.bfloat16)
+                elif quant=='fp4':
+                    qw,qs = bnb.functional.quantize_fp4(w[k])
+                    w[k] = (bnb.functional.dequantize_fp4(qw,quant_state=qs)).to(dtype=torch.bfloat16)
+                elif quant=='int8':
+                    qw,qs = bnb.functional.quantize(w[k])
+                    w[k] = (bnb.functional.dequantize(qw,state=qs)).to(dtype=torch.bfloat16)
                 bone = rearrange(w[k], '(a r1) (b r2) -> a b r1 r2', r1 = r, r2 = r)@w[gbmm]+w[gbmm]
                 w[k] += rearrange(bone, 'a b r1 r2 ->(a r1) (b r2) ')
 

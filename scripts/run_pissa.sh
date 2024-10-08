@@ -8,7 +8,7 @@ n_embd=2560
 
 micro_bsz=8
 epoch_save=1
-epoch_steps=200 #6171
+epoch_steps=1000
 ctx_len=512
 
 pissa_config='{"pissa_load":"","pissa_init":"","pissa_r":32,"svd_niter":4,"pissa_parts":"att,ffn"}'
@@ -23,5 +23,5 @@ python train.py --load_model $load_model \
 --accelerator gpu --devices 1 --precision bf16 --strategy deepspeed_stage_1 --grad_cp 1 \
 --my_testing "x060" \
 --dataload pad --loss_mask pad \
---peft pissa --pissa_config $pissa_config --train_parts [] \
+--peft pissa --pissa_config $pissa_config \
 --wandb peft-loss
