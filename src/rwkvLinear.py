@@ -17,6 +17,9 @@ def rwkv_quantize(quant_type, weight):
         qweight, qstate= bnb.functional.quantize_fp4((weight.data).to('cuda'))
     elif quant_type=='int8':
         qweight, qstate= bnb.functional.quantize((weight.data).to('cuda'))
+    elif quant_type=='fp8':
+        qweight = weight.data.to(dtype = torch.float8_e4m3fn,device = 'cuda')
+        qstate = None
     return qweight, qstate
 
 
@@ -29,7 +32,48 @@ def rwkv_dequantize(quant_type, weight, qstate):
         deweight= bnb.functional.dequantize_fp4(weight.data,quant_state=qstate)
     elif quant_type=='int8':
         deweight= bnb.functional.dequantize(weight.data,state=qstate)
+    elif quant_type=='fp8':
+        deweight= weight.data
     return deweight.to(torch.bfloat16)
+
+@torch.jit.script
+def fp8_matmul_(a,b): # shape3 @ shape2 only
+    with torch.no_grad():
+        if b.dtype == torch.float8_e4m3fn:
+                xg = a
+                S0=xg.shape[0]
+                S1=xg.shape[1]
+                if xg.dtype != torch.float8_e4m3fn:
+                    xg = torch.clamp(xg, min=-448.0, max=448.0) # for avoid NaN
+                
+                x, output_amax = torch._scaled_mm(
+                    xg.view(S0*S1,xg.shape[2]).to(torch.float8_e4m3fn).contiguous(),
+                    b,
+                    bias=None,
+                    out_dtype=a.dtype,
+                    scale_a=torch.tensor(1.0, device='cuda'),
+                    scale_b=torch.tensor(1.0, device='cuda')
+                )
+                #x.requires_grad = False
+                return x.view(S0, S1, -1)
+        else:
+                return a.to(dtype=b.dtype) @ b
+        
+class FP8Matmul(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, input, weight):
+        ctx.save_for_backward(weight)
+        output = fp8_matmul_(input, weight)
+        return output
+
+    @staticmethod
+    def backward(ctx, grad_output): 
+        weight, = ctx.saved_tensors
+        grad_input = torch.matmul(grad_output, weight.to(dtype=torch.bfloat16).t()) 
+        #grad_weight is None because frozen
+        return grad_input, None
+    
+fp8_matmul = FP8Matmul.apply
 
 
         
@@ -84,17 +128,26 @@ class LoraLinear(nn.Module):
     def quant(self, quant_type):
         self.is_quant = True
         self.quant_type = quant_type
-        self.weight.data, self.qstate= rwkv_quantize(self.quant_type, (self.weight.data).to('cuda'))
+        self.qweight, self.qstate= rwkv_quantize(self.quant_type, (self.weight.data).to('cuda'))
+        self.weight = None # Because Latest Pytorch-lightning forced to BF16 type. thats why delete
 
     def forward(self, x):
-
         if self.is_quant:
             if self.pissa:
-                return (
-                    F.linear(x, rwkv_dequantize(self.quant_type, self.weight.data, self.qstate)) + 
+                if self.qweight.dtype == torch.float8_e4m3fn:
+                    return (
+                    fp8_matmul(x,self.qweight.t()) + 
                     F.linear(F.linear(x, self.lora_A), self.lora_B))
+                return (
+                    F.linear(x, rwkv_dequantize(self.quant_type, self.qweight.data, self.qstate)) + 
+                    F.linear(F.linear(x, self.lora_A), self.lora_B))
+            
+            if self.qweight.dtype == torch.float8_e4m3fn:
+                return (fp8_matmul(x,self.qweight.t()) + self.scaling *
+                        F.linear(F.linear(self.lora_dropout(x), self.lora_A), self.lora_B)
+                )
             return (
-                F.linear(x, rwkv_dequantize(self.quant_type, self.weight.data, self.qstate)) + self.scaling *
+                F.linear(x, rwkv_dequantize(self.quant_type, self.qweight.data, self.qstate)) + self.scaling *
                 F.linear(F.linear(self.lora_dropout(x), self.lora_A), self.lora_B)) 
 
         if self.pissa:

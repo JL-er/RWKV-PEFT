@@ -1,6 +1,6 @@
-pytorch-lightning==1.9.5
+pytorch-lightning==2.4.0
 bitsandbytes
 deepspeed
 einops
-triton==2.2.0
+triton==3.0.0
 rwkv-fla
