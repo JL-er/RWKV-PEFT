@@ -7,7 +7,7 @@ n_embd=2560
 
 micro_bsz=8
 epoch_save=1
-epoch_steps=200 #6171
+epoch_steps=1000
 ctx_len=512
 
 lora_config='{"lora_load":"","lora_r":32,"lora_alpha":32,"lora_dropout":0.0,"lora_parts":"att,ffn"}'
@@ -22,5 +22,5 @@ python train.py --load_model $load_model \
 --accelerator gpu --devices 1 --precision bf16 --strategy deepspeed_stage_1 --grad_cp 1 \
 --my_testing "x060" \
 --dataload pad --loss_mask pad \
---peft lora --lora_config $lora_config --train_parts [] \
+--peft lora --lora_config $lora_config \
 --wandb peft-loss
