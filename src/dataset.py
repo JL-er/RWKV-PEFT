@@ -15,6 +15,9 @@ pipeline = PIPELINE('rwkv6', "rwkv_vocab_v20230424")
 class MyDataset(Dataset):
     def __init__(self, args):
         self.args = args
+        self.rank = 0
+        self.real_epoch = 0
+        self.world_size = 0
 
         if args.data_type == "binidx":
             self.vocab_size = args.vocab_size
@@ -102,10 +105,10 @@ class MyDataset(Dataset):
 
     def __getitem__(self, idx):
         args = self.args
-        rank = 0#self.trainer.global_rank temporary 0
-        epoch = 0#self.real_epoch temporary 0
-        world_size = 0#self.world_size temporart 0
-        # print(f"epoch {epoch} idx {idx} rank {rank}/{world_size}")
+        rank = self.rank
+        epoch = self.real_epoch
+        world_size = self.world_size
+
         devices = int(args.devices)
         if devices>1:
             idx = idx*devices+rank

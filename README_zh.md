@@ -28,6 +28,7 @@ sh scripts/run_lora.sh
 ```
 - train_parts  
 更自由的选择训练部分，如"emb","head","time","ln".如果只对k,v部分训练只需要设置[]即可
+对于普通微调用户不推荐添加该参数，不添加该参数会默认加入["time", "ln"]此部分参数量占比不大
 例如：
 ```
 --train_parts ["time", "ln"]

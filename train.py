@@ -318,7 +318,8 @@ if __name__ == "__main__":
     model = RWKV(args)
     print(model)
     freeze=False
-    if args.peft!='none' or args.train_type=='state':
+
+    if args.train_type=='state' or args.state_tune:
         model.requires_grad_(False)
         freeze=True
         for name, module in model.named_modules():
@@ -326,56 +327,61 @@ if __name__ == "__main__":
                 if 'state' in pname :
                     param.requires_grad = True
             break
+    if args.peft!='none' :
+        model.requires_grad_(False)
+        freeze=True
         if len(args.load_model) == 0:
-            if any(n.startswith("emb.") for n, _ in module.named_parameters()):
-                for pname, param in module.named_parameters():
-                    if 'emb.weight'==pname:
-                        print(f'  EMB additionally training module {pname}')
+            for name, module in model.named_modules():
+                if any(n.startswith("emb.") for n, _ in module.named_parameters()):
+                    for pname, param in module.named_parameters():
+                        if 'emb.weight'==pname:
+                            print(f'  EMB additionally training module {pname}')
+                            param.requires_grad = True
+                if any(n.startswith("head.") for n, _ in module.named_parameters()):
+                    for pname, param in module.named_parameters():
+                        if 'head.weight'==pname:
+                            print(f'  head additionally training module {pname}')
+                            param.requires_grad = True
+                if 'ln' in name:
+                    print(f'  LoRA additionally training module {name}')
+                    for param in module.parameters():
                         param.requires_grad = True
-            if any(n.startswith("head.") for n, _ in module.named_parameters()):
-                for pname, param in module.named_parameters():
-                    if 'head.weight'==pname:
-                        print(f'  head additionally training module {pname}')
-                        param.requires_grad = True
-            if 'ln' in name:
-                print(f'  LoRA additionally training module {name}')
-                for param in module.parameters():
-                    param.requires_grad = True
+                break
     
-    if args.state_tune or args.train_type=='state':
-        for name, module in model.named_modules():
+
+        for name, module in model.named_modules(): ###part train
             for pname, param in module.named_parameters():
                 for part in args.train_parts:
                     if part in pname:
                         print(f'  Parts additionally training module {name}')
                         param.requires_grad = True
             break
-    elif args.peft=='lisa':
-        import re
-        select_layers = np.random.choice(range(args.n_layer), args.lisa_r, replace=False)
-        for name, module in model.named_modules():
-            for pname, param in module.named_parameters():
-                if 'emb' in pname or 'head' in pname or '.ln' in pname or 'time' in pname :
-                    param.requires_grad = True
-                match = re.search(r'\d+', pname)
-                if match:
-                    number = int(match.group())
-                    if number in select_layers:
-                        param.requires_grad  = True
-            break
-    elif args.peft=='lora' or args.peft=='pissa':
-        for name, module in model.named_modules():
-            if any(n.startswith("lora_") for n, _ in module.named_parameters()):
-                print(f'  LoRA additionally training module {name}')
+        if args.peft=='lisa':
+            import re
+            select_layers = np.random.choice(range(args.n_layer), args.lisa_r, replace=False)
+            for name, module in model.named_modules():
                 for pname, param in module.named_parameters():
-                    param.requires_grad = 'lora_' in pname
-    elif args.peft=='bone':
-        for name, module in model.named_modules():
-            for pname, param in module.named_parameters():
-                if 'bone' in pname:
-                    print(f'  Bone additionally training parameter {pname}')
-                    param.requires_grad = True
-            break
+                    if 'emb' in pname or 'head' in pname or '.ln' in pname or 'time' in pname :
+                        param.requires_grad = True
+                    match = re.search(r'\d+', pname)
+                    if match:
+                        number = int(match.group())
+                        if number in select_layers:
+                            param.requires_grad  = True
+                break
+        elif args.peft=='lora' or args.peft=='pissa':
+            for name, module in model.named_modules():
+                if any(n.startswith("lora_") for n, _ in module.named_parameters()):
+                    print(f'  LoRA additionally training module {name}')
+                    for pname, param in module.named_parameters():
+                        param.requires_grad = 'lora_' in pname
+        elif args.peft=='bone':
+            for name, module in model.named_modules():
+                for pname, param in module.named_parameters():
+                    if 'bone' in pname:
+                        print(f'  Bone additionally training parameter {pname}')
+                        param.requires_grad = True
+                break
 
 
     if len(args.load_model) == 0 or args.my_pile_stage == 1:  # shall we build the initial weights?
@@ -418,9 +424,11 @@ if __name__ == "__main__":
             model.load_state_dict(torch.load(args.lora_config['lora_load'], map_location="cpu"),
                                 strict=False)
     elif args.peft=='pissa':
+        if int(args.devices)==1 and os.path.isfile(f'{args.proj_dir}/init_pissa.pth'):
+            assert os.path.isfile(f'{args.proj_dir}/init_pissa.pth')==False
         if os.path.isfile(f'{args.proj_dir}/init_pissa.pth') and int(args.devices)>1 and args.pissa_config['pissa_load']=="":
             pissa_init = torch.load(f'{args.proj_dir}/init_pissa.pth', map_location="cpu")
-            rank_zero_info(f"########## Load PISSA... ##########")
+            rank_zero_info(f"########## Load Init PISSA... ##########")
             for name, m in model.named_modules():
                 if hasattr(m, "pissa_load") and callable(getattr(m, "pissa_load")):
                     m.pissa_load(pissa_init[f'{name}.init_lora_A'], pissa_init[f'{name}.init_lora_B'])
@@ -474,6 +482,10 @@ if __name__ == "__main__":
         trainer.strategy.config["zero_optimization"]["reduce_bucket_size"] = args.ds_bucket_mb * 1000 * 1000
 
     # must set shuffle=False, persistent_workers=False (because worker is in another thread)
+    train_data.real_epoch=trainer.current_epoch
+    train_data.rank=trainer.global_rank
+    train_data.world_size=trainer.world_size
+    
     data_loader = DataLoader(train_data, shuffle=False, pin_memory=True, batch_size=args.micro_bsz, num_workers=1, persistent_workers=False, drop_last=True)
 
     trainer.fit(model, data_loader)
