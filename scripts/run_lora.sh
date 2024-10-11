@@ -10,7 +10,7 @@ epoch_save=1
 epoch_steps=1000
 ctx_len=512
 
-lora_config='{"lora_load":"","lora_r":32,"lora_alpha":32,"lora_dropout":0.0,"lora_parts":"att,ffn"}'
+lora_config='{"lora_load":"","lora_r":32,"lora_alpha":32,"lora_dropout":0.0}'
 
 
 python train.py --load_model $load_model \
