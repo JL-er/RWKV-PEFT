@@ -78,7 +78,7 @@ if __name__ == "__main__":
     parser.add_argument("--train_parts", default=["time", "ln"], type=list)##emb , head
 
     #LORA
-    parser.add_argument("--lora_config", default='{"lora_load":"", "lora_r":8, "lora_alpha":32, "lora_dropout":0.01, "lora_parts":"att,ffn"}', type=json.loads)
+    parser.add_argument("--lora_config", default='{"lora_load":"", "lora_r":8, "lora_alpha":32, "lora_dropout":0.01}', type=json.loads)
 
 
     #LISA
@@ -305,11 +305,11 @@ if __name__ == "__main__":
         LORA_CONFIG["r"] = args.lora_config['lora_r']
         LORA_CONFIG["alpha"] = args.lora_config['lora_alpha']
         LORA_CONFIG["dropout"] = args.lora_config['lora_dropout']
-        LORA_CONFIG["parts"] = set(str(args.lora_config['lora_parts']).split(','))
+        #LORA_CONFIG["parts"] = set(str(args.lora_config['lora_parts']).split(','))
     if args.peft=='pissa':
         assert args.pissa_config['pissa_r'] > 0, "LoRA should have its `r` > 0"
         LORA_CONFIG["r"] = args.pissa_config['pissa_r']
-        LORA_CONFIG["parts"] = set(str(args.pissa_config['pissa_parts']).split(','))
+        #LORA_CONFIG["parts"] = set(str(args.pissa_config['pissa_parts']).split(','))
     if args.quant!='none':
         LORA_CONFIG["quant"]=True
     if args.peft=='bone':
