@@ -11,7 +11,7 @@ epoch_save=1
 epoch_steps=1000
 ctx_len=512
 
-pissa_config='{"pissa_load":"","pissa_init":"","pissa_r":32,"svd_niter":4,"pissa_parts":"att,ffn"}'
+pissa_config='{"pissa_load":"","pissa_init":"","pissa_r":32,"svd_niter":4}'
 
 
 python train.py --load_model $load_model \
