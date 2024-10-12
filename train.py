@@ -107,7 +107,9 @@ if __name__ == "__main__":
     parser.add_argument("--train_type", default="none", type=str)
 
     #loss_mask
-    parser.add_argument("--loss_mask", default="none", type=str)
+    parser.add_argument("--loss_mask", default="none", type=str)### pad qa se
+    parser.add_argument("--mask_id", default='{"mask0":"0", "mask1":"1"}', type=json.loads)
+
 
     #new optim
     parser.add_argument("--optim", default="none", type=str)
