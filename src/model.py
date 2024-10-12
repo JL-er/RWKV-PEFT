@@ -18,14 +18,17 @@ if importlib.util.find_spec('deepspeed'):
     import deepspeed
     from deepspeed.ops.adam import DeepSpeedCPUAdam, FusedAdam
 from .infctx_module import *
-from einops import rearrange
-from fla.ops.rwkv6 import chunk_rwkv6, fused_recurrent_rwkv6
+from .wkv import RUN_CUDA_RWKV6_STATE, RUN_CUDA_RWKV5, RUN_CUDA_RWKV6
 from .rwkvLinear import make_linear_att, make_linear_ffn, LORA_CONFIG
+from .l2warp import L2Wrap
 
 try:
     print('RWKV_MY_TESTING', os.environ["RWKV_MY_TESTING"])
 except:
     os.environ["RWKV_MY_TESTING"] = ''
+
+if os.environ.get("RWKV_OPTIM", None) == 'adam_mini':
+    from adam_mini import Adam_mini
 
 def __nop(ob):
     return ob
@@ -39,257 +42,6 @@ if os.environ["RWKV_JIT_ON"] == "1":
 
 
 ########################################################################################################
-# CUDA Kernel
-########################################################################################################
-if os.environ["WKV"] == 'fla':
-    if 'x060' in os.environ["RWKV_MY_TESTING"]:
-        if os.environ["RWKV_TRAIN_TYPE"] == 'infctx' and 'x060' in os.environ["RWKV_MY_TESTING"]:
-            def RUN_CUDA_RWKV6_STATE(B, T, C, H, r, k, v, w, u, s):
-                r = rearrange(r, 'b l (h d) -> b h l d', h = H)
-                k = rearrange(k, 'b l (h d) -> b h l d', h = H)
-                v = rearrange(v, 'b l (h d) -> b h l d', h = H)
-                w = rearrange(-torch.exp(w), 'b l (h d) -> b h l d', h = H)
-                o, state = chunk_rwkv6(r, k, v, w, u=u, scale=1., initial_state=s, output_final_state=True)
-                x = rearrange(o, 'b h l d -> b l (h d)')
-                return x, state
-        elif os.environ["RWKV_TRAIN_TYPE"] == 'states':
-            def RUN_CUDA_RWKV6_STATE(B, T, C, H, r, k, v, w, u, s):
-                r = rearrange(r, 'b l (h d) -> b h l d', h = H)
-                k = rearrange(k, 'b l (h d) -> b h l d', h = H)
-                v = rearrange(v, 'b l (h d) -> b h l d', h = H)
-                w = rearrange(-torch.exp(w), 'b l (h d) -> b h l d', h = H)
-                s = s.transpose(1, 2).expand(B,*s.shape)
-                o,_ = chunk_rwkv6(r, k, v, w, u=u, scale=1., initial_state=s, output_final_state=False)
-                x = rearrange(o, 'b h l d -> b l (h d)')
-                return x
-        else:
-            def RUN_CUDA_RWKV6(B, T, C, H, r, k, v, w, u):
-                r = rearrange(r, 'b l (h d) -> b h l d', h = H)
-                k = rearrange(k, 'b l (h d) -> b h l d', h = H)
-                v = rearrange(v, 'b l (h d) -> b h l d', h = H)
-                w = rearrange(-torch.exp(w), 'b l (h d) -> b h l d', h = H)
-                o,_ = chunk_rwkv6(r, k, v, w, u=u, scale=1., initial_state=None, output_final_state=False)
-                x = rearrange(o, 'b h l d -> b l (h d)')
-                return x
-
-else:
-    from torch.utils.cpp_extension import load
-
-    HEAD_SIZE = int(os.environ["RWKV_HEAD_SIZE_A"])
-
-    if 'x060' in os.environ["RWKV_MY_TESTING"]:
-        if os.environ["RWKV_TRAIN_TYPE"] == 'infctx':
-            wkv6state_cuda = load(name="wkv6infctx", sources=["cuda/wkv6infctx_op.cpp", f"cuda/wkv6infctx_cuda.cu"],
-                            verbose=True, extra_cuda_cflags=["-res-usage", "--use_fast_math", "-O3", "-Xptxas -O3", "--extra-device-vectorization", f"-D_N_={HEAD_SIZE}", f"-D_T_={int(os.environ['RWKV_CTXLEN'])}"])
-                
-            class WKV_6STATE(torch.autograd.Function):
-                @staticmethod
-                def forward(ctx, B, T, C, H, r, k, v, w, u, s):
-                    with torch.no_grad():
-                        assert r.dtype == torch.bfloat16
-                        assert k.dtype == torch.bfloat16
-                        assert v.dtype == torch.bfloat16
-                        assert w.dtype == torch.bfloat16
-                        assert u.dtype == torch.bfloat16
-                        assert s.dtype == torch.bfloat16
-                        assert HEAD_SIZE == C // H
-                        ctx.B = B
-                        ctx.T = T
-                        ctx.C = C
-                        ctx.H = H
-                        assert r.is_contiguous()
-                        assert k.is_contiguous()
-                        assert v.is_contiguous()
-                        assert w.is_contiguous()
-                        assert u.is_contiguous()
-                        assert s.is_contiguous()
-                        ctx.save_for_backward(r, k, v, w, u, s)
-                        y = torch.empty((B, T, C), device=r.device, dtype=torch.bfloat16, memory_format=torch.contiguous_format)#.uniform_(-100, 100)
-                        wkv6state_cuda.forward(B, T, C, H, r, k, v, w, u, s, y)
-                        return y
-
-                @staticmethod
-                def backward(ctx, gy):
-                    with torch.no_grad():
-                        assert gy.dtype == torch.bfloat16
-                        B = ctx.B
-                        T = ctx.T
-                        C = ctx.C
-                        H = ctx.H
-                        assert gy.is_contiguous()
-                        r, k, v, w, u, s = ctx.saved_tensors
-                        gr = torch.empty((B, T, C), device=gy.device, requires_grad=False, dtype=torch.bfloat16, memory_format=torch.contiguous_format)#.uniform_(-100, 100)
-                        gk = torch.empty((B, T, C), device=gy.device, requires_grad=False, dtype=torch.bfloat16, memory_format=torch.contiguous_format)#.uniform_(-100, 100)
-                        gv = torch.empty((B, T, C), device=gy.device, requires_grad=False, dtype=torch.bfloat16, memory_format=torch.contiguous_format)#.uniform_(-100, 100)
-                        gw = torch.empty((B, T, C), device=gy.device, requires_grad=False, dtype=torch.bfloat16, memory_format=torch.contiguous_format)#.uniform_(-100, 100)
-                        gu = torch.empty((B, C), device=gy.device, requires_grad=False, dtype=torch.bfloat16, memory_format=torch.contiguous_format)#.uniform_(-100, 100)
-                        gs = torch.empty((B, H, C//H, C//H), device=gy.device, requires_grad=False, dtype=torch.bfloat16, memory_format=torch.contiguous_format)#.uniform_(-100, 100)
-                        wkv6state_cuda.backward(B, T, C, H, r, k, v, w, u, s, gy, gr, gk, gv, gw, gu, gs)
-                        gu = torch.sum(gu, 0).view(H, C//H)
-                        gs = torch.sum(gs, 0).view(H, C//H, C//H)
-                        return (None, None, None, None, gr, gk, gv, gw, gu, gs)
-
-            def RUN_CUDA_RWKV6_STATE(B, T, C, H, r, k, v, w, u, s):
-                x = WKV_6STATE.apply(B, T, C, H, r, k, v, w, u, s)
-                return x, s
-        elif os.environ["RWKV_TRAIN_TYPE"] == 'states':
-            wkv6state_cuda = load(name="wkv6state", sources=["cuda/wkv6state_op.cpp", f"cuda/wkv6state_cuda.cu"],
-                            verbose=True, extra_cuda_cflags=["-res-usage", "--use_fast_math", "-O3", "-Xptxas -O3", "--extra-device-vectorization", f"-D_N_={HEAD_SIZE}", f"-D_T_={int(os.environ['RWKV_CTXLEN'])}"])
-                
-            class WKV_6STATE(torch.autograd.Function):
-                @staticmethod
-                def forward(ctx, B, T, C, H, r, k, v, w, u, s):
-                    with torch.no_grad():
-                        assert r.dtype == torch.bfloat16
-                        assert k.dtype == torch.bfloat16
-                        assert v.dtype == torch.bfloat16
-                        assert w.dtype == torch.bfloat16
-                        assert u.dtype == torch.bfloat16
-                        assert s.dtype == torch.bfloat16
-                        assert HEAD_SIZE == C // H
-                        ctx.B = B
-                        ctx.T = T
-                        ctx.C = C
-                        ctx.H = H
-                        assert r.is_contiguous()
-                        assert k.is_contiguous()
-                        assert v.is_contiguous()
-                        assert w.is_contiguous()
-                        assert u.is_contiguous()
-                        assert s.is_contiguous()
-                        ctx.save_for_backward(r, k, v, w, u, s)
-                        y = torch.empty((B, T, C), device=r.device, dtype=torch.bfloat16, memory_format=torch.contiguous_format)#.uniform_(-100, 100)
-                        wkv6state_cuda.forward(B, T, C, H, r, k, v, w, u, s, y)
-                        return y
-
-                @staticmethod
-                def backward(ctx, gy):
-                    with torch.no_grad():
-                        assert gy.dtype == torch.bfloat16
-                        B = ctx.B
-                        T = ctx.T
-                        C = ctx.C
-                        H = ctx.H
-                        assert gy.is_contiguous()
-                        r, k, v, w, u, s = ctx.saved_tensors
-                        gr = torch.empty((B, T, C), device=gy.device, requires_grad=False, dtype=torch.bfloat16, memory_format=torch.contiguous_format)#.uniform_(-100, 100)
-                        gk = torch.empty((B, T, C), device=gy.device, requires_grad=False, dtype=torch.bfloat16, memory_format=torch.contiguous_format)#.uniform_(-100, 100)
-                        gv = torch.empty((B, T, C), device=gy.device, requires_grad=False, dtype=torch.bfloat16, memory_format=torch.contiguous_format)#.uniform_(-100, 100)
-                        gw = torch.empty((B, T, C), device=gy.device, requires_grad=False, dtype=torch.bfloat16, memory_format=torch.contiguous_format)#.uniform_(-100, 100)
-                        gu = torch.empty((B, C), device=gy.device, requires_grad=False, dtype=torch.bfloat16, memory_format=torch.contiguous_format)#.uniform_(-100, 100)
-                        gs = torch.empty((B, H, C//H, C//H), device=gy.device, requires_grad=False, dtype=torch.bfloat16, memory_format=torch.contiguous_format)#.uniform_(-100, 100)
-                        wkv6state_cuda.backward(B, T, C, H, r, k, v, w, u, s, gy, gr, gk, gv, gw, gu, gs)
-                        gu = torch.sum(gu, 0).view(H, C//H)
-                        gs = torch.sum(gs, 0).view(H, C//H, C//H)
-                        return (None, None, None, None, gr, gk, gv, gw, gu, gs)
-
-            def RUN_CUDA_RWKV6_STATE(B, T, C, H, r, k, v, w, u, s):
-                return WKV_6STATE.apply(B, T, C, H, r, k, v, w, u, s)
-
-        else:
-            wkv6_cuda = load(name="wkv6", sources=["cuda/wkv6_op.cpp", f"cuda/wkv6_cuda.cu"],
-                            verbose=True, extra_cuda_cflags=["-res-usage", "--use_fast_math", "-O3", "-Xptxas -O3", "--extra-device-vectorization", f"-D_N_={HEAD_SIZE}", f"-D_T_={int(os.environ['RWKV_CTXLEN'])}"])
-                
-            class WKV_6(torch.autograd.Function):
-                @staticmethod
-                def forward(ctx, B, T, C, H, r, k, v, w, u):
-                    with torch.no_grad():
-                        assert r.dtype == torch.bfloat16
-                        assert k.dtype == torch.bfloat16
-                        assert v.dtype == torch.bfloat16
-                        assert w.dtype == torch.bfloat16
-                        assert u.dtype == torch.bfloat16
-                        assert HEAD_SIZE == C // H
-                        ctx.B = B
-                        ctx.T = T
-                        ctx.C = C
-                        ctx.H = H
-                        assert r.is_contiguous()
-                        assert k.is_contiguous()
-                        assert v.is_contiguous()
-                        assert w.is_contiguous()
-                        assert u.is_contiguous()
-                        ew = (-torch.exp(w.float())).contiguous()
-                        ctx.save_for_backward(r, k, v, ew, u)
-                        y = torch.empty((B, T, C), device=r.device, dtype=torch.bfloat16, memory_format=torch.contiguous_format)#.uniform_(-100, 100)
-                        wkv6_cuda.forward(B, T, C, H, r, k, v, ew, u, y)
-                        return y
-
-                @staticmethod
-                def backward(ctx, gy):
-                    with torch.no_grad():
-                        assert gy.dtype == torch.bfloat16
-                        B = ctx.B
-                        T = ctx.T
-                        C = ctx.C
-                        H = ctx.H
-                        assert gy.is_contiguous()
-                        r, k, v, ew, u = ctx.saved_tensors
-                        gr = torch.empty((B, T, C), device=gy.device, requires_grad=False, dtype=torch.bfloat16, memory_format=torch.contiguous_format)#.uniform_(-100, 100)
-                        gk = torch.empty((B, T, C), device=gy.device, requires_grad=False, dtype=torch.bfloat16, memory_format=torch.contiguous_format)#.uniform_(-100, 100)
-                        gv = torch.empty((B, T, C), device=gy.device, requires_grad=False, dtype=torch.bfloat16, memory_format=torch.contiguous_format)#.uniform_(-100, 100)
-                        gw = torch.empty((B, T, C), device=gy.device, requires_grad=False, dtype=torch.bfloat16, memory_format=torch.contiguous_format)#.uniform_(-100, 100)
-                        gu = torch.empty((B, C), device=gy.device, requires_grad=False, dtype=torch.bfloat16, memory_format=torch.contiguous_format)#.uniform_(-100, 100)
-                        wkv6_cuda.backward(B, T, C, H, r, k, v, ew, u, gy, gr, gk, gv, gw, gu)
-                        gu = torch.sum(gu, 0).view(H, C//H)
-                        return (None, None, None, None, gr, gk, gv, gw, gu)
-
-            def RUN_CUDA_RWKV6(B, T, C, H, r, k, v, w, u):
-                return WKV_6.apply(B, T, C, H, r, k, v, w, u)
-    else:
-        wkv5_cuda = load(name="wkv5", sources=["cuda/wkv5_op.cpp", f"cuda/wkv5_cuda.cu"],
-                        verbose=True, extra_cuda_cflags=["-res-usage", "--use_fast_math", "-O3", "-Xptxas -O3", "--extra-device-vectorization", f"-D_N_={HEAD_SIZE}"])
-            
-        class WKV_5(torch.autograd.Function):
-            @staticmethod
-            def forward(ctx, B, T, C, H, r, k, v, w, u):
-                with torch.no_grad():
-                    assert r.dtype == torch.bfloat16
-                    assert k.dtype == torch.bfloat16
-                    assert v.dtype == torch.bfloat16
-                    assert w.dtype == torch.bfloat16
-                    assert u.dtype == torch.bfloat16
-                    assert HEAD_SIZE == C // H
-                    ctx.B = B
-                    ctx.T = T
-                    ctx.C = C
-                    ctx.H = H
-                    assert r.is_contiguous()
-                    assert k.is_contiguous()
-                    assert v.is_contiguous()
-                    assert w.is_contiguous()
-                    assert u.is_contiguous()
-                    ew = (-torch.exp(w.float())).contiguous()
-                    eew = (torch.exp(ew)).contiguous()
-                    ctx.save_for_backward(r, k, v, eew, ew, u)
-                    y = torch.empty((B, T, C), device=r.device, dtype=torch.bfloat16, memory_format=torch.contiguous_format) # .uniform_(-1, 1)
-                    wkv5_cuda.forward(B, T, C, H, r, k, v, eew, u, y)
-                    return y
-
-            @staticmethod
-            def backward(ctx, gy):
-                with torch.no_grad():
-                    assert gy.dtype == torch.bfloat16
-                    B = ctx.B
-                    T = ctx.T
-                    C = ctx.C
-                    H = ctx.H
-                    assert gy.is_contiguous()
-                    r, k, v, eew, ew, u = ctx.saved_tensors
-                    gr = torch.empty((B, T, C), device=gy.device, requires_grad=False, dtype=torch.bfloat16, memory_format=torch.contiguous_format) # .uniform_(-1, 1)
-                    gk = torch.empty((B, T, C), device=gy.device, requires_grad=False, dtype=torch.bfloat16, memory_format=torch.contiguous_format) # .uniform_(-1, 1)
-                    gv = torch.empty((B, T, C), device=gy.device, requires_grad=False, dtype=torch.bfloat16, memory_format=torch.contiguous_format) # .uniform_(-1, 1)
-                    gw = torch.empty((B, C), device=gy.device, requires_grad=False, dtype=torch.bfloat16, memory_format=torch.contiguous_format) # .uniform_(-1, 1)
-                    gu = torch.empty((B, C), device=gy.device, requires_grad=False, dtype=torch.bfloat16, memory_format=torch.contiguous_format) # .uniform_(-1, 1)
-                    wkv5_cuda.backward(B, T, C, H, r, k, v, eew, ew, u, gy, gr, gk, gv, gw, gu)
-                    gw = torch.sum(gw, 0).view(H, C//H)
-                    gu = torch.sum(gu, 0).view(H, C//H)
-                    return (None, None, None, None, gr, gk, gv, gw, gu)
-
-        def RUN_CUDA_RWKV5(B, T, C, H, r, k, v, w, u):
-            return WKV_5.apply(B, T, C, H, r, k, v, w, u)
-
-########################################################################################################
 
 class RWKV_TimeMix_RWKV5(MyModule):
     def __init__(self, args, layer_id):
@@ -298,6 +50,7 @@ class RWKV_TimeMix_RWKV5(MyModule):
         self.layer_id = layer_id
 
         self.head_size = args.head_size_a
+        HEAD_SIZE = int(os.environ["RWKV_HEAD_SIZE_A"])
         assert HEAD_SIZE == self.head_size # change HEAD_SIZE to match args.head_size_a
         self.n_head = args.dim_att // self.head_size
         assert args.dim_att % self.n_head == 0
@@ -581,7 +334,7 @@ class RWKV_Tmix_x060_state(MyModule):
         H = self.n_head
 
         r, k, v, g, w = self.jit_func(x)
-        x = RUN_CUDA_RWKV6_STATE(B, T, C, H, r, k, v, w, u=self.time_faaaa, s=self.time_state)
+        x, _ = RUN_CUDA_RWKV6_STATE(B, T, C, H, r, k, v, w, u=self.time_faaaa, s=self.time_state)
 
         return self.jit_func_2(x, g)
 ########################################################################################################
@@ -812,10 +565,10 @@ class RWKV_CMix_x060_infctx(MyModule):
         k = torch.relu(k) ** 2
         kv = self.value(k)
         return torch.sigmoid(self.receptance(xr)) * kv, ChannelMixState(x[:, -1])
+
 ########################################################################################################
 # The RWKV Model with our blocks
 ########################################################################################################
-
 
 class Block(nn.Module):
     def __init__(self, args, layer_id):
@@ -877,20 +630,18 @@ class Block(nn.Module):
                     pos_emb = (self.pos_emb_x + self.pos_emb_y).reshape(T+1, -1)[:-1,:]
                     x = x + pos_emb
 
-            if self.args.dropout == 0:
-                if self.layer_id == 0 and args.pre_ffn > 0:
-                    x = x + self.ffnPre(self.ln1(x))
-                else:
-                    att_out, att_state = self.att(self.ln1(x), last_state.time_mix_state)
-                    x = x + att_out
-                ffn_out, fnn_state = self.ffn(self.ln2(x), last_state.channel_mix_state)
-                x = x + ffn_out
+
+            if self.layer_id == 0 and args.pre_ffn > 0:
+                x = x + self.ffnPre(self.ln1(x))
+                x = x if self.args.dropout == 0 else self.drop0(x)
             else:
-                if self.layer_id == 0 and args.pre_ffn > 0:
-                    x = self.drop0(x + self.ffnPre(self.ln1(x)))
-                else:
-                    x = self.drop0(x + self.att(self.ln1(x)))
-                x = self.drop1(x + self.ffn(self.ln2(x)))
+                att_out, att_state = self.att(self.ln1(x), last_state.time_mix_state)
+                x = x + att_out
+                x = x if self.args.dropout == 0 else self.drop0(x)
+            ffn_out, fnn_state = self.ffn(self.ln2(x), last_state.channel_mix_state)
+            x = x + ffn_out
+            x = x if self.args.dropout == 0 else self.drop1(x)
+            
 
             if args.tiny_att_dim > 0 and self.layer_id == args.tiny_att_layer:
                 xx = self.tiny_ln(x)
@@ -931,47 +682,6 @@ class Block(nn.Module):
                 c = c.masked_fill(self.tiny_mask[:T, :T] == 0, 0)
                 x = x + c @ self.tiny_v(x_emb)
             return x
-
-
-if os.environ["RWKV_TRAIN_TYPE"] == 'infctx':
-    class L2Wrap(torch.autograd.Function):
-        @staticmethod
-        def forward(ctx, loss, y, token_amount):
-            ctx.save_for_backward(y)
-            ctx.token_amount = token_amount
-            return loss
-
-        @staticmethod
-        def backward(ctx, grad_output): #这个函数会不会影响batch和grad_accu的一致性？感觉上会。梯度累积时，factor变大了。但是只有loss缩放，这里的正则化项反而没有缩放
-            y = ctx.saved_tensors[0]
-            # to encourage the logits to be close to 0
-            if ctx.token_amount == 0:
-                return (grad_output, None, None)
-            factor = 1e-4 / ctx.token_amount #这一行类似crossentropy在token上平均。
-            maxx, ids = torch.max(y, -1, keepdim=True)
-            gy = torch.zeros_like(y)
-            if os.environ.get("WN_FIX_L2WRAP"): #实现batch等价性
-                # maxx[maxx<3.]=0. #防止对已经较小的logits值下拉，只对大于阈值的往下拉
-                gy.scatter_(-1, ids, maxx * factor * grad_output)
-            else:
-                gy.scatter_(-1, ids, maxx * factor)
-            return (grad_output, gy, None)
-else:
-    class L2Wrap(torch.autograd.Function):
-        @staticmethod
-        def forward(ctx, loss, y):
-            ctx.save_for_backward(y)
-            return loss
-
-        @staticmethod
-        def backward(ctx, grad_output):
-            y = ctx.saved_tensors[0]
-            # to encourage the logits to be close to 0
-            factor = 1e-4 / (y.shape[0] * y.shape[1])
-            maxx, ids = torch.max(y, -1, keepdim=True)
-            gy = torch.zeros_like(y)
-            gy.scatter_(-1, ids, maxx * factor)
-            return (grad_output, gy)
 
 
 class RWKV(pl.LightningModule):
