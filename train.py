@@ -481,6 +481,9 @@ if __name__ == "__main__":
         trainer.strategy.config["zero_optimization"]["allgather_bucket_size"] = args.ds_bucket_mb * 1000 * 1000
         trainer.strategy.config["zero_optimization"]["reduce_bucket_size"] = args.ds_bucket_mb * 1000 * 1000
 
+    if args.optim == 'adam_mini':
+        os.environ["RWKV_OPTIM"] = 'adam_mini'
+
     # must set shuffle=False, persistent_workers=False (because worker is in another thread)
     train_data.real_epoch=trainer.current_epoch
     train_data.rank=trainer.global_rank
