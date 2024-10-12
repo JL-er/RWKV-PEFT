@@ -11,7 +11,7 @@ epoch_steps=1000
 ctx_len=512
 
 bone_config='{"bone_load":"","bone_r":64}'
-$mask_id='{"mask0":"<ltoken>","mask01":"<rtoken>"}'
+mask_id='{"mask0":"<ltoken>","mask01":"<rtoken>"}'
 
 python train.py --load_model $load_model \
 --proj_dir $proj_dir --data_file $data_file \
