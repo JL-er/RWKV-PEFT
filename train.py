@@ -74,15 +74,15 @@ if __name__ == "__main__":
     parser.add_argument("--my_exit", default=99999999, type=int)
     parser.add_argument("--my_exit_tokens", default=0, type=int)
 
-    parser.add_argument("--peft", default="none", type=str)# lora pissa lisa
+    parser.add_argument("--peft", default="none", type=str)# lora pissa bone
     parser.add_argument("--train_parts", default=["time", "ln"], type=list)##emb , head
 
     #LORA
     parser.add_argument("--lora_config", default='{"lora_load":"", "lora_r":8, "lora_alpha":32, "lora_dropout":0.01}', type=json.loads)
 
 
-    #LISA
-    parser.add_argument("--lisa_config", default='{"lisa_r":2, "lisa_k":100}', type=json.loads)
+    # #LISA
+    # parser.add_argument("--lisa_config", default='{"lisa_r":2, "lisa_k":100}', type=json.loads)
 
     #PISSA
     parser.add_argument("--pissa_config", default='{"pissa_load":"", "pissa_init":"", "pissa_r":8, "svd_niter":4}', type=json.loads)
@@ -358,26 +358,26 @@ if __name__ == "__main__":
                         print(f'  Parts additionally training module {name}')
                         param.requires_grad = True
             break
-        if args.peft=='lisa':
-            import re
-            select_layers = np.random.choice(range(args.n_layer), args.lisa_r, replace=False)
-            for name, module in model.named_modules():
-                for pname, param in module.named_parameters():
-                    if 'emb' in pname or 'head' in pname or '.ln' in pname or 'time' in pname :
-                        param.requires_grad = True
-                    match = re.search(r'\d+', pname)
-                    if match:
-                        number = int(match.group())
-                        if number in select_layers:
-                            param.requires_grad  = True
-                break
-        elif args.peft=='lora' or args.peft=='pissa':
+        # if args.peft=='lisa':
+        #     import re
+        #     select_layers = np.random.choice(range(args.n_layer), args.lisa_r, replace=False)
+        #     for name, module in model.named_modules():
+        #         for pname, param in module.named_parameters():
+        #             if 'emb' in pname or 'head' in pname or '.ln' in pname or 'time' in pname :
+        #                 param.requires_grad = True
+        #             match = re.search(r'\d+', pname)
+        #             if match:
+        #                 number = int(match.group())
+        #                 if number in select_layers:
+        #                     param.requires_grad  = True
+        #         break
+        if args.peft=='lora' or args.peft=='pissa':
             for name, module in model.named_modules():
                 if any(n.startswith("lora_") for n, _ in module.named_parameters()):
                     print(f'  LoRA additionally training module {name}')
                     for pname, param in module.named_parameters():
                         param.requires_grad = 'lora_' in pname
-        elif args.peft=='bone':
+        if args.peft=='bone':
             for name, module in model.named_modules():
                 for pname, param in module.named_parameters():
                     if 'bone' in pname:
