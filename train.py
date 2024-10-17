@@ -109,7 +109,7 @@ if __name__ == "__main__":
     #loss_mask
     parser.add_argument("--loss_mask", default="none", type=str)### pad qa se
     parser.add_argument("--mask_id", default='{"mask0":"0", "mask1":"1"}', type=json.loads)
-    parser.add_argument("--datashuffle", default=True, type=bool)
+    parser.add_argument("--data_shuffle", default=1, type=int)
 
 
     #new optim
@@ -489,10 +489,12 @@ if __name__ == "__main__":
     train_data.rank=trainer.global_rank
     train_data.world_size=trainer.world_size
     
+    data_shuffle = True if args.data_shuffle==1 else False
     if int(args.devices)>1 : 
-        args.data_shuffle = False
+        data_shuffle = False
     if args.epoch_count>1:
-        args.data_shuffle = True
+        data_shuffle = True
+
     data_loader = DataLoader(train_data, shuffle=args.data_shuffle, pin_memory=True, batch_size=args.micro_bsz, num_workers=1, persistent_workers=False, drop_last=True)
 
     trainer.fit(model, data_loader)

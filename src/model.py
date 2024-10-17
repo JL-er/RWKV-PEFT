@@ -17,7 +17,8 @@ from pytorch_lightning.strategies import DeepSpeedStrategy
 if importlib.util.find_spec('deepspeed'):
     import deepspeed
     from deepspeed.ops.adam import DeepSpeedCPUAdam, FusedAdam
-
+    
+from .infctx_module import BlockStateList
 from .block import Block
 try:
     print('RWKV_MY_TESTING', os.environ["RWKV_MY_TESTING"])
