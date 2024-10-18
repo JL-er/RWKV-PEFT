@@ -5,8 +5,8 @@ import datetime
 import subprocess
 import torch
 from torch.utils.data import DataLoader
-import pytorch_lightning as pl
-from pytorch_lightning.utilities import rank_zero_info, rank_zero_only
+from lightning_utilities.core.rank_zero import rank_zero_info, rank_zero_only
+import lightning as pl
 import re
 import numpy as np
 

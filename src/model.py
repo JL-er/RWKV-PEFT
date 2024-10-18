@@ -13,9 +13,9 @@ import torch
 # torch._C._jit_set_profiling_mode(True)
 import torch.nn as nn
 from torch.nn import functional as F
-import pytorch_lightning as pl
-from pytorch_lightning.utilities import rank_zero_info, rank_zero_only
-from pytorch_lightning.strategies import DeepSpeedStrategy
+from lightning_utilities.core.rank_zero import rank_zero_info, rank_zero_only
+import lightning as pl
+from lightning.pytorch.strategies import DeepSpeedStrategy
 from torch.optim import Adam
 if importlib.util.find_spec('deepspeed') and os.environ.get("USE_DEEPSPEED", "0") == '1':
     import deepspeed

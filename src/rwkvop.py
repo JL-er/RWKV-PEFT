@@ -11,7 +11,8 @@ RUN_WKV5_GENERAL = None
 ########################################################################################################
 scale_factor = 1.0 if os.environ["RWKV_FLOAT_MODE"] != "fp16" else -1.0
 
-
+@torch.compiler.disable(recursive=True) 
+# torch.compiler introduces errors in numerical precision (torch 2.4)
 def RUN_CUDA_RWKV6_STATE_FLA(B, T, C, H, r, k, v, w, u, s=None):
     r = rearrange(r, 'b l (h d) -> b h l d', h=H)
     k = rearrange(k, 'b l (h d) -> b h l d', h=H)

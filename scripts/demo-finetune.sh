@@ -21,6 +21,6 @@ python train.py \
 --ctx_len $ctx_len --epoch_steps $epoch_steps --epoch_count 1 --epoch_begin 0 --epoch_save $epoch_save --micro_bsz $micro_bsz \
 --n_layer $n_layer --n_embd $n_embd \
 --pre_ffn 0 --head_qk 0 --lr_init $LR_INIT --lr_final $LR_FINAL --warmup_steps 10 --beta1 0.9 --beta2 0.99 --adam_eps 1e-8 \
---accelerator xpu --devices 1 --precision bf16 --strategy single_device --grad_cp 1 \
+--accelerator xpu --devices 1 --precision bf16 --strategy single --grad_cp 1 \
 --my_testing "x060" \
 --train_type "finetune"  --dataload pad --fla --wandb peft-test-platform
