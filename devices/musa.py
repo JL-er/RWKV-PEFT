@@ -7,7 +7,6 @@ from pytorch_lightning.accelerators.accelerator import Accelerator
 from typing_extensions import override
 
 
-
 class MUSAAccelerator(Accelerator):
     """Accelerator for Morethreads MUSA devices."""
 
@@ -16,14 +15,13 @@ class MUSAAccelerator(Accelerator):
         """
         Raises:
             ValueError:
-                If the selected device is not of type CUDA.
+                If the selected device is not of type MUSA.
         """
         if device.type != "musa":
             raise ValueError(f"Device should be of type 'musa', got '{device.type}' instead.")
-        if device.index == None:
+        if device.index is None:
             device = torch.device("musa", 0)
         torch.musa.set_device(device.index)
-
 
     @override
     def teardown(self) -> None:
@@ -45,7 +43,7 @@ class MUSAAccelerator(Accelerator):
         elif type(devices) is list:
             try:
                 return [torch.device("musa", i) for i in devices]
-            except:
+            except BaseException:
                 return devices
         elif type(devices) is str and devices == "auto":
             return [torch.device("musa", i) for i in range(torch.musa.device_count())]
@@ -66,7 +64,7 @@ class MUSAAccelerator(Accelerator):
     def get_device_stats(self, device: Union[str, torch.device]) -> Dict[str, Any]:
         # Return optional device statistics for loggers
         return {}
-    
+
     @classmethod
     @override
     def register_accelerators(cls, accelerator_registry):

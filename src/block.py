@@ -8,6 +8,8 @@ from .rwkv5.rwkv_channel_mix import RWKV_ChannelMix
 from .rwkv5.rwkv_time_mix import RWKV_TimeMix_RWKV5
 from .rwkv6.rwkv_channel_mix import RWKV_CMix_x060, RWKV_CMix_x060_infctx
 from .rwkv6.rwkv_time_mix import RWKV_Tmix_x060, RWKV_Tmix_x060_state, RWKV_Tmix_x060_infctx
+
+
 def __nop(ob):
     return ob
 
@@ -17,6 +19,7 @@ MyFunction = __nop
 if os.environ["RWKV_JIT_ON"] == "1":
     MyModule = torch.jit.ScriptModule
     MyFunction = torch.jit.script_method
+
 
 class MishGLU(MyModule):
     def __init__(self, args, layer_id):
@@ -66,8 +69,8 @@ class Block(nn.Module):
         if self.layer_id == 0:
             self.ln0 = nn.LayerNorm(args.n_embd)
             if args.my_pos_emb > 0:
-                self.pos_emb_x = nn.Parameter(torch.zeros((1,args.my_pos_emb,args.n_embd)))
-                self.pos_emb_y = nn.Parameter(torch.zeros((args.my_pos_emb,1,args.n_embd)))
+                self.pos_emb_x = nn.Parameter(torch.zeros((1, args.my_pos_emb, args.n_embd)))
+                self.pos_emb_y = nn.Parameter(torch.zeros((args.my_pos_emb, 1, args.n_embd)))
 
         if self.layer_id == 0 and self.args.pre_ffn > 0:
             self.ffnPre = RWKV_ChannelMix(args, 0)
@@ -92,7 +95,7 @@ class Block(nn.Module):
                     self.ffn = RWKV_CMix_x060(args, layer_id)
             else:
                 self.ffn = RWKV_ChannelMix(args, layer_id)
-        
+
         if args.tiny_att_dim > 0 and self.layer_id == args.tiny_att_layer:
             self.tiny_ln = nn.LayerNorm(args.n_embd)
             self.tiny_q = nn.Linear(args.n_embd, args.tiny_att_dim, bias=False)
@@ -101,8 +104,8 @@ class Block(nn.Module):
             self.register_buffer("tiny_mask", torch.tril(torch.ones(args.ctx_len, args.ctx_len)))
 
         if args.dropout > 0:
-            self.drop0 = nn.Dropout(p = args.dropout)
-            self.drop1 = nn.Dropout(p = args.dropout)
+            self.drop0 = nn.Dropout(p=args.dropout)
+            self.drop1 = nn.Dropout(p=args.dropout)
 
     if os.environ["RWKV_TRAIN_TYPE"] == 'infctx':
         def forward(self, x, last_state: BlockState, x_emb=None):
@@ -111,7 +114,7 @@ class Block(nn.Module):
             if self.layer_id == 0:
                 x = self.ln0(x)
                 if args.my_pos_emb > 0:
-                    pos_emb = (self.pos_emb_x + self.pos_emb_y).reshape(T+1, -1)[:-1,:]
+                    pos_emb = (self.pos_emb_x + self.pos_emb_y).reshape(T + 1, -1)[:-1, :]
                     x = x + pos_emb
 
             if self.args.dropout == 0:
@@ -144,7 +147,7 @@ class Block(nn.Module):
             if self.layer_id == 0:
                 x = self.ln0(x)
                 if args.my_pos_emb > 0:
-                    pos_emb = (self.pos_emb_x + self.pos_emb_y).reshape(T+1, -1)[:-1,:]
+                    pos_emb = (self.pos_emb_x + self.pos_emb_y).reshape(T + 1, -1)[:-1, :]
                     x = x + pos_emb
 
             if self.args.dropout == 0:

@@ -43,8 +43,8 @@ with torch.no_grad():
                 w[lora_B] = w[lora_B].to(device=device)
                 w_init_lora[init_lora_A] = w_init_lora[init_lora_A].to(device=device)
                 w_init_lora[init_lora_B] = w_init_lora[init_lora_B].to(device=device)
-                w[k] = (w[k]- w_init_lora[init_lora_B] @ w_init_lora[init_lora_A]).to(dtype=torch.bfloat16)
-                w[k] +=  w[lora_B] @ w[lora_A]
+                w[k] = (w[k] - w_init_lora[init_lora_B] @ w_init_lora[init_lora_A]).to(dtype=torch.bfloat16)
+                w[k] += w[lora_B] @ w[lora_A]
                 output_w[k] = w[k].to(device='cpu', copy=True)
                 del w[k]
                 del w[lora_A]

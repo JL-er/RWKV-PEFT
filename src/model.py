@@ -4,7 +4,10 @@
 from torch.utils.checkpoint import checkpoint as torch_checkpoint
 from torch.profiler import profile, record_function, ProfilerActivity
 
-import os, math, gc, importlib
+import os
+import math
+import gc
+import importlib
 import torch
 # torch._C._jit_set_profiling_executor(True)
 # torch._C._jit_set_profiling_mode(True)
@@ -17,17 +20,18 @@ from torch.optim import Adam
 if importlib.util.find_spec('deepspeed') and os.environ.get("USE_DEEPSPEED", "0") == '1':
     import deepspeed
     from deepspeed.ops.adam import DeepSpeedCPUAdam, FusedAdam
-    
+
 from .infctx_module import BlockStateList
 from .block import Block
 from .l2warp import L2Wrap
 try:
     print('RWKV_MY_TESTING', os.environ["RWKV_MY_TESTING"])
-except:
+except BaseException:
     os.environ["RWKV_MY_TESTING"] = ''
 
 if os.environ.get("RWKV_OPTIM", None) == 'adam_mini':
     from adam_mini import Adam_mini
+
 
 def __nop(ob):
     return ob
@@ -38,8 +42,6 @@ MyFunction = __nop
 if os.environ["RWKV_JIT_ON"] == "1":
     MyModule = torch.jit.ScriptModule
     MyFunction = torch.jit.script_method
-
-
 
 
 class RWKV(pl.LightningModule):
@@ -70,11 +72,11 @@ class RWKV(pl.LightningModule):
             self.head_k = nn.Linear(args.n_embd, args.head_qk, bias=False)
             self.register_buffer("copy_mask", torch.tril(torch.ones(args.ctx_len, args.ctx_len)))
         if args.dropout > 0:
-            self.drop0 = nn.Dropout(p = args.dropout)
+            self.drop0 = nn.Dropout(p=args.dropout)
 
     def configure_optimizers(self):
         args = self.args
-        
+
         lr_decay = set()
         lr_1x = set()
         lr_2x = set()
@@ -115,13 +117,13 @@ class RWKV(pl.LightningModule):
         # print('2x', lr_2x)
         # print('3x', lr_3x)
         param_dict = {n: p for n, p in self.named_parameters()}
-        
+
         if args.layerwise_lr > 0:
             if args.my_pile_stage == 2:
                 optim_groups = [
                     {"params": [param_dict[n] for n in lr_1x], "weight_decay": 0.0, "my_lr_scale": 1.0},
-                    {"params": [param_dict[n] for n in lr_2x], "weight_decay": 0.0, "my_lr_scale": 5.0},# test: 2e-3 / args.lr_init},
-                    {"params": [param_dict[n] for n in lr_3x], "weight_decay": 0.0, "my_lr_scale": 5.0},# test: 3e-3 / args.lr_init},
+                    {"params": [param_dict[n] for n in lr_2x], "weight_decay": 0.0, "my_lr_scale": 5.0},  # test: 2e-3 / args.lr_init},
+                    {"params": [param_dict[n] for n in lr_3x], "weight_decay": 0.0, "my_lr_scale": 5.0},  # test: 3e-3 / args.lr_init},
                 ]
             else:
                 optim_groups = [
@@ -134,8 +136,8 @@ class RWKV(pl.LightningModule):
 
         if args.weight_decay > 0:
             optim_groups += [{"params": [param_dict[n] for n in lr_decay], "weight_decay": args.weight_decay, "my_lr_scale": 1.0}]
-            if args.optim=='adam_mini':
-                return Adam_mini(self, lr=self.args.lr_init, betas=self.args.betas, eps=self.args.adam_eps, weight_decay=0, model_sharding=True, n_feature=args.n_embd, n_head=args.n_embd//64, lora_r=8)
+            if args.optim == 'adam_mini':
+                return Adam_mini(self, lr=self.args.lr_init, betas=self.args.betas, eps=self.args.adam_eps, weight_decay=0, model_sharding=True, n_feature=args.n_embd, n_head=args.n_embd // 64, lora_r=8)
             if os.environ.get("USE_DEEPSPEED", "0") == "1":
                 if self.deepspeed_offload:
                     return DeepSpeedCPUAdam(optim_groups, lr=self.args.lr_init, betas=self.args.betas, eps=self.args.adam_eps, bias_correction=True, adamw_mode=True, amsgrad=False)
@@ -144,8 +146,8 @@ class RWKV(pl.LightningModule):
                 # use normal adam
                 return Adam(optim_groups, lr=self.args.lr_init, betas=self.args.betas, eps=self.args.adam_eps, weight_decay=0, amsgrad=False)
         else:
-            if args.optim=='adam_mini':
-                return Adam_mini(self, lr=self.args.lr_init, betas=self.args.betas, eps=self.args.adam_eps, weight_decay=0, model_sharding=True, n_feature=args.n_embd, n_head=args.n_embd//64, lora_r=8)
+            if args.optim == 'adam_mini':
+                return Adam_mini(self, lr=self.args.lr_init, betas=self.args.betas, eps=self.args.adam_eps, weight_decay=0, model_sharding=True, n_feature=args.n_embd, n_head=args.n_embd // 64, lora_r=8)
             if os.environ.get("USE_DEEPSPEED", "0") == "1":
                 if self.deepspeed_offload:
                     return DeepSpeedCPUAdam(optim_groups, lr=self.args.lr_init, betas=self.args.betas, eps=self.args.adam_eps, bias_correction=True, adamw_mode=False, weight_decay=0, amsgrad=False)
@@ -163,24 +165,24 @@ class RWKV(pl.LightningModule):
 
     if os.environ["RWKV_TRAIN_TYPE"] == 'infctx':
 
-        def forward(self, idx,  last_shift_states: torch.Tensor,
-                last_wkv_states: torch.Tensor):
+        def forward(self, idx, last_shift_states: torch.Tensor,
+                    last_wkv_states: torch.Tensor):
             args = self.args
             B, T = idx.size()
             assert T <= args.chunk_ctx, "Cannot forward, model ctx_len is exhausted."
             C = args.n_embd
-            H =  args.dim_att // args.head_size_a
-            assert C==H*args.head_size_a
-            
+            H = args.dim_att // args.head_size_a
+            assert C == H * args.head_size_a
+
             x = self.emb(idx)
             x_emb = x
             new_states = BlockStateList.empty(args.n_layer, B, args.n_embd, H,
-                                            x.device, x.dtype)
+                                              x.device, x.dtype)
             if args.dropout > 0:
                 x = self.drop0(x)
 
             for i, (block, block_state) in enumerate(zip(self.blocks,
-                BlockStateList(last_shift_states, last_wkv_states))):
+                                                         BlockStateList(last_shift_states, last_wkv_states))):
                 # x = x.to(block.device)
                 if args.grad_cp == 1 and i > 0:  # and i < len(self.blocks)-1
                     x, new_block_state = torch_checkpoint(block, x, block_state, use_reentrant=False)
@@ -208,44 +210,44 @@ class RWKV(pl.LightningModule):
                 x = self.head(x)
 
             return x, new_states.shift_states, new_states.wkv_states
-    
+
         def training_step(self, batch, batch_idx):
             args = self.args
-            T_train = args.chunk_ctx 
+            T_train = args.chunk_ctx
             idx, targets = batch
             B, T = idx.shape
             C = args.n_embd
-            H =  args.dim_att // args.head_size_a
-            assert C==H*args.head_size_a
+            H = args.dim_att // args.head_size_a
+            assert C == H * args.head_size_a
             states = BlockStateList.create(args.n_layer, B, C, H, idx.device,
-                self.emb.weight.dtype)
+                                           self.emb.weight.dtype)
 
             def checkpointed_step(idx, targets, prev_loss, last_shift_states,
-                                last_wkv_states, prev_token_amount):
+                                  last_wkv_states, prev_token_amount):
                 logits, new_shift_states, new_wkv_states = self(idx, last_shift_states, last_wkv_states)
-                current_token_amount = (targets!=-100).sum() #这样是不是更合适？
+                current_token_amount = (targets != -100).sum()  # 这样是不是更合适？
                 current_token_amount = idx.shape[1]
                 if current_token_amount == 0:
-                    loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.reshape(-1),reduction='sum')
+                    loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.reshape(-1), reduction='sum')
                 else:
                     loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.reshape(-1))
                     loss = L2Wrap.apply(loss, logits, current_token_amount)
-                new_token_amount = prev_token_amount+current_token_amount
-                if new_token_amount>0:
+                new_token_amount = prev_token_amount + current_token_amount
+                if new_token_amount > 0:
                     new_loss = prev_loss * (prev_token_amount / new_token_amount) + loss * (
                         current_token_amount / new_token_amount)
                 else:
                     new_loss = prev_loss
 
                 return new_loss, new_shift_states, new_wkv_states, new_token_amount
-            
-            total_loss = torch.tensor(0.,dtype=self.emb.weight.dtype).requires_grad_()
+
+            total_loss = torch.tensor(0., dtype=self.emb.weight.dtype).requires_grad_()
             token_amount = 0
             i = 0
             for i in range(math.ceil(T / T_train)):
                 # states.shift_states = states.shift_states.cuda()
                 # states.wkv_states = states.wkv_states.cuda()
-                total_loss,new_shift_states, new_wkv_states,token_amount = torch_checkpoint(
+                total_loss, new_shift_states, new_wkv_states, token_amount = torch_checkpoint(
                     checkpointed_step,
                     idx[:, i * T_train:(i + 1) * T_train],
                     targets[:, i * T_train:(i + 1) * T_train],
@@ -266,7 +268,7 @@ class RWKV(pl.LightningModule):
                 # new_shift_states = new_shift_states.cpu()
                 # new_wkv_states = new_wkv_states.cpu()
                 states = BlockStateList(new_shift_states, new_wkv_states)
-            
+
             return total_loss
     else:
         def forward(self, idx):
@@ -285,7 +287,6 @@ class RWKV(pl.LightningModule):
                     x = torch_checkpoint(block, x, x_emb, use_reentrant=False)
                 else:
                     x = block(x, x_emb)
-
 
             x = self.ln_out(x)
 
@@ -310,7 +311,7 @@ class RWKV(pl.LightningModule):
 
         def training_step(self, batch, batch_idx):
             args = self.args
-            if args.loss_mask!='none':
+            if args.loss_mask != 'none':
                 idx, targets, mask = batch
                 mask = mask.view(-1)
                 sum_mask = torch.sum(mask).item()
@@ -359,7 +360,7 @@ class RWKV(pl.LightningModule):
             return L2Wrap.apply(loss, logits)
 
     def training_step_end(self, batch_parts):
-        if pl.__version__[0]!='2':
+        if pl.__version__[0] != '2':
             all = self.all_gather(batch_parts)
             if self.trainer.is_global_zero:
                 self.trainer.my_loss_all = all
@@ -383,7 +384,7 @@ class RWKV(pl.LightningModule):
             scale = 1.0
             if "ln_" in n or ".ln" in n or "time_" in n or "_mask" in n or "pos_emb" in n or '.mask.' in n:
                 if 'ln_x.weight' in n:
-                    layer_scale = (1+int(n.split('.')[1])) / self.args.n_layer
+                    layer_scale = (1 + int(n.split('.')[1])) / self.args.n_layer
                     m[n] = (p * 0.0) + (layer_scale ** 0.7)
                 else:
                     m[n] = p

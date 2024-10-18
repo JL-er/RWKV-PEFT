@@ -45,15 +45,15 @@ elif os.environ["RWKV_TRAIN_TYPE"] == 'infctx':
             return loss
 
         @staticmethod
-        def backward(ctx, grad_output): #这个函数会不会影响batch和grad_accu的一致性？感觉上会。梯度累积时，factor变大了。但是只有loss缩放，这里的正则化项反而没有缩放
+        def backward(ctx, grad_output):  # 这个函数会不会影响batch和grad_accu的一致性？感觉上会。梯度累积时，factor变大了。但是只有loss缩放，这里的正则化项反而没有缩放
             y = ctx.saved_tensors[0]
             # to encourage the logits to be close to 0
             if ctx.token_amount == 0:
                 return (grad_output, None, None)
-            factor = 1e-4 / ctx.token_amount #这一行类似crossentropy在token上平均。
+            factor = 1e-4 / ctx.token_amount  # 这一行类似crossentropy在token上平均。
             maxx, ids = torch.max(y, -1, keepdim=True)
             gy = torch.zeros_like(y)
-            if os.environ.get("WN_FIX_L2WRAP"): #实现batch等价性
+            if os.environ.get("WN_FIX_L2WRAP"):  # 实现batch等价性
                 # maxx[maxx<3.]=0. #防止对已经较小的logits值下拉，只对大于阈值的往下拉
                 gy.scatter_(-1, ids, maxx * factor * grad_output)
             else:
@@ -74,7 +74,7 @@ elif os.environ.get("L2WRAP_SPARSE", "0") == "1":
         def backward(ctx, grad_output):
             max_vals, max_ids = ctx.saved_tensors
             y_shape = ctx.y_shape
-            factor = 1e-4 / (y_shape[0] * y_shape[1]) # may have problem when padding
+            factor = 1e-4 / (y_shape[0] * y_shape[1])  # may have problem when padding
             batch_size = y_shape[0]
             seq_len = y_shape[1]
             batch_indices = torch.arange(batch_size, device=max_ids.device).repeat_interleave(seq_len)
@@ -104,4 +104,3 @@ else:
             gy = torch.zeros_like(y)
             gy.scatter_(-1, ids, maxx * factor)
             return (grad_output, gy)
-

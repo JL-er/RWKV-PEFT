@@ -1,5 +1,8 @@
 
-import os, math, gc, importlib
+import os
+import math
+import gc
+import importlib
 import torch
 
 import torch.nn as nn
@@ -22,6 +25,7 @@ if os.environ["RWKV_JIT_ON"] == "1":
 
 HEAD_SIZE = int(os.environ["RWKV_HEAD_SIZE_A"])
 
+
 class RWKV_TimeMix_RWKV5(MyModule):
     def __init__(self, args, layer_id):
         super().__init__()
@@ -29,7 +33,7 @@ class RWKV_TimeMix_RWKV5(MyModule):
         self.layer_id = layer_id
 
         self.head_size = args.head_size_a
-        assert HEAD_SIZE == self.head_size # change HEAD_SIZE to match args.head_size_a
+        assert HEAD_SIZE == self.head_size  # change HEAD_SIZE to match args.head_size_a
         self.n_head = args.dim_att // self.head_size
         assert args.dim_att % self.n_head == 0
         self.head_size_divisor = args.head_size_divisor
@@ -74,7 +78,7 @@ class RWKV_TimeMix_RWKV5(MyModule):
     def jit_func(self, x):
         B, T, C = x.size()
 
-        xx = self.time_shift(x) # Mix x with the previous timestep to produce xk, xv, xr
+        xx = self.time_shift(x)  # Mix x with the previous timestep to produce xk, xv, xr
         xk = x * self.time_mix_k + xx * (1 - self.time_mix_k)
         xv = x * self.time_mix_v + xx * (1 - self.time_mix_v)
         xr = x * self.time_mix_r + xx * (1 - self.time_mix_r)
@@ -91,7 +95,7 @@ class RWKV_TimeMix_RWKV5(MyModule):
     def jit_func_2(self, x, g):
         B, T, C = x.size()
         x = x.view(B * T, C)
-        
+
         x = self.ln_x(x / self.head_size_divisor).view(B, T, C)
         x = self.output(x * g)
         return x

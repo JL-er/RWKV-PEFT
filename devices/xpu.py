@@ -7,7 +7,6 @@ from pytorch_lightning.accelerators.accelerator import Accelerator
 from typing_extensions import override
 
 
-
 class XPUAccelerator(Accelerator):
     """Accelerator for INTEL XPU devices."""
 
@@ -16,16 +15,13 @@ class XPUAccelerator(Accelerator):
         """
         Raises:
             ValueError:
-                If the selected device is not of type CUDA.
+                If the selected device is not of type XPU.
         """
         if device.type != "xpu":
             raise ValueError(f"Device should be of type 'xpu', got '{device.type}' instead.")
-        if device.index == None:
+        if device.index is None:
             device = torch.device("xpu", 0)
         torch.xpu.set_device(device.index)
-
-    def get_device_type(self) -> str:
-        return "xpu"
 
     @override
     def teardown(self) -> None:
@@ -47,7 +43,7 @@ class XPUAccelerator(Accelerator):
         elif type(devices) is list:
             try:
                 return [torch.device("xpu", i) for i in devices]
-            except:
+            except BaseException:
                 return devices
         elif type(devices) is str and devices == "auto":
             return [torch.device("xpu", i) for i in range(torch.xpu.device_count())]
@@ -68,7 +64,7 @@ class XPUAccelerator(Accelerator):
     def get_device_stats(self, device: Union[str, torch.device]) -> Dict[str, Any]:
         # Return optional device statistics for loggers
         return {}
-    
+
     @classmethod
     @override
     def register_accelerators(cls, accelerator_registry):

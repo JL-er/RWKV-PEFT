@@ -7,7 +7,6 @@ from pytorch_lightning.accelerators.accelerator import Accelerator
 from typing_extensions import override
 
 
-
 class NPUAccelerator(Accelerator):
     """Accelerator for HUAWEI NPU devices."""
 
@@ -16,16 +15,13 @@ class NPUAccelerator(Accelerator):
         """
         Raises:
             ValueError:
-                If the selected device is not of type CUDA.
+                If the selected device is not of type NPU.
         """
         if device.type != "npu":
             raise ValueError(f"Device should be of type 'npu', got '{device.type}' instead.")
-        if device.index == None:
+        if device.index is None:
             device = torch.device("npu", 0)
         torch.npu.set_device(device.index)
-
-    def get_device_type(self) -> str:
-        return "npu"
 
     @override
     def teardown(self) -> None:
@@ -47,7 +43,7 @@ class NPUAccelerator(Accelerator):
         elif type(devices) is list:
             try:
                 return [torch.device("npu", i) for i in devices]
-            except:
+            except BaseException:
                 return devices
         elif type(devices) is str and devices == "auto":
             return [torch.device("npu", i) for i in range(torch.npu.device_count())]
@@ -68,7 +64,7 @@ class NPUAccelerator(Accelerator):
     def get_device_stats(self, device: Union[str, torch.device]) -> Dict[str, Any]:
         # Return optional device statistics for loggers
         return {}
-    
+
     @classmethod
     @override
     def register_accelerators(cls, accelerator_registry):

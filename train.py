@@ -48,8 +48,8 @@ if __name__ == "__main__":
     parser.add_argument("--beta2", default=0.99, type=float)  # use 0.999 when your model is close to convergence
     parser.add_argument("--adam_eps", default=1e-8, type=float)
     parser.add_argument("--grad_cp", default=0, type=int)  # gradient checkpt: saves VRAM, but slower
-    parser.add_argument("--dropout", default=0, type=float) # try 0.01 / 0.02 / 0.05 / 0.1
-    parser.add_argument("--weight_decay", default=0, type=float) # try 0.1 / 0.01 / 0.001
+    parser.add_argument("--dropout", default=0, type=float)  # try 0.01 / 0.02 / 0.05 / 0.1
+    parser.add_argument("--weight_decay", default=0, type=float)  # try 0.1 / 0.01 / 0.001
     parser.add_argument("--weight_decay_final", default=-1, type=float)
 
     parser.add_argument("--my_pile_version", default=1, type=int)  # my special pile version
@@ -63,7 +63,7 @@ if __name__ == "__main__":
     parser.add_argument("--my_sample_len", default=0, type=int)
     parser.add_argument("--my_ffn_shift", default=1, type=int)
     parser.add_argument("--my_att_shift", default=1, type=int)
-    parser.add_argument("--head_size_a", default=64, type=int) # can try larger values for larger models
+    parser.add_argument("--head_size_a", default=64, type=int)  # can try larger values for larger models
     parser.add_argument("--head_size_divisor", default=8, type=int)
     parser.add_argument("--my_pos_emb", default=0, type=int)
     parser.add_argument("--load_partial", default=0, type=int)
@@ -74,53 +74,48 @@ if __name__ == "__main__":
     parser.add_argument("--my_exit", default=99999999, type=int)
     parser.add_argument("--my_exit_tokens", default=0, type=int)
 
-    parser.add_argument("--peft", default="none", type=str)# lora pissa bone
-    parser.add_argument("--train_parts", default=["time", "ln"], type=list)##emb , head
+    parser.add_argument("--peft", default="none", type=str)  # lora pissa bone
+    parser.add_argument("--train_parts", default=["time", "ln"], type=list)  # emb , head
     parser.add_argument("--l2warp_sparse", default=0, type=int)
 
-    #LORA
+    # LORA
     parser.add_argument("--lora_config", default='{"lora_load":"", "lora_r":8, "lora_alpha":32, "lora_dropout":0.01}', type=json.loads)
-
 
     # #LISA
     # parser.add_argument("--lisa_config", default='{"lisa_r":2, "lisa_k":100}', type=json.loads)
 
-    #PISSA
+    # PISSA
     parser.add_argument("--pissa_config", default='{"pissa_load":"", "pissa_init":"", "pissa_r":8, "svd_niter":4}', type=json.loads)
 
-    #Bone
+    # Bone
     parser.add_argument("--bone_config", default='{"bone_load":"", "bone_r":64}', type=json.loads)
 
-
-    #quant
+    # quant
     parser.add_argument("--quant", default="none", type=str)
 
-    #dataset
+    # dataset
     parser.add_argument("--dataload", default="get", type=str)
 
-    #state tuning
+    # state tuning
     parser.add_argument("--state_tune", action="store_true")
 
-
     parser.add_argument("--chunk_ctx", default=512, type=int)
-    #fla
+    # fla
     parser.add_argument("--fla", action="store_true")
     parser.add_argument("--train_type", default="none", type=str)
 
-    #loss_mask
-    parser.add_argument("--loss_mask", default="none", type=str)### pad qa se
+    # loss_mask
+    parser.add_argument("--loss_mask", default="none", type=str)  # pad qa se
     parser.add_argument("--mask_id", default='{"mask0":"0", "mask1":"1"}', type=json.loads)
     parser.add_argument("--data_shuffle", default=1, type=int)
 
-
-    #new optim
+    # new optim
     parser.add_argument("--optim", default="none", type=str)
 
-    #acc_grad_batchs
+    # acc_grad_batchs
     parser.add_argument("--avg_loss", default=0, type=int)
 
-
-    if pl.__version__[0]=='2':
+    if pl.__version__[0] == '2':
         parser.add_argument("--accelerator", default="gpu", type=str)
         parser.add_argument("--strategy", default="auto", type=str)
         parser.add_argument("--devices", default=1, type=int)
@@ -133,7 +128,12 @@ if __name__ == "__main__":
 
     ########################################################################################################
 
-    import os, warnings, math, datetime, sys, time
+    import os
+    import warnings
+    import math
+    import datetime
+    import sys
+    import time
     import numpy as np
     import torch
     from torch.utils.data import DataLoader
@@ -160,29 +160,29 @@ if __name__ == "__main__":
     args.check_val_every_n_epoch = int(1e20)
     args.log_every_n_steps = int(1e20)
     args.max_epochs = -1  # continue forever
-    if args.dataload!='get':
+    if args.dataload != 'get':
         args.max_epochs = args.epoch_count
     args.betas = (args.beta1, args.beta2)
     args.real_bsz = int(args.num_nodes) * int(args.devices) * args.micro_bsz
     os.environ["RWKV_MY_TESTING"] = args.my_testing
     os.environ["RWKV_CTXLEN"] = str(args.ctx_len)
     os.environ["RWKV_HEAD_SIZE_A"] = str(args.head_size_a)
-    ######state tuning
-    os.environ["RWKV_TRAIN_TYPE"]=''
-    assert args.train_type in ['none', 'state', 'infctx','finetune']
-    if args.train_type=='state':
-        os.environ["RWKV_TRAIN_TYPE"]='states'
-    elif args.train_type=='infctx':
-        os.environ["RWKV_TRAIN_TYPE"]='infctx'
+    # state tuning
+    os.environ["RWKV_TRAIN_TYPE"] = ''
+    assert args.train_type in ['none', 'state', 'infctx', 'finetune']
+    if args.train_type == 'state':
+        os.environ["RWKV_TRAIN_TYPE"] = 'states'
+    elif args.train_type == 'infctx':
+        os.environ["RWKV_TRAIN_TYPE"] = 'infctx'
 
-    os.environ["WKV"]='fla' if args.fla else ''
+    os.environ["WKV"] = 'fla' if args.fla else ''
     if args.fla:
         print('FLA use triton as backend, and always rember to upgrade the latest version of both triton and rwkv-fla.')
     os.environ["L2WRAP_SPARSE"] = str(args.l2warp_sparse)
     if args.dim_att <= 0:
         args.dim_att = args.n_embd
     if args.dim_ffn <= 0:
-        args.dim_ffn = int((args.n_embd * 3.5) // 32 * 32) # default = 3.5x emb size
+        args.dim_ffn = int((args.n_embd * 3.5) // 32 * 32)  # default = 3.5x emb size
 
     if args.data_type == "wds_img":
         args.run_name = f"v{args.my_img_version}-{args.my_img_size}-{args.my_img_bit}bit-{args.my_img_clip}x{args.my_img_clip_scale}"
@@ -239,7 +239,7 @@ if __name__ == "__main__":
     tokens_per_epoch = samples_per_epoch * args.ctx_len
     try:
         deepspeed_version = deepspeed.__version__
-    except:
+    except BaseException:
         deepspeed_version = None
         pass
     rank_zero_info(
@@ -307,54 +307,54 @@ if __name__ == "__main__":
 
     train_data = MyDataset(args)
     args.vocab_size = train_data.vocab_size
-    
+
     from src.model import RWKV
-    if args.peft=='lora' :
+    if args.peft == 'lora':
         from src.rwkvLinear import LORA_CONFIG
         assert args.lora_config['lora_r'] > 0, "LoRA should have its `r` > 0"
         LORA_CONFIG["r"] = args.lora_config['lora_r']
         LORA_CONFIG["alpha"] = args.lora_config['lora_alpha']
         LORA_CONFIG["dropout"] = args.lora_config['lora_dropout']
-        #LORA_CONFIG["parts"] = set(str(args.lora_config['lora_parts']).split(','))
-    if args.peft=='pissa':
+        # LORA_CONFIG["parts"] = set(str(args.lora_config['lora_parts']).split(','))
+    if args.peft == 'pissa':
         assert args.pissa_config['pissa_r'] > 0, "LoRA should have its `r` > 0"
         LORA_CONFIG["r"] = args.pissa_config['pissa_r']
-        #LORA_CONFIG["parts"] = set(str(args.pissa_config['pissa_parts']).split(','))
-    if args.quant!='none':
-        LORA_CONFIG["quant"]=True
+        # LORA_CONFIG["parts"] = set(str(args.pissa_config['pissa_parts']).split(','))
+    if args.quant != 'none':
+        LORA_CONFIG["quant"] = True
         os.environ["RWKV_QUANT"] = 1
-    if args.peft=='bone':
+    if args.peft == 'bone':
         from src.rwkvLinear import BONE_CONFIG
         BONE_CONFIG["r"] = args.bone_config['bone_r']
 
     model = RWKV(args)
     print(model)
-    freeze=False
+    freeze = False
 
     if args.train_type == 'state':
         args.state_tune = True
 
-    if args.train_type=='state' or args.state_tune:
+    if args.train_type == 'state' or args.state_tune:
         model.requires_grad_(False)
-        freeze=True
+        freeze = True
         for name, module in model.named_modules():
             for pname, param in module.named_parameters():
-                if 'state' in pname :
+                if 'state' in pname:
                     param.requires_grad = True
             break
-    if args.peft!='none' :
+    if args.peft != 'none':
         model.requires_grad_(False)
-        freeze=True
+        freeze = True
         if len(args.load_model) == 0:
             for name, module in model.named_modules():
                 if any(n.startswith("emb.") for n, _ in module.named_parameters()):
                     for pname, param in module.named_parameters():
-                        if 'emb.weight'==pname:
+                        if 'emb.weight' == pname:
                             print(f'  EMB additionally training module {pname}')
                             param.requires_grad = True
                 if any(n.startswith("head.") for n, _ in module.named_parameters()):
                     for pname, param in module.named_parameters():
-                        if 'head.weight'==pname:
+                        if 'head.weight' == pname:
                             print(f'  head additionally training module {pname}')
                             param.requires_grad = True
                 if 'ln' in name:
@@ -362,9 +362,8 @@ if __name__ == "__main__":
                     for param in module.parameters():
                         param.requires_grad = True
                 break
-    
 
-        for name, module in model.named_modules(): ###part train
+        for name, module in model.named_modules():  # part train
             for pname, param in module.named_parameters():
                 for part in args.train_parts:
                     if part in pname:
@@ -384,20 +383,19 @@ if __name__ == "__main__":
         #                 if number in select_layers:
         #                     param.requires_grad  = True
         #         break
-        if args.peft=='lora' or args.peft=='pissa':
+        if args.peft == 'lora' or args.peft == 'pissa':
             for name, module in model.named_modules():
                 if any(n.startswith("lora_") for n, _ in module.named_parameters()):
                     print(f'  LoRA additionally training module {name}')
                     for pname, param in module.named_parameters():
                         param.requires_grad = 'lora_' in pname
-        if args.peft=='bone':
+        if args.peft == 'bone':
             for name, module in model.named_modules():
                 for pname, param in module.named_parameters():
                     if 'bone' in pname:
                         print(f'  Bone additionally training parameter {pname}')
                         param.requires_grad = True
                 break
-
 
     if len(args.load_model) == 0 or args.my_pile_stage == 1:  # shall we build the initial weights?
         init_weight_name = f"{args.proj_dir}/rwkv-init.pth"
@@ -432,23 +430,23 @@ if __name__ == "__main__":
     #             load_dict[k] = model.state_dict()[k]
     model.load_state_dict(torch.load(args.load_model, map_location="cpu"), strict=(not freeze))
 
-    ####Load peft checkpoint
-    ####multi-GPU training
-    if args.peft=='lora':
+    # Load peft checkpoint
+    # multi-GPU training
+    if args.peft == 'lora':
         if os.path.isfile(args.lora_config['lora_load']):
             model.load_state_dict(torch.load(args.lora_config['lora_load'], map_location="cpu"),
-                                strict=False)
-    elif args.peft=='pissa':
-        if int(args.devices)==1 and os.path.isfile(f'{args.proj_dir}/init_pissa.pth'):
-            assert os.path.isfile(f'{args.proj_dir}/init_pissa.pth')==False
-        if os.path.isfile(f'{args.proj_dir}/init_pissa.pth') and int(args.devices)>1 and args.pissa_config['pissa_load']=="":
+                                  strict=False)
+    elif args.peft == 'pissa':
+        if int(args.devices) == 1 and os.path.isfile(f'{args.proj_dir}/init_pissa.pth'):
+            assert os.path.isfile(f'{args.proj_dir}/init_pissa.pth') == False
+        if os.path.isfile(f'{args.proj_dir}/init_pissa.pth') and int(args.devices) > 1 and args.pissa_config['pissa_load'] == "":
             pissa_init = torch.load(f'{args.proj_dir}/init_pissa.pth', map_location="cpu")
             rank_zero_info(f"########## Load Init PISSA... ##########")
             for name, m in model.named_modules():
                 if hasattr(m, "pissa_load") and callable(getattr(m, "pissa_load")):
                     m.pissa_load(pissa_init[f'{name}.init_lora_A'], pissa_init[f'{name}.init_lora_B'])
 
-        if args.pissa_config['pissa_load']=="" and not os.path.isfile(f'{args.proj_dir}/init_pissa.pth'):
+        if args.pissa_config['pissa_load'] == "" and not os.path.isfile(f'{args.proj_dir}/init_pissa.pth'):
             init_dict = {}
             rank_zero_info(f"########## Init PISSA... ##########")
             for name, m in model.named_modules():
@@ -459,41 +457,39 @@ if __name__ == "__main__":
             torch.save(init_dict, f'{args.proj_dir}/init_pissa.pth')
         if os.path.isfile(args.pissa_config['pissa_load']):
             model.load_state_dict(torch.load(args.pissa_config['pissa_load'], map_location="cpu"),
-                                strict=False)
+                                  strict=False)
             pissa_init = torch.load(args.pissa_config['pissa_init'], map_location="cpu")
             rank_zero_info(f"########## Load PISSA... ##########")
             for name, m in model.named_modules():
                 if hasattr(m, "pissa_load") and callable(getattr(m, "pissa_load")):
                     m.pissa_load(pissa_init[f'{name}.init_lora_A'], pissa_init[f'{name}.init_lora_B'])
-    
-    if args.quant!='none':
+
+    if args.quant != 'none':
         rank_zero_info(f"########## Quant... ##########")
         for name, m in model.named_modules():
             if hasattr(m, "quant") and callable(getattr(m, "quant")):
-                    m.quant(args.quant)
+                m.quant(args.quant)
 
     from pytorch_lightning.strategies import SingleDeviceStrategy
     if args.accelerator.lower() == "gpu":
-        actual_acc = args.accelerator # work for NV, AMD, 沐曦
+        actual_acc = args.accelerator  # work for NV, AMD, 沐曦
         actual_strategy = args.strategy
     elif args.accelerator.lower() == "xpu":
         from devices.xpu import XPUAccelerator
-        actual_acc = XPUAccelerator() # work for Intel
+        actual_acc = XPUAccelerator()  # work for Intel
         # FIXME
         actual_strategy = SingleDeviceStrategy(device="xpu")
     elif args.accelerator.lower() == "musa":
-        from devices.musa import MUSAAccelerator # work for Morethreads
+        from devices.musa import MUSAAccelerator  # work for Morethreads
         actual_acc = MUSAAccelerator()
         actual_strategy = SingleDeviceStrategy(device="musa")
     else:
         raise ValueError(f"Unknown accelerator {args.accelerator}")
-    
-    
-    
-    if pl.__version__[0]=='2':
-        trainer = Trainer(accelerator=actual_acc,  strategy=actual_strategy, devices=args.devices,num_nodes=args.num_nodes,precision=args.precision,
-        logger=args.logger,callbacks=[train_callback(args)],max_epochs=args.max_epochs,check_val_every_n_epoch=args.check_val_every_n_epoch,num_sanity_val_steps=args.num_sanity_val_steps,
-        log_every_n_steps=args.log_every_n_steps,enable_checkpointing=args.enable_checkpointing,accumulate_grad_batches=args.accumulate_grad_batches,gradient_clip_val=args.gradient_clip_val)
+
+    if pl.__version__[0] == '2':
+        trainer = Trainer(accelerator=actual_acc, strategy=actual_strategy, devices=args.devices, num_nodes=args.num_nodes, precision=args.precision,
+                          logger=args.logger, callbacks=[train_callback(args)], max_epochs=args.max_epochs, check_val_every_n_epoch=args.check_val_every_n_epoch, num_sanity_val_steps=args.num_sanity_val_steps,
+                          log_every_n_steps=args.log_every_n_steps, enable_checkpointing=args.enable_checkpointing, accumulate_grad_batches=args.accumulate_grad_batches, gradient_clip_val=args.gradient_clip_val)
     else:
         trainer = Trainer.from_argparse_args(
             args,
@@ -517,14 +513,14 @@ if __name__ == "__main__":
         os.environ["RWKV_OPTIM"] = 'adam_mini'
 
     # must set shuffle=False, persistent_workers=False (because worker is in another thread)
-    train_data.real_epoch=trainer.current_epoch
-    train_data.rank=trainer.global_rank
-    train_data.world_size=trainer.world_size
-    
-    data_shuffle = True if args.data_shuffle==1 else False
-    if int(args.devices)>1 : 
+    train_data.real_epoch = trainer.current_epoch
+    train_data.rank = trainer.global_rank
+    train_data.world_size = trainer.world_size
+
+    data_shuffle = True if args.data_shuffle == 1 else False
+    if int(args.devices) > 1:
         data_shuffle = False
-    if args.epoch_count>1:
+    if args.epoch_count > 1:
         data_shuffle = True
 
     data_loader = DataLoader(train_data, shuffle=args.data_shuffle, pin_memory=True, batch_size=args.micro_bsz, num_workers=1, persistent_workers=False, drop_last=True)

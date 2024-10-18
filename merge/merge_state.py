@@ -15,10 +15,10 @@ parser.add_argument("--output", default="", type=str)
 parser.add_argument("--device", default="cuda", type=str)
 # parser.add_argument("--lora_alpha", default=16, type=int)
 args = parser.parse_args()
-device= args.device
+device = args.device
 base_model = args.base_model
-state= args.state_checkpoint
-output= args.output
+state = args.state_checkpoint
+output = args.output
 
 
 with torch.no_grad():
@@ -32,5 +32,5 @@ with torch.no_grad():
     # merge LoRA weights
     for k in w.keys():
         print(k)
-    
+
     torch.save(w, output)

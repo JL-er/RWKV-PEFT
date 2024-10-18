@@ -3,10 +3,10 @@ proj_dir='/home/lzy/workspace/RWKV-PEFT/test/output'
 data_file='/home/lzy/workspace/RWKV-PEFT/test/input/bad_text_document'
 
 
-N_LAYER="12"
-N_EMBD="768"
+n_layer=12
+n_embd=768
 
-micro_bsz=16
+micro_bsz=2
 epoch_save=10
 epoch_steps=800
 ctx_len=512

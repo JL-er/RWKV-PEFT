@@ -2,7 +2,11 @@
 # The RWKV Language Model - https://github.com/BlinkDL/RWKV-LM
 ########################################################################################################
 
-import json, math, random, os, sys
+import json
+import math
+import random
+import os
+import sys
 import numpy as np
 import torch
 from torch.utils.data import Dataset
@@ -11,6 +15,7 @@ from .binidx import MMapIndexedDataset
 from .utils import MaybeIsPrime
 from rwkv.utils import PIPELINE
 pipeline = PIPELINE('rwkv6', "rwkv_vocab_v20230424")
+
 
 class MyDataset(Dataset):
     def __init__(self, args):
@@ -110,11 +115,11 @@ class MyDataset(Dataset):
         world_size = self.world_size
 
         devices = int(args.devices)
-        if devices>1:
-            idx = idx*devices+rank
+        if devices > 1:
+            idx = idx * devices + rank
 
         if args.data_type == "uint16":
-            i = np.random.randint(0, self.data_size-1)
+            i = np.random.randint(0, self.data_size - 1)
             dix = self.data[i]
             x = torch.tensor(dix[:-1], dtype=torch.long)
             y = torch.tensor(dix[1:], dtype=torch.long)
@@ -167,14 +172,14 @@ class MyDataset(Dataset):
                     for j in range(len(data)):
                         if i < data[j][0]:
                             ii = i
-                            i = (i - (data[j-1][0] if j > 0 else 0)) % data[j][1]
+                            i = (i - (data[j - 1][0] if j > 0 else 0)) % data[j][1]
                             dix = data[j][2].get(idx=0, offset=i, length=req_len).astype(int)
                             # print(ii, j, i)
                             break
             elif args.data_type == "numpy":
-                dix = data[i : i + req_len]
+                dix = data[i: i + req_len]
             else:
-                dix = [self.stoi[s] for s in data[i : i + req_len]]
+                dix = [self.stoi[s] for s in data[i: i + req_len]]
 
             if args.my_qa_mask == 1:
                 if data == self.data_pile:
@@ -184,7 +189,7 @@ class MyDataset(Dataset):
                     z_sum = 0
                     isGood = False
                     for i in range(3, ctx_len):
-                        if dix[i] == 27 and dix[i-1] == 34 and dix[i-2] == 187 and dix[i-3] == 187:
+                        if dix[i] == 27 and dix[i - 1] == 34 and dix[i - 2] == 187 and dix[i - 3] == 187:
                             isGood = True
                         if dix[i] == 0:
                             isGood = False
@@ -208,26 +213,25 @@ class MyDataset(Dataset):
 
             if args.my_qa_mask == 1:
                 return x, y, z
-            if args.loss_mask=='qa':
+            if args.loss_mask == 'qa':
 
                 t1 = pipeline.encode('User:')
                 t2 = pipeline.encode('Assistant:')
                 mask = self.create_mask(dix, t1, t2, min_len)
                 return x, y, mask
-            
-            if args.loss_mask=='pad':
-                mask = torch.zeros(req_len-1)
-                mask[:min_len-1] = 1
+
+            if args.loss_mask == 'pad':
+                mask = torch.zeros(req_len - 1)
+                mask[:min_len - 1] = 1
                 return x, y, mask
-            if args.loss_mask=='se':
+            if args.loss_mask == 'se':
                 t1 = pipeline.encode(args.mask_id['mask0'])
                 t2 = pipeline.encode(args.mask_id['mask1'])
                 mask = self.generate_mask(dix, t1, t2, min_len)
                 return x, y, mask
-                
 
             return x, y
-        
+
     def create_mask(self, seq, token1, token2, min_len):
         # 找到所有特殊标记的索引
         indices1 = []
@@ -240,7 +244,7 @@ class MyDataset(Dataset):
             if np.array_equal(seq[i:i + len(token2)], token2):
                 indices2.append(i)
         mask = torch.zeros(seq.shape)
-        #assert len(indices2)!=0 and len(indices1)!=0
+        # assert len(indices2)!=0 and len(indices1)!=0
         select = 0
         for i in range(min_len):
             if i in indices1:
@@ -248,22 +252,22 @@ class MyDataset(Dataset):
             elif i in indices2:
                 select = 1
             mask[i] = select
-        if torch.sum(mask)==0:
-            mask[:min_len-1] = 1
+        if torch.sum(mask) == 0:
+            mask[:min_len - 1] = 1
         return mask[1:]
-    
+
     def generate_mask(seq, token1, token2, min_len):
         mask = torch.zeros(seq.shape)  # 初始化mask列表，默认全为0
         current_mask_value = 0  # 初始状态下，所有位置的mask值为0
 
         i = 0
         while i < min_len:
-            if seq[i:i+len(token1)] == token1:
+            if seq[i:i + len(token1)] == token1:
                 current_mask_value = 0
                 for j in range(len(token1)):
                     mask[i + j] = current_mask_value
                 i += len(token1)
-            elif seq[i:i+len(token2)] == token2:
+            elif seq[i:i + len(token2)] == token2:
                 current_mask_value = 1
                 for j in range(len(token2)):
                     mask[i + j] = current_mask_value
@@ -272,7 +276,6 @@ class MyDataset(Dataset):
                 mask[i] = current_mask_value
                 i += 1
 
-        if torch.sum(mask)==0:
-            mask[:min_len-1] = 1
+        if torch.sum(mask) == 0:
+            mask[:min_len - 1] = 1
         return mask[1:]
-

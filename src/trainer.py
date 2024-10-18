@@ -1,10 +1,15 @@
-import os, math, time, datetime, subprocess
+import os
+import math
+import time
+import datetime
+import subprocess
 import torch
 from torch.utils.data import DataLoader
 import pytorch_lightning as pl
 from pytorch_lightning.utilities import rank_zero_info, rank_zero_only
 import re
 import numpy as np
+
 
 def my_save(args, trainer, dd, ff):
     if '14b-run1' in ff:
@@ -20,6 +25,7 @@ def my_save(args, trainer, dd, ff):
         subprocess.Popen(f" aws s3 mv {fff} s3://rwkv-world/{aa}-{fn} --quiet", shell=True)
     else:
         torch.save(dd, ff)
+
 
 class train_callback(pl.Callback):
     def __init__(self, args):
@@ -49,12 +55,12 @@ class train_callback(pl.Callback):
             # if trainer.is_global_zero:
             #     print(trainer.global_step, decay_step, decay_total, w_step, progress, lr)
 
-        if args.my_exit_tokens != 0: # cosine decay
+        if args.my_exit_tokens != 0:  # cosine decay
             real_tokens = real_step * args.ctx_len * args.real_bsz
             warmup_tokens = w_step * args.ctx_len * args.real_bsz
             progress = (real_tokens - warmup_tokens) / (abs(args.my_exit_tokens) - warmup_tokens)
             progress = max(0, min(1, progress))
-            lr_final_factor = args.lr_final / args.lr_init                
+            lr_final_factor = args.lr_final / args.lr_init
             lr_mult = (0.5 + lr_final_factor / 2) + (0.5 - lr_final_factor / 2) * math.cos(math.pi * progress)
             if args.my_exit_tokens > 0:
                 lr = args.lr_init * lr_mult
@@ -98,7 +104,7 @@ class train_callback(pl.Callback):
                 try:
                     print(f"\n{trainer.strategy.config}\n")
                     trainer.my_log.write(f"{trainer.strategy.config}\n")
-                except:
+                except BaseException:
                     pass
                 trainer.my_log.flush()
                 if len(args.wandb) > 0:
@@ -124,10 +130,10 @@ class train_callback(pl.Callback):
                 kt_s = token_per_step / t_cost / 1000
                 self.log("REAL it/s", 1.0 / t_cost, prog_bar=True, on_step=True)
                 self.log("Kt/s", kt_s, prog_bar=True, on_step=True)
-            except:
+            except BaseException:
                 pass
             trainer.my_time_ns = t_now
-            if pl.__version__[0]=='2':
+            if pl.__version__[0] == '2':
                 trainer.my_loss = outputs["loss"]
             else:
                 trainer.my_loss = trainer.my_loss_all.float().mean().item()
@@ -139,9 +145,9 @@ class train_callback(pl.Callback):
             # self.log("s", real_step, prog_bar=True, on_step=True)
 
             if len(args.wandb) > 0:
-                if trainer.accumulate_grad_batches!=None:
-                    args.avg_loss += trainer.my_loss/trainer.accumulate_grad_batches
-                    if (batch_idx+1)%trainer.accumulate_grad_batches==0:
+                if trainer.accumulate_grad_batches is not None:
+                    args.avg_loss += trainer.my_loss / trainer.accumulate_grad_batches
+                    if (batch_idx + 1) % trainer.accumulate_grad_batches == 0:
                         lll = {"loss": args.avg_loss, "lr": trainer.my_lr, "wd": trainer.my_wd, "Gtokens": real_step * token_per_step / 1e9}
                         if kt_s > 0:
                             lll["kt/s"] = kt_s
@@ -152,7 +158,7 @@ class train_callback(pl.Callback):
                     if kt_s > 0:
                         lll["kt/s"] = kt_s
                     trainer.my_wandb.log(lll, step=int(real_step))
-        if (trainer.is_global_zero) or ('deepspeed_stage_3' in args.strategy): # save pth
+        if (trainer.is_global_zero) or ('deepspeed_stage_3' in args.strategy):  # save pth
             if args.magic_prime > 0:
                 expand_factor = 2 if args.my_qa_mask > 0 else 1
                 if int(real_step) == int(args.magic_prime * expand_factor // args.real_bsz) - 1 + int(args.my_random_steps):
@@ -166,7 +172,7 @@ class train_callback(pl.Callback):
         # if args.LISA and (batch_idx+1)%args.lisa_k==0:
         #     pl_module.requires_grad_(False)
         #     select_layers = np.random.choice(range(args.n_layer), args.lisa_r, replace=False)
-            
+
         #     for name, module in pl_module.named_modules():
         #         for pname, param in module.named_parameters():
         #             if 'emb' in pname or 'head' in pname or '.ln' in pname or 'time' in pname:
@@ -192,11 +198,10 @@ class train_callback(pl.Callback):
         #             )
         #     except Exception as e:
         #         print('Error\n\n', e, '\n\n')
-                
 
     def on_train_epoch_start(self, trainer, pl_module):
         args = self.args
-        if pl.__version__[0]=='2':
+        if pl.__version__[0] == '2':
             dataset = trainer.train_dataloader.dataset
         else:
             dataset = trainer.train_dataloader.dataset.datasets
@@ -219,14 +224,14 @@ class train_callback(pl.Callback):
                 else:
                     to_save_dict = pl_module.state_dict()
 
-                if args.state_tune or args.train_type=='state':
+                if args.state_tune or args.train_type == 'state':
                     peft_dict = {}
                     for name, state in to_save_dict.items():
                         if 'state' in name:
                             peft_dict[name] = state
                     to_save_dict = peft_dict
 
-                if args.peft!='none':
+                if args.peft != 'none':
                     peft_dict = {}
                     for name, state in to_save_dict.items():
                         if len(args.load_model) == 0:
@@ -235,13 +240,13 @@ class train_callback(pl.Callback):
                         for part in args.train_parts:
                             if part in name:
                                 peft_dict[name] = state
-                        if args.peft=='pissa' and ('lora' in name):
+                        if args.peft == 'pissa' and ('lora' in name):
                             peft_dict[name] = state
                         elif args.peft in name:
                             peft_dict[name] = state
                     # if args.peft=='lora' or args.peft=='pissa':
                     #     for name, state in to_save_dict.items():
-                           
+
                     #         if ('.lora_' in name):
                     #             peft_dict[name] = state
                     # if args.peft=='bone':
@@ -283,13 +288,13 @@ def generate_init_weight(model, init_weight_name):
             for k in load_dict:
                 try:
                     assert k in mm
-                except:
+                except BaseException:
                     print('missing', k)
                     exit(0)
                 src = load_dict[k]
                 try:
                     mm[k] = src.reshape(mm[k].shape)
-                except:
+                except BaseException:
                     tmp = mm[k].squeeze().clone()
                     print(k, src.shape, '-->', mm[k].shape)
                     ss = src.shape[0]
@@ -297,11 +302,11 @@ def generate_init_weight(model, init_weight_name):
                     for i in range(dd):
                         pos = i / dd * ss
                         if pos >= ss - 1:
-                            tmp[i] = src[ss-1]
+                            tmp[i] = src[ss - 1]
                         else:
                             p0 = int(math.floor(pos))
                             ii = pos - p0
-                            tmp[i] = src[p0] * (1-ii) + src[p0+1] * (ii)
+                            tmp[i] = src[p0] * (1 - ii) + src[p0 + 1] * (ii)
                     mm[k] = tmp.reshape(mm[k].shape)
                     sss = src.squeeze().float().cpu().numpy()
                     print(sss[:10], '...', sss[-10:])
