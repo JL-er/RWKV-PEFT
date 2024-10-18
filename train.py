@@ -182,6 +182,8 @@ if __name__ == "__main__":
     if args.random_seed >= 0:
         print(f"########## WARNING: GLOBAL SEED {args.random_seed} THIS WILL AFFECT MULTIGPU SAMPLING ##########\n" * 3)
         seed_everything(args.random_seed)
+    
+    _set_env_var()
 
     np.set_printoptions(precision=4, suppress=True, linewidth=200)
     warnings.filterwarnings("ignore", ".*Consider increasing the value of the `num_workers` argument*")
