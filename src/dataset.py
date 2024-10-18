@@ -219,6 +219,11 @@ class MyDataset(Dataset):
                 mask = torch.zeros(req_len-1)
                 mask[:min_len-1] = 1
                 return x, y, mask
+            if args.loss_mask=='se':
+                t1 = pipeline.encode(args.mask_id['mask0'])
+                t2 = pipeline.encode(args.mask_id['mask1'])
+                mask = self.generate_mask(dix, t1, t2, min_len)
+                return x, y, mask
                 
 
             return x, y
@@ -243,6 +248,30 @@ class MyDataset(Dataset):
             elif i in indices2:
                 select = 1
             mask[i] = select
+        if torch.sum(mask)==0:
+            mask[:min_len-1] = 1
+        return mask[1:]
+    
+    def generate_mask(seq, token1, token2, min_len):
+        mask = torch.zeros(seq.shape)  # 初始化mask列表，默认全为0
+        current_mask_value = 0  # 初始状态下，所有位置的mask值为0
+
+        i = 0
+        while i < min_len:
+            if seq[i:i+len(token1)] == token1:
+                current_mask_value = 0
+                for j in range(len(token1)):
+                    mask[i + j] = current_mask_value
+                i += len(token1)
+            elif seq[i:i+len(token2)] == token2:
+                current_mask_value = 1
+                for j in range(len(token2)):
+                    mask[i + j] = current_mask_value
+                i += len(token2)
+            else:
+                mask[i] = current_mask_value
+                i += 1
+
         if torch.sum(mask)==0:
             mask[:min_len-1] = 1
         return mask[1:]
