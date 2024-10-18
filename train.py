@@ -8,9 +8,23 @@ logging.basicConfig(level=logging.INFO)
 
 if __name__ == "__main__":
     from argparse import ArgumentParser
-    from pytorch_lightning import Trainer
-    from pytorch_lightning.utilities import rank_zero_info, rank_zero_only
-    import pytorch_lightning as pl
+    from lightning import Trainer
+    from lightning.pytorch import seed_everything
+    from lightning_utilities.core.rank_zero import rank_zero_info
+    import lightning as pl
+    from lightning.pytorch.strategies import SingleDeviceStrategy, FSDPStrategy, DDPStrategy, DeepSpeedStrategy
+    from lightning.pytorch.accelerators.accelerator import Accelerator
+    from lightning.pytorch.plugins import (
+                _PLUGIN_INPUT,
+                BitsandbytesPrecision,
+                CheckpointIO,
+                DeepSpeedPrecision,
+                DoublePrecision,
+                FSDPPrecision,
+                HalfPrecision,
+                MixedPrecision,
+                Precision,
+            )
     import json
     rank_zero_info("########## work in progress ##########")
 
@@ -177,7 +191,6 @@ if __name__ == "__main__":
         if args.optim == 'adam_mini':
             os.environ["RWKV_OPTIM"] = 'adam_mini'
 
-    from pytorch_lightning import seed_everything
 
     if args.random_seed >= 0:
         print(f"########## WARNING: GLOBAL SEED {args.random_seed} THIS WILL AFFECT MULTIGPU SAMPLING ##########\n" * 3)
@@ -490,8 +503,7 @@ if __name__ == "__main__":
             if hasattr(m, "quant") and callable(getattr(m, "quant")):
                 m.quant(args.quant)
 
-    from pytorch_lightning.strategies import SingleDeviceStrategy, FSDPStrategy, DDPStrategy, DeepSpeedStrategy
-    from pytorch_lightning.accelerators.accelerator import Accelerator
+    
     def _get_strategy(strategy: str, devices: int, accelerator: Accelerator):
         if strategy == "auto":
             if devices == 1:

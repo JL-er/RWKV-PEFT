@@ -2,7 +2,7 @@ import torch
 
 from functools import lru_cache
 from typing import Any, Dict, Union
-from pytorch_lightning.accelerators.accelerator import Accelerator
+from lightning.pytorch.accelerators.accelerator import Accelerator
 
 from typing_extensions import override
 
@@ -73,3 +73,8 @@ class XPUAccelerator(Accelerator):
             cls,
             description=f"XPU Accelerator - optimized for large-scale machine learning.",
         )
+
+    @staticmethod
+    @override
+    def get_device() -> str:
+        return "xpu"

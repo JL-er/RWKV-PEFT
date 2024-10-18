@@ -10,7 +10,7 @@ import sys
 import numpy as np
 import torch
 from torch.utils.data import Dataset
-from pytorch_lightning.utilities import rank_zero_info
+from lightning_utilities.core.rank_zero import rank_zero_info
 from .binidx import MMapIndexedDataset
 from .utils import MaybeIsPrime
 from rwkv.utils import PIPELINE
