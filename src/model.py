@@ -3,7 +3,6 @@
 ########################################################################################################
 from torch.utils.checkpoint import checkpoint as torch_checkpoint
 from torch.profiler import profile, record_function, ProfilerActivity
-#from adam_mini import Adam_mini
 
 import os, math, gc, importlib
 import torch
@@ -14,12 +13,13 @@ from torch.nn import functional as F
 import pytorch_lightning as pl
 from pytorch_lightning.utilities import rank_zero_info, rank_zero_only
 from pytorch_lightning.strategies import DeepSpeedStrategy
-if importlib.util.find_spec('deepspeed'):
+from torch.optim import Adam
+if importlib.util.find_spec('deepspeed') and os.environ.get("USE_DEEPSPEED", "0") == '1':
     import deepspeed
     from deepspeed.ops.adam import DeepSpeedCPUAdam, FusedAdam
 from .infctx_module import *
-from .wkv import RUN_CUDA_RWKV6_STATE, RUN_CUDA_RWKV5, RUN_CUDA_RWKV6
-from .rwkvLinear import make_linear_att, make_linear_ffn, LORA_CONFIG
+from .wkv import RUN_WKV6_GENERAL, RUN_WKV5_GENERAL
+from .rwkvLinear import make_linear_att, make_linear_ffn
 from .l2warp import L2Wrap
 
 try:
@@ -124,7 +124,7 @@ class RWKV_TimeMix_RWKV5(MyModule):
 
         r, k, v, g = self.jit_func(x)
 
-        x = RUN_CUDA_RWKV5(B, T, C, H, r, k, v, w=self.time_decay, u=self.time_faaaa)
+        x = RUN_WKV5_GENERAL(B, T, C, H, r, k, v, w=self.time_decay, u=self.time_faaaa)
 
         return self.jit_func_2(x, g)
 
@@ -227,7 +227,7 @@ class RWKV_Tmix_x060(MyModule):
         H = self.n_head
 
         r, k, v, g, w = self.jit_func(x)
-        x = RUN_CUDA_RWKV6(B, T, C, H, r, k, v, w, u=self.time_faaaa)
+        x, _ = RUN_WKV6_GENERAL(B, T, C, H, r, k, v, w, u=self.time_faaaa)
 
         return self.jit_func_2(x, g)
 
@@ -334,7 +334,7 @@ class RWKV_Tmix_x060_state(MyModule):
         H = self.n_head
 
         r, k, v, g, w = self.jit_func(x)
-        x, _ = RUN_CUDA_RWKV6_STATE(B, T, C, H, r, k, v, w, u=self.time_faaaa, s=self.time_state)
+        x, _ = RUN_WKV6_GENERAL(B, T, C, H, r, k, v, w, u=self.time_faaaa, s=self.time_state)
 
         return self.jit_func_2(x, g)
 ########################################################################################################
@@ -532,7 +532,7 @@ class RWKV_Tmix_x060_infctx(MyModule):
         r, k, v, g, w, lx = self.jit_func(x, shift_state)
         ######
         wkv_state = last_state.wkv_state.clone().contiguous()
-        x, wkv_state = RUN_CUDA_RWKV6_STATE(B, T, C, H, r, k, v, w, u=self.time_faaaa, s=wkv_state)
+        x, wkv_state = RUN_WKV6_GENERAL(B, T, C, H, r, k, v, w, u=self.time_faaaa, s=wkv_state)
         #wkv_state = last_state.wkv_state
         return self.jit_func_2(x, g, TimeMixState(lx, wkv_state))
 
@@ -778,15 +778,22 @@ class RWKV(pl.LightningModule):
             optim_groups += [{"params": [param_dict[n] for n in lr_decay], "weight_decay": args.weight_decay, "my_lr_scale": 1.0}]
             if args.optim=='adam_mini':
                 return Adam_mini(self, lr=self.args.lr_init, betas=self.args.betas, eps=self.args.adam_eps, weight_decay=0, model_sharding=True, n_feature=args.n_embd, n_head=args.n_embd//64, lora_r=8)
-            if self.deepspeed_offload:
-                return DeepSpeedCPUAdam(optim_groups, lr=self.args.lr_init, betas=self.args.betas, eps=self.args.adam_eps, bias_correction=True, adamw_mode=True, amsgrad=False)
-            return FusedAdam(optim_groups, lr=self.args.lr_init, betas=self.args.betas, eps=self.args.adam_eps, bias_correction=True, adam_w_mode=True, amsgrad=False)
+            if os.environ.get("USE_DEEPSPEED", "0") == "1":
+                if self.deepspeed_offload:
+                    return DeepSpeedCPUAdam(optim_groups, lr=self.args.lr_init, betas=self.args.betas, eps=self.args.adam_eps, bias_correction=True, adamw_mode=True, amsgrad=False)
+                return FusedAdam(optim_groups, lr=self.args.lr_init, betas=self.args.betas, eps=self.args.adam_eps, bias_correction=True, adam_w_mode=True, amsgrad=False)
+            else:
+                # use normal adam
+                return Adam(optim_groups, lr=self.args.lr_init, betas=self.args.betas, eps=self.args.adam_eps, weight_decay=0, amsgrad=False)
         else:
             if args.optim=='adam_mini':
                 return Adam_mini(self, lr=self.args.lr_init, betas=self.args.betas, eps=self.args.adam_eps, weight_decay=0, model_sharding=True, n_feature=args.n_embd, n_head=args.n_embd//64, lora_r=8)
-            if self.deepspeed_offload:
-                return DeepSpeedCPUAdam(optim_groups, lr=self.args.lr_init, betas=self.args.betas, eps=self.args.adam_eps, bias_correction=True, adamw_mode=False, weight_decay=0, amsgrad=False)
-            return FusedAdam(optim_groups, lr=self.args.lr_init, betas=self.args.betas, eps=self.args.adam_eps, bias_correction=True, adam_w_mode=False, weight_decay=0, amsgrad=False)
+            if os.environ.get("USE_DEEPSPEED", "0") == "1":
+                if self.deepspeed_offload:
+                    return DeepSpeedCPUAdam(optim_groups, lr=self.args.lr_init, betas=self.args.betas, eps=self.args.adam_eps, bias_correction=True, adamw_mode=False, weight_decay=0, amsgrad=False)
+                return FusedAdam(optim_groups, lr=self.args.lr_init, betas=self.args.betas, eps=self.args.adam_eps, bias_correction=True, adam_w_mode=False, weight_decay=0, amsgrad=False)
+            else:
+                return Adam(optim_groups, lr=self.args.lr_init, betas=self.args.betas, eps=self.args.adam_eps, weight_decay=0, amsgrad=False)
         # return ZeroOneAdam(optim_groups, lr=self.args.lr_init, betas=self.args.betas, eps=self.args.adam_eps, bias_correction=True, weight_decay=0, amsgrad=False, cuda_aware=False)
 
     @property
@@ -915,24 +922,13 @@ class RWKV(pl.LightningModule):
 
             if args.dropout > 0:
                 x = self.drop0(x)
-            if args.tiny_att_dim > 0:
-                for block in self.blocks:
-                    if args.grad_cp == 1:
-                        if args.state_tune or args.train_type == 'state' or args.peft !='none':
-                            x = torch_checkpoint(block, x, x_emb, use_reentrant=False)
-                        else:
-                            x = deepspeed.checkpointing.checkpoint(block, x, x_emb)
-                    else:
-                        x = block(x, x_emb)
-            else:
-                for block in self.blocks:
-                    if args.grad_cp == 1:
-                        if args.state_tune or args.train_type == 'state' or args.peft !='none':
-                            x = torch_checkpoint(block, x, x_emb ,use_reentrant=False)
-                        else:
-                            x = deepspeed.checkpointing.checkpoint(block, x)
-                    else:
-                        x = block(x)
+
+            for block in self.blocks:
+                if args.grad_cp == 1:
+                    x = torch_checkpoint(block, x, x_emb, use_reentrant=False)
+                else:
+                    x = block(x, x_emb)
+
 
             x = self.ln_out(x)
 

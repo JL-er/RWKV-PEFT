@@ -3,3 +3,4 @@ wandb/
 src/__pycache__/
 demo/
 fla/
+test/*

@@ -135,6 +135,7 @@ if __name__ == "__main__":
     from torch.utils.data import DataLoader
     if "deepspeed" in args.strategy:
         import deepspeed
+        os.environ["USE_DEEPSPEED"] = "1"
     from pytorch_lightning import seed_everything
 
     if args.random_seed >= 0:
@@ -164,12 +165,15 @@ if __name__ == "__main__":
     os.environ["RWKV_HEAD_SIZE_A"] = str(args.head_size_a)
     ######state tuning
     os.environ["RWKV_TRAIN_TYPE"]=''
+    assert args.train_type in ['none', 'state', 'infctx','finetune']
     if args.train_type=='state':
         os.environ["RWKV_TRAIN_TYPE"]='states'
     elif args.train_type=='infctx':
         os.environ["RWKV_TRAIN_TYPE"]='infctx'
 
     os.environ["WKV"]='fla' if args.fla else ''
+    if args.fla:
+        print('FLA use triton as backend, and always rember to upgrade the latest version of both triton and rwkv-fla.')
     if args.dim_att <= 0:
         args.dim_att = args.n_embd
     if args.dim_ffn <= 0:
@@ -298,9 +302,10 @@ if __name__ == "__main__":
 
     train_data = MyDataset(args)
     args.vocab_size = train_data.vocab_size
-    from src.rwkvLinear import LORA_CONFIG, LoraLinear, BONE_CONFIG
+    
     from src.model import RWKV
     if args.peft=='lora' :
+        from src.rwkvLinear import LORA_CONFIG
         assert args.lora_config['lora_r'] > 0, "LoRA should have its `r` > 0"
         LORA_CONFIG["r"] = args.lora_config['lora_r']
         LORA_CONFIG["alpha"] = args.lora_config['lora_alpha']
@@ -312,12 +317,17 @@ if __name__ == "__main__":
         #LORA_CONFIG["parts"] = set(str(args.pissa_config['pissa_parts']).split(','))
     if args.quant!='none':
         LORA_CONFIG["quant"]=True
+        os.environ["RWKV_QUANT"] = 1
     if args.peft=='bone':
+        from src.rwkvLinear import BONE_CONFIG
         BONE_CONFIG["r"] = args.bone_config['bone_r']
 
     model = RWKV(args)
     print(model)
     freeze=False
+
+    if args.train_type == 'state':
+        args.state_tune = True
 
     if args.train_type=='state' or args.state_tune:
         model.requires_grad_(False)
@@ -457,9 +467,26 @@ if __name__ == "__main__":
             if hasattr(m, "quant") and callable(getattr(m, "quant")):
                     m.quant(args.quant)
 
-
+    from pytorch_lightning.strategies import SingleDeviceStrategy
+    if args.accelerator.lower() == "gpu":
+        actual_acc = args.accelerator # work for NV, AMD, 沐曦
+        actual_strategy = args.strategy
+    elif args.accelerator.lower() == "xpu":
+        from devices.xpu import XPUAccelerator
+        actual_acc = XPUAccelerator() # work for Intel
+        # FIXME
+        actual_strategy = SingleDeviceStrategy(device="xpu")
+    elif args.accelerator.lower() == "musa":
+        from devices.musa import MUSAAccelerator # work for Morethreads
+        actual_acc = MUSAAccelerator()
+        actual_strategy = SingleDeviceStrategy(device="musa")
+    else:
+        raise ValueError(f"Unknown accelerator {args.accelerator}")
+    
+    
+    
     if pl.__version__[0]=='2':
-        trainer = Trainer(accelerator=args.accelerator,strategy=args.strategy,devices=args.devices,num_nodes=args.num_nodes,precision=args.precision,
+        trainer = Trainer(accelerator=actual_acc,  strategy=actual_strategy, devices=args.devices,num_nodes=args.num_nodes,precision=args.precision,
         logger=args.logger,callbacks=[train_callback(args)],max_epochs=args.max_epochs,check_val_every_n_epoch=args.check_val_every_n_epoch,num_sanity_val_steps=args.num_sanity_val_steps,
         log_every_n_steps=args.log_every_n_steps,enable_checkpointing=args.enable_checkpointing,accumulate_grad_batches=args.accumulate_grad_batches,gradient_clip_val=args.gradient_clip_val)
     else:

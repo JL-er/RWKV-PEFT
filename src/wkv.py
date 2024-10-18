@@ -3,20 +3,26 @@ import torch
 from einops import rearrange
 from fla.ops.rwkv6 import chunk_rwkv6, fused_recurrent_rwkv6
 
+
+RUN_WKV6_GENERAL = None
+RUN_WKV5_GENERAL = None
 ########################################################################################################
 # CUDA Kernel
 ########################################################################################################
 scale_factor = 1.0 if os.environ["RWKV_FLOAT_MODE"] != "fp16" else -1.0
+def RUN_CUDA_RWKV6_STATE_FLA(B, T, C, H, r, k, v, w, u, s=None):
+    r = rearrange(r, 'b l (h d) -> b h l d', h = H)
+    k = rearrange(k, 'b l (h d) -> b h l d', h = H)
+    v = rearrange(v, 'b l (h d) -> b h l d', h = H)
+    w = rearrange(-torch.exp(w), 'b l (h d) -> b h l d', h = H)
+    o, state = chunk_rwkv6(r, k, v, w, u=u, scale=scale_factor, initial_state=s, output_final_state=True)
+    x = rearrange(o, 'b h l d -> b l (h d)')
+    return x, state
+
+
 if os.environ["WKV"] == 'fla':
     if 'x060' in os.environ["RWKV_MY_TESTING"]:
-        def RUN_CUDA_RWKV6_STATE(B, T, C, H, r, k, v, w, u, s=None):
-            r = rearrange(r, 'b l (h d) -> b h l d', h = H)
-            k = rearrange(k, 'b l (h d) -> b h l d', h = H)
-            v = rearrange(v, 'b l (h d) -> b h l d', h = H)
-            w = rearrange(-torch.exp(w), 'b l (h d) -> b h l d', h = H)
-            o, state = chunk_rwkv6(r, k, v, w, u=u, scale=scale_factor, initial_state=s, output_final_state=True)
-            x = rearrange(o, 'b h l d -> b l (h d)')
-            return x, state
+        RUN_WKV6_GENERAL = RUN_CUDA_RWKV6_STATE_FLA
     else:
         # 'fla only supports x060'
         raise NotImplementedError('fla only supports x060')
@@ -85,11 +91,12 @@ else:
             def RUN_CUDA_RWKV6_STATE(B, T, C, H, r, k, v, w, u, s):
                 x = WKV_6STATE.apply(B, T, C, H, r, k, v, w, u, s)
                 return x, s
+            RUN_WKV6_GENERAL = RUN_CUDA_RWKV6_STATE
         else:
             wkv6_cuda = load(name="wkv6", sources=["cuda/wkv6_op.cpp", f"cuda/wkv6_cuda.cu"],
                             verbose=True, extra_cuda_cflags=["-res-usage", "--use_fast_math", "-O3", "-Xptxas -O3", "--extra-device-vectorization", f"-D_N_={HEAD_SIZE}", f"-D_T_={int(os.environ['RWKV_CTXLEN'])}"])
                 
-            class WKV_6(torch.autograd.Function):
+            class WKV_6_NO_STATE(torch.autograd.Function):
                 @staticmethod
                 def forward(ctx, B, T, C, H, r, k, v, w, u):
                     with torch.no_grad():
@@ -133,8 +140,10 @@ else:
                         gu = torch.sum(gu, 0).view(H, C//H)
                         return (None, None, None, None, gr, gk, gv, gw, gu)
 
-            def RUN_CUDA_RWKV6(B, T, C, H, r, k, v, w, u):
-                return WKV_6.apply(B, T, C, H, r, k, v, w, u)
+            def RUN_CUDA_RWKV6(B, T, C, H, r, k, v, w, u, s=None):
+                return WKV_6_NO_STATE.apply(B, T, C, H, r, k, v, w, u), None
+    
+            RUN_WKV6_GENERAL = RUN_CUDA_RWKV6
     else:
         wkv5_cuda = load(name="wkv5", sources=["cuda/wkv5_op.cpp", f"cuda/wkv5_cuda.cu"],
                         verbose=True, extra_cuda_cflags=["-res-usage", "--use_fast_math", "-O3", "-Xptxas -O3", "--extra-device-vectorization", f"-D_N_={HEAD_SIZE}"])
@@ -187,3 +196,5 @@ else:
 
         def RUN_CUDA_RWKV5(B, T, C, H, r, k, v, w, u):
             return WKV_5.apply(B, T, C, H, r, k, v, w, u)
+        
+        RUN_WKV5_GENERAL = RUN_CUDA_RWKV5

@@ -1,6 +1,8 @@
 import torch, math
 import torch.nn as nn
-import bitsandbytes as bnb
+import os
+if os.environ.get("RWKV_QUANT", "0") == "1":
+    import bitsandbytes as bnb
 from torch.nn import functional as F
 from torch._lowrank import svd_lowrank
 import functools
@@ -8,17 +10,17 @@ from einops import rearrange
 from torch.utils.checkpoint import checkpoint as torch_checkpoint
 #from .blaff import flash_bone
 
-def rwkv_quantize(quant_type, weight):
+def rwkv_quantize(quant_type, weight: nn.Parameter):
     if quant_type=='4bit':
-        qweight, qstate= bnb.functional.quantize_4bit((weight.data).to('cuda'))
+        qweight, qstate= bnb.functional.quantize_4bit((weight.data).to(weight.device))
     elif quant_type=='nf4':
-        qweight, qstate= bnb.functional.quantize_nf4((weight.data).to('cuda'))
+        qweight, qstate= bnb.functional.quantize_nf4((weight.data).to(weight.device))
     elif quant_type=='fp4':
-        qweight, qstate= bnb.functional.quantize_fp4((weight.data).to('cuda'))
+        qweight, qstate= bnb.functional.quantize_fp4((weight.data).to(weight.device))
     elif quant_type=='int8':
-        qweight, qstate= bnb.functional.quantize((weight.data).to('cuda'))
+        qweight, qstate= bnb.functional.quantize((weight.data).to(weight.device))
     elif quant_type=='fp8':
-        qweight = weight.data.to(dtype = torch.float8_e4m3fn,device = 'cuda')
+        qweight = weight.data.to(dtype = torch.float8_e4m3fn,device = weight.device)
         qstate = None
     return qweight, qstate
 
@@ -36,7 +38,7 @@ def rwkv_dequantize(quant_type, weight, qstate):
         deweight= weight.data
     return deweight.to(torch.bfloat16)
 
-@torch.jit.script
+@torch.compile
 def fp8_matmul_(a,b): # shape3 @ shape2 only
     with torch.no_grad():
         if b.dtype == torch.float8_e4m3fn:
@@ -51,8 +53,8 @@ def fp8_matmul_(a,b): # shape3 @ shape2 only
                     b,
                     bias=None,
                     out_dtype=a.dtype,
-                    scale_a=torch.tensor(1.0, device='cuda'),
-                    scale_b=torch.tensor(1.0, device='cuda')
+                    scale_a=torch.tensor(1.0, device=xg.device),
+                    scale_b=torch.tensor(1.0, device=xg.device)
                 )
                 #x.requires_grad = False
                 return x.view(S0, S1, -1)
@@ -128,7 +130,7 @@ class LoraLinear(nn.Module):
     def quant(self, quant_type):
         self.is_quant = True
         self.quant_type = quant_type
-        self.qweight, self.qstate= rwkv_quantize(self.quant_type, (self.weight.data).to('cuda'))
+        self.qweight, self.qstate= rwkv_quantize(self.quant_type, (self.weight.data).to(self.weight.device))
         self.weight = None # Because Latest Pytorch-lightning forced to BF16 type. thats why delete
 
     def forward(self, x):
@@ -171,7 +173,7 @@ class QuantLinear(nn.Module):
         self.is_quant = True
         self.quant_type = quant_type
         #self.dummy_tensor = nn.Parameter(torch.zeros(1))
-        self.weight.data, self.qstate= rwkv_quantize(self.quant_type, (self.weight.data).to('cuda'))
+        self.weight.data, self.qstate= rwkv_quantize(self.quant_type, (self.weight.data).to(self.weight.device))
     def forward(self, x):
 
         if self.is_quant:
@@ -208,7 +210,7 @@ class BoneLinear(nn.Module):
     def quant(self, quant_type):
         self.is_quant = True
         self.quant_type = quant_type
-        self.qweight, self.qstate= rwkv_quantize(self.quant_type, (self.weight.data).to('cuda'))
+        self.qweight, self.qstate= rwkv_quantize(self.quant_type, (self.weight.data).to(self.weight.device))
         self.weight = None # Because Latest Pytorch-lightning forced to BF16 type. thats why delete
 
     def forward(self, x):
