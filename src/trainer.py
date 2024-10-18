@@ -6,6 +6,8 @@ from pytorch_lightning.utilities import rank_zero_info, rank_zero_only
 from .rwkvLinear import LORA_CONFIG, BONE_CONFIG
 import re
 import numpy as np
+import streamlit as st
+import json
 
 def my_save(args, trainer, dd, ff):
     if '14b-run1' in ff:
@@ -21,11 +23,22 @@ def my_save(args, trainer, dd, ff):
         subprocess.Popen(f" aws s3 mv {fff} s3://rwkv-world/{aa}-{fn} --quiet", shell=True)
     else:
         torch.save(dd, ff)
+        
+
 
 class train_callback(pl.Callback):
     def __init__(self, args):
         super().__init__()
         self.args = args
+        self.loss_file = os.path.join(args.proj_dir, "loss_data.json")
+        if os.path.exists(self.loss_file):
+            os.remove(self.loss_file)
+            
+    def write_data(self, loss_data, t_cost, kt_s):
+        # 将loss数据写入文件，便于streamlit绘图
+        with open(self.loss_file, 'a') as f:
+            json.dump({"loss": loss_data, "t_cost": t_cost, "kt_s": kt_s}, f)
+            f.write('\n')
 
     def on_train_batch_start(self, trainer, pl_module, batch, batch_idx):
         args = self.args
@@ -120,6 +133,7 @@ class train_callback(pl.Callback):
         if trainer.is_global_zero:  # logging
             t_now = time.time_ns()
             kt_s = 0
+            t_cost = 0
             try:
                 t_cost = (t_now - trainer.my_time_ns) / 1e9
                 kt_s = token_per_step / t_cost / 1000
@@ -137,22 +151,43 @@ class train_callback(pl.Callback):
             trainer.my_epoch_loss = trainer.my_loss_sum / trainer.my_loss_count
             self.log("lr", trainer.my_lr, prog_bar=True, on_step=True)
             self.log("loss", trainer.my_epoch_loss, prog_bar=True, on_step=True)
+           
             # self.log("s", real_step, prog_bar=True, on_step=True)
 
-            if len(args.wandb) > 0:
-                if trainer.accumulate_grad_batches!=None:
-                    args.avg_loss += trainer.my_loss/trainer.accumulate_grad_batches
-                    if (batch_idx+1)%trainer.accumulate_grad_batches==0:
+            # if len(args.wandb) > 0:
+            #     if trainer.accumulate_grad_batches!=None:
+            #         args.avg_loss += trainer.my_loss/trainer.accumulate_grad_batches
+            #         if (batch_idx+1)%trainer.accumulate_grad_batches==0:
+            #             lll = {"loss": args.avg_loss, "lr": trainer.my_lr, "wd": trainer.my_wd, "Gtokens": real_step * token_per_step / 1e9}
+            #             if kt_s > 0:
+            #                 lll["kt/s"] = kt_s
+            #             trainer.my_wandb.log(lll, step=int(real_step))
+            #             args.avg_loss = 0
+            #     else:
+            #         lll = {"loss": trainer.my_loss, "lr": trainer.my_lr, "wd": trainer.my_wd, "Gtokens": real_step * token_per_step / 1e9}
+            #         if kt_s > 0:
+            #             lll["kt/s"] = kt_s
+            #         trainer.my_wandb.log(lll, step=int(real_step))
+            # else:
+            # 将loss、t_cost、kt_s写入data.json
+            if trainer.accumulate_grad_batches!=None:
+                args.avg_loss += trainer.my_loss / trainer.accumulate_grad_batches
+                if (batch_idx+1) % trainer.accumulate_grad_batches == 0:
+                    if len(args.wandb) > 0:
                         lll = {"loss": args.avg_loss, "lr": trainer.my_lr, "wd": trainer.my_wd, "Gtokens": real_step * token_per_step / 1e9}
                         if kt_s > 0:
                             lll["kt/s"] = kt_s
-                        trainer.my_wandb.log(lll, step=int(real_step))
-                        args.avg_loss = 0
-                else:
+                            trainer.my_wandb.log(lll, step=int(real_step))
+                    self.write_data(args.avg_loss, t_cost, kt_s)
+                    args.avg_loss = 0
+            else:
+                if len(args.wandb) > 0:
                     lll = {"loss": trainer.my_loss, "lr": trainer.my_lr, "wd": trainer.my_wd, "Gtokens": real_step * token_per_step / 1e9}
                     if kt_s > 0:
                         lll["kt/s"] = kt_s
                     trainer.my_wandb.log(lll, step=int(real_step))
+                self.write_data(trainer.my_loss, t_cost, kt_s)
+                
         if (trainer.is_global_zero) or ('deepspeed_stage_3' in args.strategy): # save pth
             if args.magic_prime > 0:
                 expand_factor = 2 if args.my_qa_mask > 0 else 1
@@ -315,3 +350,4 @@ def generate_init_weight(model, init_weight_name):
     if model.args.my_pile_stage == 1:
         print("Done. Now go for stage 2.")
         exit(0)
+
