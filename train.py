@@ -515,11 +515,11 @@ if __name__ == "__main__":
     elif args.accelerator.lower() == "xpu":
         from devices.xpu import XPUAccelerator
         actual_acc = XPUAccelerator()  # work for Intel
-        actual_strategy = _get_strategy(args.strategy, "xpu")
+        actual_strategy = _get_strategy(args.strategy, "xpu", accelerator=actual_acc)
     elif args.accelerator.lower() == "musa":
         from devices.musa import MUSAAccelerator  # work for Morethreads
         actual_acc = MUSAAccelerator()
-        actual_strategy = _get_strategy(args.strategy, "musa")
+        actual_strategy = _get_strategy(args.strategy, "musa", accelerator=actual_acc)
     else:
         raise ValueError(f"Unknown accelerator {args.accelerator}")
 
