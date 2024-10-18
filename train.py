@@ -137,9 +137,46 @@ if __name__ == "__main__":
     import numpy as np
     import torch
     from torch.utils.data import DataLoader
-    if "deepspeed" in args.strategy:
-        import deepspeed
-        os.environ["USE_DEEPSPEED"] = "1"
+
+    def _set_env_var():
+        if "deepspeed" in args.strategy:
+            import deepspeed
+            os.environ["USE_DEEPSPEED"] = "1"
+        if args.optim == 'adam_mini':
+            os.environ["RWKV_OPTIM"] = 'adam_mini'
+        os.environ["RWKV_MY_TESTING"] = args.my_testing
+        os.environ["RWKV_CTXLEN"] = str(args.ctx_len)
+        os.environ["RWKV_HEAD_SIZE_A"] = str(args.head_size_a)
+        # state tuning
+        os.environ["RWKV_TRAIN_TYPE"] = ''
+        assert args.train_type in ['none', 'state', 'infctx', 'finetune']
+        if args.train_type == 'state':
+            os.environ["RWKV_TRAIN_TYPE"] = 'states'
+        elif args.train_type == 'infctx':
+            os.environ["RWKV_TRAIN_TYPE"] = 'infctx'
+
+        os.environ["WKV"] = 'fla' if args.fla else ''
+        if args.fla:
+            print('FLA use triton as backend, and always rember to upgrade the latest version of both triton and rwkv-fla.')
+        os.environ["L2WRAP_SPARSE"] = str(args.l2warp_sparse)
+        os.environ["RWKV_FLOAT_MODE"] = args.precision
+
+        if args.precision == "fp32":
+            for i in range(10):
+                rank_zero_info("\n\nNote: you are using fp32 (very slow). Try bf16 / tf32 for faster training.\n\n")
+        if args.precision == "fp16":
+            rank_zero_info("\n\nNote: you are using fp16 (might overflow). Try bf16 / tf32 for stable training.\n\n")
+
+        os.environ["RWKV_JIT_ON"] = "0"
+        if "deepspeed_stage_3" in args.strategy:
+            os.environ["RWKV_JIT_ON"] = "0"
+
+        if args.quant != 'none':
+            os.environ["RWKV_QUANT"] = 1
+
+        if args.optim == 'adam_mini':
+            os.environ["RWKV_OPTIM"] = 'adam_mini'
+
     from pytorch_lightning import seed_everything
 
     if args.random_seed >= 0:
@@ -164,21 +201,7 @@ if __name__ == "__main__":
         args.max_epochs = args.epoch_count
     args.betas = (args.beta1, args.beta2)
     args.real_bsz = int(args.num_nodes) * int(args.devices) * args.micro_bsz
-    os.environ["RWKV_MY_TESTING"] = args.my_testing
-    os.environ["RWKV_CTXLEN"] = str(args.ctx_len)
-    os.environ["RWKV_HEAD_SIZE_A"] = str(args.head_size_a)
-    # state tuning
-    os.environ["RWKV_TRAIN_TYPE"] = ''
-    assert args.train_type in ['none', 'state', 'infctx', 'finetune']
-    if args.train_type == 'state':
-        os.environ["RWKV_TRAIN_TYPE"] = 'states'
-    elif args.train_type == 'infctx':
-        os.environ["RWKV_TRAIN_TYPE"] = 'infctx'
 
-    os.environ["WKV"] = 'fla' if args.fla else ''
-    if args.fla:
-        print('FLA use triton as backend, and always rember to upgrade the latest version of both triton and rwkv-fla.')
-    os.environ["L2WRAP_SPARSE"] = str(args.l2warp_sparse)
     if args.dim_att <= 0:
         args.dim_att = args.n_embd
     if args.dim_ffn <= 0:
@@ -273,16 +296,12 @@ if __name__ == "__main__":
         rank_zero_info("\n\nNote: lr_final = 0 or lr_init = 0. Using linear LR schedule instead.\n\n")
 
     assert args.precision in ["fp32", "tf32", "fp16", "bf16"]
-    os.environ["RWKV_FLOAT_MODE"] = args.precision
+
     if args.precision == "fp32":
         for i in range(10):
             rank_zero_info("\n\nNote: you are using fp32 (very slow). Try bf16 / tf32 for faster training.\n\n")
     if args.precision == "fp16":
         rank_zero_info("\n\nNote: you are using fp16 (might overflow). Try bf16 / tf32 for stable training.\n\n")
-
-    os.environ["RWKV_JIT_ON"] = "0"
-    if "deepspeed_stage_3" in args.strategy:
-        os.environ["RWKV_JIT_ON"] = "0"
 
     torch.backends.cudnn.benchmark = True
     torch.backends.cudnn.enabled = True
@@ -322,7 +341,6 @@ if __name__ == "__main__":
         # LORA_CONFIG["parts"] = set(str(args.pissa_config['pissa_parts']).split(','))
     if args.quant != 'none':
         LORA_CONFIG["quant"] = True
-        os.environ["RWKV_QUANT"] = 1
     if args.peft == 'bone':
         from src.rwkvLinear import BONE_CONFIG
         BONE_CONFIG["r"] = args.bone_config['bone_r']
@@ -470,19 +488,36 @@ if __name__ == "__main__":
             if hasattr(m, "quant") and callable(getattr(m, "quant")):
                 m.quant(args.quant)
 
-    from pytorch_lightning.strategies import SingleDeviceStrategy
+    from pytorch_lightning.strategies import SingleDeviceStrategy, FSDPStrategy, DDPStrategy, DeepSpeedStrategy
+    from pytorch_lightning.accelerators.accelerator import Accelerator
+    def _get_strategy(strategy: str, devices: int, accelerator: Accelerator):
+        if strategy == "auto":
+            if devices == 1:
+                return SingleDeviceStrategy(device=devices)
+            else:
+                return DDPStrategy(parallel_devices=accelerator.get_parallel_devices(devices))
+        elif strategy == "single":
+            return SingleDeviceStrategy(device=devices)
+        elif strategy == "fsdp":
+            return FSDPStrategy(parallel_devices=accelerator.get_parallel_devices(devices))
+        elif strategy == "ddp":
+            return DDPStrategy(parallel_devices=accelerator.get_parallel_devices(devices))
+        elif strategy == "deepspeed":
+            return DeepSpeedStrategy(parallel_devices=accelerator.get_parallel_devices(devices))
+        else:
+            raise ValueError(f"Unknown strategy {strategy}")
+
     if args.accelerator.lower() == "gpu":
         actual_acc = args.accelerator  # work for NV, AMD, 沐曦
         actual_strategy = args.strategy
     elif args.accelerator.lower() == "xpu":
         from devices.xpu import XPUAccelerator
         actual_acc = XPUAccelerator()  # work for Intel
-        # FIXME
-        actual_strategy = SingleDeviceStrategy(device="xpu")
+        actual_strategy = _get_strategy(args.strategy, "xpu")
     elif args.accelerator.lower() == "musa":
         from devices.musa import MUSAAccelerator  # work for Morethreads
         actual_acc = MUSAAccelerator()
-        actual_strategy = SingleDeviceStrategy(device="musa")
+        actual_strategy = _get_strategy(args.strategy, "musa")
     else:
         raise ValueError(f"Unknown accelerator {args.accelerator}")
 
@@ -508,9 +543,6 @@ if __name__ == "__main__":
     if "deepspeed" in args.strategy:
         trainer.strategy.config["zero_optimization"]["allgather_bucket_size"] = args.ds_bucket_mb * 1000 * 1000
         trainer.strategy.config["zero_optimization"]["reduce_bucket_size"] = args.ds_bucket_mb * 1000 * 1000
-
-    if args.optim == 'adam_mini':
-        os.environ["RWKV_OPTIM"] = 'adam_mini'
 
     # must set shuffle=False, persistent_workers=False (because worker is in another thread)
     train_data.real_epoch = trainer.current_epoch
