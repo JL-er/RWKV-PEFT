@@ -23,5 +23,4 @@ python train.py --load_model $load_model \
 --accelerator gpu --devices 1 --precision bf16 --strategy deepspeed_stage_1 --grad_cp 1 \
 --my_testing "x060" \
 --dataload pad --loss_mask pad \
---peft pissa --pissa_config $pissa_config \
---wandb peft-loss
+--peft pissa --pissa_config $pissa_config

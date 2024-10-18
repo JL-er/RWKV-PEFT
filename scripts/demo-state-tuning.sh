@@ -11,14 +11,13 @@ epoch_save=1
 epoch_steps=800
 ctx_len=512
 
-QUANT='nf4' 
 
 python train.py --load_model $load_model \
 --proj_dir $proj_dir --data_file $data_file \
 --data_type binidx --vocab_size 65536 \
---ctx_len $ctx_len --epoch_steps $epoch_steps --epoch_count 1 --epoch_begin 0 --epoch_save $epoch_save --micro_bsz $micro_bsz \
+--ctx_len $ctx_len --epoch_steps $epoch_steps --epoch_count 10 --epoch_begin 0 --epoch_save $epoch_save --micro_bsz $micro_bsz \
 --n_layer $n_layer --n_embd $n_embd \
 --pre_ffn 0 --head_qk 0 --lr_init 1 --lr_final 1e-2 --warmup_steps 10 --beta1 0.9 --beta2 0.99 --adam_eps 1e-8 \
 --accelerator gpu --devices 1 --precision bf16 --strategy deepspeed_stage_1 --grad_cp 1 \
 --my_testing "x060" \
---train_type "state"  --dataload pad --fla --wandb peft-test
+--train_type "state"  --dataload pad --fla \

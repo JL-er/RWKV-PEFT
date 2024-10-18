@@ -6,19 +6,18 @@ from torch._lowrank import svd_lowrank
 import functools
 from einops import rearrange
 from torch.utils.checkpoint import checkpoint as torch_checkpoint
-#from .blaff import flash_bone
 
 def rwkv_quantize(quant_type, weight):
     if quant_type=='4bit':
-        qweight, qstate= bnb.functional.quantize_4bit((weight.data).to('cuda'))
+        qweight, qstate= bnb.functional.quantize_4bit(weight.data)
     elif quant_type=='nf4':
-        qweight, qstate= bnb.functional.quantize_nf4((weight.data).to('cuda'))
+        qweight, qstate= bnb.functional.quantize_nf4(weight.data)
     elif quant_type=='fp4':
-        qweight, qstate= bnb.functional.quantize_fp4((weight.data).to('cuda'))
+        qweight, qstate= bnb.functional.quantize_fp4(weight.data)
     elif quant_type=='int8':
-        qweight, qstate= bnb.functional.quantize((weight.data).to('cuda'))
+        qweight, qstate= bnb.functional.quantize(weight.data)
     elif quant_type=='fp8':
-        qweight = weight.data.to(dtype = torch.float8_e4m3fn,device = 'cuda')
+        qweight = weight.data.to(dtype = torch.float8_e4m3fn)
         qstate = None
     return qweight, qstate
 
@@ -139,7 +138,7 @@ class LoraLinear(nn.Module):
                     fp8_matmul(x,self.qweight.t()) + 
                     F.linear(F.linear(x, self.lora_A), self.lora_B))
                 return (
-                    F.linear(x, rwkv_dequantize(self.quant_type, self.qweight.data, self.qstate)) + 
+                    F.linear(x, rwkv_dequantize(self.quant_type, self.qweight.data, self.qstate).to(x.device)) + 
                     F.linear(F.linear(x, self.lora_A), self.lora_B))
             
             if self.qweight.dtype == torch.float8_e4m3fn:
@@ -147,7 +146,7 @@ class LoraLinear(nn.Module):
                         F.linear(F.linear(self.lora_dropout(x), self.lora_A), self.lora_B)
                 )
             return (
-                F.linear(x, rwkv_dequantize(self.quant_type, self.qweight.data, self.qstate)) + self.scaling *
+                F.linear(x, rwkv_dequantize(self.quant_type, self.qweight.data, self.qstate).to(x.device)) + self.scaling *
                 F.linear(F.linear(self.lora_dropout(x), self.lora_A), self.lora_B)) 
 
         if self.pissa:
@@ -175,7 +174,7 @@ class QuantLinear(nn.Module):
     def forward(self, x):
 
         if self.is_quant:
-            return F.linear(x, rwkv_dequantize(self.quant_type, self.weight.data, self.qstate))
+            return F.linear(x, rwkv_dequantize(self.quant_type, self.weight.data, self.qstate).to(x.device))
         else:
             return F.linear(x, self.weight)
         
@@ -213,7 +212,7 @@ class BoneLinear(nn.Module):
 
     def forward(self, x):
         if self.is_quant:
-            qw = rwkv_dequantize(self.quant_type, self.qweight.data, self.qstate)
+            qw = rwkv_dequantize(self.quant_type, self.qweight.data, self.qstate).to(x.device)
             w = rearrange(qw, '(a r1) (b r2) -> a b r1 r2', r1 = self.r, r2 = self.r)@self.bone+self.bone
             w = rearrange(w, 'a b r1 r2 ->(a r1) (b r2) ')
             return F.linear(x,qw+w)
