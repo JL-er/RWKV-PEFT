@@ -1,12 +1,10 @@
 
 import os, math, gc, importlib
 import torch
-# torch._C._jit_set_profiling_executor(True)
-# torch._C._jit_set_profiling_mode(True)
+
 import torch.nn as nn
 from src.infctx_module import *
-# from einops import rearrange
-# from fla.ops.rwkv6 import chunk_rwkv6, fused_recurrent_rwkv6
+
 from src.rwkvLinear import make_linear_att
 from src.rwkvop import RUN_CUDA_RWKV5
 from torch.nn import functional as F

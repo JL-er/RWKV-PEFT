@@ -5,3 +5,4 @@ einops
 triton==3.0.0
 rwkv-fla
 rwkv
+transformers
