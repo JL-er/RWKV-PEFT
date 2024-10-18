@@ -391,3 +391,4 @@ if __name__ == "__main__":
         model = torch.compile(model)
 
     trainer.fit(model, train_data)
+     print(" ✨✨✨ train finished ✨✨✨ ")
