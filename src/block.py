@@ -117,20 +117,16 @@ class Block(nn.Module):
                     pos_emb = (self.pos_emb_x + self.pos_emb_y).reshape(T + 1, -1)[:-1, :]
                     x = x + pos_emb
 
-            if self.args.dropout == 0:
-                if self.layer_id == 0 and args.pre_ffn > 0:
-                    x = x + self.ffnPre(self.ln1(x))
-                else:
-                    att_out, att_state = self.att(self.ln1(x), last_state.time_mix_state)
-                    x = x + att_out
-                ffn_out, fnn_state = self.ffn(self.ln2(x), last_state.channel_mix_state)
-                x = x + ffn_out
+            if self.layer_id == 0 and args.pre_ffn > 0:
+                x = x + self.ffnPre(self.ln1(x))
+                x = x if self.args.dropout == 0 else self.drop0(x)
             else:
-                if self.layer_id == 0 and args.pre_ffn > 0:
-                    x = self.drop0(x + self.ffnPre(self.ln1(x)))
-                else:
-                    x = self.drop0(x + self.att(self.ln1(x)))
-                x = self.drop1(x + self.ffn(self.ln2(x)))
+                att_out, att_state = self.att(self.ln1(x), last_state.time_mix_state)
+                x = x + att_out
+                x = x if self.args.dropout == 0 else self.drop0(x)
+            ffn_out, fnn_state = self.ffn(self.ln2(x), last_state.channel_mix_state)
+            x = x + ffn_out
+            x = x if self.args.dropout == 0 else self.drop1(x)
 
             if args.tiny_att_dim > 0 and self.layer_id == args.tiny_att_layer:
                 xx = self.tiny_ln(x)
