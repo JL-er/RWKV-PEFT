@@ -1,5 +1,7 @@
 import torch
-######state
+# state
+
+
 class TimeMixState:
     def __init__(self, shift_state: torch.Tensor, wkv_state: torch.Tensor):
         self.shift_state = shift_state
@@ -17,6 +19,7 @@ class BlockState:
         self.time_mix_state = time_mix_state
         self.channel_mix_state = channel_mix_state
 
+
 class BlockStateList:
 
     def __init__(self, shift_states, wkv_states):
@@ -33,7 +36,7 @@ class BlockStateList:
 
     @staticmethod
     def empty(N, B, C, H, device, dtype):
-        wkv_states = torch.empty((N, B, H, C//H, C//H),
+        wkv_states = torch.empty((N, B, H, C // H, C // H),
                                  device=device,
                                  dtype=torch.bfloat16)
         shift_states = torch.empty((N, 2, B, C), device=device, dtype=dtype)
@@ -48,5 +51,3 @@ class BlockStateList:
         self.shift_states[layer, 0] = state.time_mix_state.shift_state
         self.wkv_states[layer] = state.time_mix_state.wkv_state
         self.shift_states[layer, 1] = state.channel_mix_state.shift_state
-
-

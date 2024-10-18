@@ -1,5 +1,8 @@
 
-import os, math, gc, importlib
+import os
+import math
+import gc
+import importlib
 import torch
 
 import torch.nn as nn
@@ -33,7 +36,7 @@ class RWKV_ChannelMix(MyModule):
                 ddd[0, 0, i] = i / args.n_embd
             self.time_mix_k = nn.Parameter(torch.pow(ddd, ratio_1_to_almost0))
             self.time_mix_r = nn.Parameter(torch.pow(ddd, ratio_1_to_almost0))
-        
+
         self.key = make_linear_ffn(args.n_embd, args.dim_ffn, bias=False)
         self.receptance = make_linear_ffn(args.n_embd, args.n_embd, bias=False)
         self.value = make_linear_ffn(args.dim_ffn, args.n_embd, bias=False)
