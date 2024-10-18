@@ -76,6 +76,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--peft", default="none", type=str)# lora pissa bone
     parser.add_argument("--train_parts", default=["time", "ln"], type=list)##emb , head
+    parser.add_argument("--l2warp_sparse", default=0, type=int)
 
     #LORA
     parser.add_argument("--lora_config", default='{"lora_load":"", "lora_r":8, "lora_alpha":32, "lora_dropout":0.01}', type=json.loads)
@@ -177,6 +178,7 @@ if __name__ == "__main__":
     os.environ["WKV"]='fla' if args.fla else ''
     if args.fla:
         print('FLA use triton as backend, and always rember to upgrade the latest version of both triton and rwkv-fla.')
+    os.environ["L2WRAP_SPARSE"] = str(args.l2warp_sparse)
     if args.dim_att <= 0:
         args.dim_att = args.n_embd
     if args.dim_ffn <= 0:
