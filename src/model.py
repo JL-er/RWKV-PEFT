@@ -24,6 +24,7 @@ if importlib.util.find_spec('deepspeed') and os.environ.get("USE_DEEPSPEED", "0"
 from .infctx_module import BlockStateList
 from .block import Block
 from .l2warp import L2Wrap
+from .args_type import TrainingArgs
 try:
     print('RWKV_MY_TESTING', os.environ["RWKV_MY_TESTING"])
 except BaseException:
@@ -45,7 +46,7 @@ if os.environ["RWKV_JIT_ON"] == "1":
 
 
 class RWKV(pl.LightningModule):
-    def __init__(self, args):
+    def __init__(self, args: TrainingArgs):
         super().__init__()
         self.args = args
         if not hasattr(args, 'dim_att'):

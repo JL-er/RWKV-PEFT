@@ -7,7 +7,7 @@ import torch
 
 import torch.nn as nn
 from src.infctx_module import *
-
+from src.args_type import TrainingArgs
 from src.rwkvLinear import make_linear_ffn
 
 
@@ -23,7 +23,7 @@ if os.environ["RWKV_JIT_ON"] == "1":
 
 
 class RWKV_ChannelMix(MyModule):
-    def __init__(self, args, layer_id):
+    def __init__(self, args: TrainingArgs, layer_id):
         super().__init__()
         self.args = args
         self.layer_id = layer_id

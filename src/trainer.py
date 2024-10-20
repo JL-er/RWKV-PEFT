@@ -9,9 +9,10 @@ from lightning_utilities.core.rank_zero import rank_zero_info, rank_zero_only
 import lightning as pl
 import re
 import numpy as np
+from src.args_type import TrainingArgs
 
 
-def my_save(args, trainer, dd, ff):
+def my_save(args: TrainingArgs, trainer, dd, ff):
     if '14b-run1' in ff:
         fn = ff.split('/')[-1]
         fff = '/dev/shm/' + fn
@@ -28,7 +29,7 @@ def my_save(args, trainer, dd, ff):
 
 
 class train_callback(pl.Callback):
-    def __init__(self, args):
+    def __init__(self, args: TrainingArgs):
         super().__init__()
         self.args = args
 

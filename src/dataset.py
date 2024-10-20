@@ -13,12 +13,13 @@ from torch.utils.data import Dataset
 from lightning_utilities.core.rank_zero import rank_zero_info
 from .binidx import MMapIndexedDataset
 from .utils import MaybeIsPrime
+from .args_type import TrainingArgs
 from rwkv.utils import PIPELINE
 pipeline = PIPELINE('rwkv6', "rwkv_vocab_v20230424")
 
 
 class MyDataset(Dataset):
-    def __init__(self, args):
+    def __init__(self, args: TrainingArgs):
         self.args = args
         self.rank = 0
         self.real_epoch = 0

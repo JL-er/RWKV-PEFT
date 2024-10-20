@@ -10,6 +10,7 @@ from src.infctx_module import *
 
 from src.rwkvLinear import make_linear_att
 from src.rwkvop import RUN_WKV5_GENERAL
+from src.args_type import TrainingArgs
 from torch.nn import functional as F
 
 
@@ -27,7 +28,7 @@ HEAD_SIZE = int(os.environ["RWKV_HEAD_SIZE_A"])
 
 
 class RWKV_TimeMix_RWKV5(MyModule):
-    def __init__(self, args, layer_id):
+    def __init__(self, args: TrainingArgs, layer_id):
         super().__init__()
         self.args = args
         self.layer_id = layer_id

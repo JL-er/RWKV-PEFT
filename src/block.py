@@ -8,7 +8,7 @@ from .rwkv5.rwkv_channel_mix import RWKV_ChannelMix
 from .rwkv5.rwkv_time_mix import RWKV_TimeMix_RWKV5
 from .rwkv6.rwkv_channel_mix import RWKV_CMix_x060, RWKV_CMix_x060_infctx
 from .rwkv6.rwkv_time_mix import RWKV_Tmix_x060, RWKV_Tmix_x060_state, RWKV_Tmix_x060_infctx
-
+from .args_type import TrainingArgs
 
 def __nop(ob):
     return ob
@@ -22,7 +22,7 @@ if os.environ["RWKV_JIT_ON"] == "1":
 
 
 class MishGLU(MyModule):
-    def __init__(self, args, layer_id):
+    def __init__(self, args: TrainingArgs, layer_id):
         super().__init__()
         self.args = args
         self.layer_id = layer_id
@@ -58,7 +58,7 @@ class MishGLU(MyModule):
 
 
 class Block(nn.Module):
-    def __init__(self, args, layer_id):
+    def __init__(self, args: TrainingArgs, layer_id):
         super().__init__()
         self.args = args
         self.layer_id = layer_id

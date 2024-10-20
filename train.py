@@ -15,6 +15,7 @@ if __name__ == "__main__":
     from lightning.pytorch.strategies import SingleDeviceStrategy, FSDPStrategy, DDPStrategy, DeepSpeedStrategy
     from lightning.pytorch.accelerators.accelerator import Accelerator
     import json
+    from src.args_type import TrainingArgs
     rank_zero_info("########## work in progress ##########")
 
     parser = ArgumentParser()
@@ -73,7 +74,7 @@ if __name__ == "__main__":
     parser.add_argument("--magic_prime", default=0, type=int)
     parser.add_argument("--my_qa_mask", default=0, type=int)
     parser.add_argument("--my_random_steps", default=0, type=int)
-    parser.add_argument("--my_testing", default='x052', type=str)
+    parser.add_argument("--my_testing", default='x060', type=str)
     parser.add_argument("--my_exit", default=99999999, type=int)
     parser.add_argument("--my_exit_tokens", default=0, type=int)
 
@@ -129,7 +130,7 @@ if __name__ == "__main__":
         parser.add_argument("--accumulate_grad_batches", default=1, type=int)
     else:
         parser = Trainer.add_argparse_args(parser)
-    args = parser.parse_args()
+    args = TrainingArgs(**vars(parser.parse_args()))
 
     ########################################################################################################
 

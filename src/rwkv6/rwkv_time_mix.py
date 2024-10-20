@@ -10,6 +10,7 @@ from src.infctx_module import *
 
 from src.rwkvLinear import make_linear_att
 from src.rwkvop import RUN_WKV6_GENERAL
+from src.args_type import TrainingArgs
 from torch.nn import functional as F
 
 
@@ -25,7 +26,7 @@ if os.environ["RWKV_JIT_ON"] == "1":
 
 
 class RWKV_Tmix_x060(MyModule):
-    def __init__(self, args, layer_id):
+    def __init__(self, args: TrainingArgs, layer_id):
         super().__init__()
         self.args = args
         self.layer_id = layer_id
@@ -129,7 +130,7 @@ class RWKV_Tmix_x060(MyModule):
 
 
 class RWKV_Tmix_x060_state(MyModule):
-    def __init__(self, args, layer_id):
+    def __init__(self, args: TrainingArgs, layer_id):
         super().__init__()
         self.args = args
         self.layer_id = layer_id
@@ -235,7 +236,7 @@ class RWKV_Tmix_x060_state(MyModule):
 
 
 class RWKV_Tmix_x060_infctx(MyModule):
-    def __init__(self, args, layer_id):
+    def __init__(self, args: TrainingArgs, layer_id):
         super().__init__()
         self.args = args
         self.layer_id = layer_id
