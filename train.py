@@ -233,7 +233,7 @@ if __name__ == "__main__":
     np.set_printoptions(precision=4, suppress=True, linewidth=200)
     warnings.filterwarnings("ignore", ".*Consider increasing the value of the `num_workers` argument*")
     warnings.filterwarnings("ignore", ".*The progress bar already tracks a metric with the*")
-    # os.environ["WDS_SHOW_SEED"] = "1"
+    warnings.filterwarnings("ignore", "*error: operation scheduled before its operands*")
 
     args.my_timestamp = datetime.datetime.today().strftime("%Y-%m-%d-%H-%M-%S")
     args.enable_checkpointing = False
