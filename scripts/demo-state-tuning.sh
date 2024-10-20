@@ -18,6 +18,6 @@ python train.py --load_model $load_model \
 --ctx_len $ctx_len --epoch_steps $epoch_steps --epoch_count 10 --epoch_begin 0 --epoch_save $epoch_save --micro_bsz $micro_bsz \
 --n_layer $n_layer --n_embd $n_embd \
 --pre_ffn 0 --head_qk 0 --lr_init 1 --lr_final 1e-2 --warmup_steps 10 --beta1 0.9 --beta2 0.99 --adam_eps 1e-8 \
---accelerator xpu --devices 1 --precision bf16 --strategy single_device --grad_cp 1 \
+--accelerator gpu --devices 1 --precision bf16 --strategy single-device --grad_cp 1 \
 --my_testing "x060" \
 --train_type "state"  --dataload pad --fla \

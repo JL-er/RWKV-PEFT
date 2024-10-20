@@ -147,7 +147,7 @@ if __name__ == "__main__":
     def _args_check():
         assert args.precision in ["fp32", "tf32", "fp16", "bf16-true", "bf16"]
         assert args.accelerator in ["gpu", "xpu", "musa"]
-        assert args.strategy in ["auto", "single-gpu", "fsdp", "ddp", "deepspeed", "deepspeed_stage_1", "deepspeed_stage_2", "deepspeed_stage_3"]
+        assert args.strategy in ["auto", "single-device", "fsdp", "ddp", "deepspeed", "deepspeed_stage_1", "deepspeed_stage_2", "deepspeed_stage_3"]
         assert args.train_type in ['none', 'state', 'infctx', 'finetune']
         assert args.data_type in ["utf-8", "utf-16le", "numpy", "binidx", "dummy", "uint16"]
         if "32" in args.precision:
@@ -491,7 +491,7 @@ if __name__ == "__main__":
                 return SingleDeviceStrategy(device=devices)
             else:
                 return DDPStrategy(parallel_devices=accelerator.get_parallel_devices(devices))
-        elif strategy == "single-gpu":
+        elif strategy == "single-device":
             return SingleDeviceStrategy(device=devices)
         elif strategy == "fsdp":
             return FSDPStrategy(parallel_devices=accelerator.get_parallel_devices(devices))
