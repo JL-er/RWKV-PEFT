@@ -147,6 +147,8 @@ if __name__ == "__main__":
         assert args.precision in ["fp32", "tf32", "fp16", "bf16-true", "bf16"]
         assert args.accelerator in ["gpu", "xpu", "musa"]
         assert args.strategy in ["auto", "single-gpu", "fsdp", "ddp", "deepspeed", "deepspeed_stage_1", "deepspeed_stage_2", "deepspeed_stage_3"]
+        assert args.train_type in ['none', 'state', 'infctx', 'finetune']
+        assert args.data_type in ["utf-8", "utf-16le", "numpy", "binidx", "dummy", "uint16"]
         if "32" in args.precision:
             args.precision = "32"
             torch.backends.cudnn.allow_tf32 = False
@@ -168,11 +170,14 @@ if __name__ == "__main__":
                 import torch_musa
                 torch.backends.mudnn.allow_tf32 = True
 
-
+    deepspeed_version = None
     def _set_env_var():
+        global deepspeed_version
         if "deepspeed" in args.strategy:
             import deepspeed
+            deepspeed_version = deepspeed.__version__
             os.environ["USE_DEEPSPEED"] = "1"
+        
         if args.optim == 'adam_mini':
             os.environ["RWKV_OPTIM"] = 'adam_mini'
         os.environ["RWKV_MY_TESTING"] = args.my_testing
@@ -180,7 +185,7 @@ if __name__ == "__main__":
         os.environ["RWKV_HEAD_SIZE_A"] = str(args.head_size_a)
         # state tuning
         os.environ["RWKV_TRAIN_TYPE"] = ''
-        assert args.train_type in ['none', 'state', 'infctx', 'finetune']
+        
         if args.train_type == 'state':
             os.environ["RWKV_TRAIN_TYPE"] = 'states'
         elif args.train_type == 'infctx':
@@ -301,11 +306,7 @@ if __name__ == "__main__":
 
     samples_per_epoch = args.epoch_steps * args.real_bsz
     tokens_per_epoch = samples_per_epoch * args.ctx_len
-    try:
-        deepspeed_version = deepspeed.__version__
-    except BaseException:
-        deepspeed_version = None
-        pass
+
     rank_zero_info(
         f"""
 ############################################################################
@@ -331,7 +332,6 @@ if __name__ == "__main__":
     )
     rank_zero_info(str(vars(args)) + "\n")
 
-    assert args.data_type in ["utf-8", "utf-16le", "numpy", "binidx", "dummy", "uint16"]
 
     if args.lr_final == 0 or args.lr_init == 0:
         rank_zero_info("\n\nNote: lr_final = 0 or lr_init = 0. Using linear LR schedule instead.\n\n")
