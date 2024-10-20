@@ -498,11 +498,43 @@ if __name__ == "__main__":
         elif strategy == "ddp":
             return DDPStrategy(parallel_devices=accelerator.get_parallel_devices(devices))
         elif "deepspeed" in strategy:
-            stage = int(strategy.split("_")[-1]) if strategy.startswith("deepspeed_stage") else 2
-            return DeepSpeedStrategy(parallel_devices=accelerator.get_parallel_devices(devices), 
-                                     stage=stage,
-                                     allgather_bucket_size=args.ds_bucket_mb * 1000 * 1000, 
-                                     reduce_bucket_size=args.ds_bucket_mb * 1000 * 1000)
+            def get_deepspeed_config(strategy: str, args: TrainingArgs):
+                base_config = {
+                    "stage": 2,  # 默认值
+                    "offload_optimizer": False,
+                    "offload_parameters": False,
+                    "remote_device": None,
+                    "offload_params_device": None,
+                    "offload_optimizer_device": None,
+                    "allgather_bucket_size": args.ds_bucket_mb * 1000 * 1000,
+                    "reduce_bucket_size": args.ds_bucket_mb * 1000 * 1000
+                }
+
+                if strategy == "deepspeed":
+                    return base_config
+                
+                parts = strategy.split("_")
+                if "stage" in parts:
+                    stage_index = parts.index("stage")
+                    base_config["stage"] = int(parts[stage_index + 1])
+                
+                if "offload" in parts:
+                    base_config["offload_optimizer"] = True
+                    if base_config["stage"] == 3:
+                        base_config["offload_parameters"] = True
+                
+                if "nvme" in parts:
+                    base_config["remote_device"] = "nvme"
+                    base_config["offload_params_device"] = "nvme"
+                    base_config["offload_optimizer_device"] = "nvme"
+                
+                return base_config
+
+            config = get_deepspeed_config(strategy, args)
+            return DeepSpeedStrategy(
+                parallel_devices=accelerator.get_parallel_devices(devices),
+                **config
+            )
         else:
             raise ValueError(f"Unknown strategy {strategy}")
 
