@@ -14,17 +14,6 @@ if __name__ == "__main__":
     import lightning as pl
     from lightning.pytorch.strategies import SingleDeviceStrategy, FSDPStrategy, DDPStrategy, DeepSpeedStrategy
     from lightning.pytorch.accelerators.accelerator import Accelerator
-    from lightning.pytorch.plugins import (
-                _PLUGIN_INPUT,
-                BitsandbytesPrecision,
-                CheckpointIO,
-                DeepSpeedPrecision,
-                DoublePrecision,
-                FSDPPrecision,
-                HalfPrecision,
-                MixedPrecision,
-                Precision,
-            )
     import json
     rank_zero_info("########## work in progress ##########")
 
@@ -129,7 +118,7 @@ if __name__ == "__main__":
     # acc_grad_batchs
     parser.add_argument("--avg_loss", default=0, type=int)
 
-    parser.add_argument("--compile", default=False, type=bool)
+    parser.add_argument("--compile", action="store_true")
 
     if pl.__version__[0] == '2':
         parser.add_argument("--accelerator", default="gpu", type=str)
@@ -154,6 +143,32 @@ if __name__ == "__main__":
     import torch
     from torch.utils.data import DataLoader
 
+    def _args_check():
+        assert args.precision in ["fp32", "tf32", "fp16", "bf16-true", "bf16"]
+        assert args.accelerator in ["gpu", "xpu", "musa"]
+        assert args.strategy in ["auto", "single-gpu", "fsdp", "ddp", "deepspeed", "deepspeed_stage_1", "deepspeed_stage_2", "deepspeed_stage_3"]
+        if "32" in args.precision:
+            args.precision = "32"
+            torch.backends.cudnn.allow_tf32 = False
+            torch.backends.cuda.matmul.allow_tf32 = False
+        elif args.precision == "fp16":
+            args.precision = "16-mixed"
+        elif args.precision == "bf16":
+            args.precision = "bf16-mixed"
+        else:
+            args.precision = "bf16-true"
+        torch.backends.cudnn.benchmark = True
+        torch.backends.cudnn.enabled = True
+
+        if "32"  not in args.precision:
+            if args.accelerator == "gpu":
+                torch.backends.cudnn.allow_tf32 = True
+                torch.backends.cuda.matmul.allow_tf32 = True
+            elif args.accelerator == "musa":
+                import torch_musa
+                torch.backends.mudnn.allow_tf32 = True
+
+
     def _set_env_var():
         if "deepspeed" in args.strategy:
             import deepspeed
@@ -173,11 +188,19 @@ if __name__ == "__main__":
 
         os.environ["WKV"] = 'fla' if args.fla else ''
         if args.fla:
-            rank_zero_info('FLA use triton as backend, and always rember to upgrade the latest version of both triton and rwkv-fla.')
-        os.environ["L2WRAP_SPARSE"] = str(args.l2warp_sparse)
-        os.environ["RWKV_FLOAT_MODE"] = args.precision
+            os.system('pip uninstall fla -y')
+            os.system('pip install --upgrade rwkv-fla')
 
-        if args.precision == "fp32":
+        os.environ["L2WRAP_SPARSE"] = str(args.l2warp_sparse)
+
+        if args.precision == "32":
+            os.environ["RWKV_FLOAT_MODE"] = "32"
+        elif args.precision == "16-mixed":
+            os.environ["RWKV_FLOAT_MODE"] = "fp16"
+        elif isinstance(args.precision, str) and "bf16" in args.precision:
+            os.environ["RWKV_FLOAT_MODE"] = "bf16"
+
+        if args.precision == "32":
             for i in range(10):
                 rank_zero_info("\n\nNote: you are using fp32 (very slow). Try bf16 / tf32 for faster training.\n\n")
         if args.precision == "fp16":
@@ -198,6 +221,7 @@ if __name__ == "__main__":
         rank_zero_info(f"########## WARNING: GLOBAL SEED {args.random_seed} THIS WILL AFFECT MULTIGPU SAMPLING ##########\n" * 3)
         seed_everything(args.random_seed)
     
+    _args_check()
     _set_env_var()
 
     np.set_printoptions(precision=4, suppress=True, linewidth=200)
@@ -312,35 +336,8 @@ if __name__ == "__main__":
     if args.lr_final == 0 or args.lr_init == 0:
         rank_zero_info("\n\nNote: lr_final = 0 or lr_init = 0. Using linear LR schedule instead.\n\n")
 
-    assert args.precision in ["fp32", "tf32", "fp16", "bf16-true", "bf16"]
 
-    if args.precision == "fp32":
-        for i in range(10):
-            rank_zero_info("\n\nNote: you are using fp32 (very slow). Try bf16 / tf32 for faster training.\n\n")
-    if args.precision == "fp16":
-        rank_zero_info("\n\nNote: you are using fp16 (might overflow). Try bf16 / tf32 for stable training.\n\n")
 
-    torch.backends.cudnn.benchmark = True
-    torch.backends.cudnn.enabled = True
-    if args.precision == "fp32":
-        torch.backends.cudnn.allow_tf32 = False
-        torch.backends.cuda.matmul.allow_tf32 = False
-    else:
-        if args.accelerator == "gpu":
-            torch.backends.cudnn.allow_tf32 = True
-            torch.backends.cuda.matmul.allow_tf32 = True
-        elif args.accelerator == "musa":
-            import torch_musa
-            torch.backends.mudnn.allow_tf32 = True
-
-    if "32" in args.precision:
-        args.precision = 32
-    elif args.precision == "fp16":
-        args.precision = "16-mixed"
-    elif args.precision == "bf16":
-        args.precision = "bf16-mixed"
-    else:
-        args.precision = "bf16-true"
 
     ########################################################################################################
 
@@ -510,7 +507,7 @@ if __name__ == "__main__":
 
     if args.accelerator.lower() == "gpu":
         actual_acc = args.accelerator  # work for NV, AMD, 沐曦
-        actual_strategy = args.strategy
+        actual_strategy = _get_strategy(args.strategy, "cuda", accelerator=actual_acc)
     elif args.accelerator.lower() == "xpu":
         from devices.xpu import XPUAccelerator
         actual_acc = XPUAccelerator()  # work for Intel
@@ -540,10 +537,6 @@ if __name__ == "__main__":
                 print(f"{str(shape[0]).ljust(5)} {str(shape[1]).ljust(5)} {n}")
             else:
                 print(f"{str(shape[0]).ljust(5)}       {n}")
-
-    if "deepspeed" in args.strategy:
-        trainer.strategy.config["zero_optimization"]["allgather_bucket_size"] = args.ds_bucket_mb * 1000 * 1000
-        trainer.strategy.config["zero_optimization"]["reduce_bucket_size"] = args.ds_bucket_mb * 1000 * 1000
 
     # must set shuffle=False, persistent_workers=False (because worker is in another thread)
     train_data.real_epoch = trainer.current_epoch
