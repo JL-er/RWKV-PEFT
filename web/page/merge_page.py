@@ -23,11 +23,11 @@ class MergePage:
 
         # Common configuration options
         self.config["base_model"] = st.text_input("Base Model Path", "/home/ryan/code/model/RWKV-x060-World-1B6-v2.1-20240328-ctx4096.pth")
-        self.config["lora_checkpoint"] = st.text_input("LoRA Checkpoint Path", "/home/ryan/code/out_model/meta{}-1.6b/rwkv-0.pth".format(self.config["merge_type"]))
+        self.config["lora_checkpoint"] = st.text_input("LoRA Checkpoint Path", "/home/ryan/code/out_model/meta{}/rwkv-0.pth".format(self.config["merge_type"]))
         self.config["output"] = st.text_input("Output Path", "/home/ryan/code/model/meta{}-1.6b.pth".format(self.config["merge_type"]))
 
         if self.config["merge_type"] == "pissa":
-            self.config["lora_init"] = st.text_input("LoRA Init Path", "/home/ryan/code/out_model/metapissa-1.6b/init_pissa.pth")
+            self.config["lora_init"] = st.text_input("LoRA Init Path", "/home/ryan/code/out_model/metapissa/init_pissa.pth")
 
         if self.config["merge_type"] == "lora":
             self.config["lora_alpha"] = st.number_input("LoRA Alpha", value=32, min_value=1)
@@ -43,17 +43,19 @@ class MergePage:
     def generate_merge_command(self):
         python_path = sys.executable  # 获取当前 Python 解释器的路径
         if self.config["merge_type"] == "bone":
-            return f"""{python_path} {self.working_directory}/merge/merge_bone.py --base_model {self.config['base_model']} \
---lora_checkpoint {self.config['lora_checkpoint']} \
+            return f"""
+python merge/merge_bone.py \\
+--base_model {self.config['base_model']} \\
+--lora_checkpoint {self.config['lora_checkpoint']} \\
 --output {self.config['output']}"""
         elif self.config["merge_type"] == "pissa":
-            return f"""{python_path} {self.working_directory}/merge/merge.py --base_model {self.config['base_model']} \
+            return f"""python merge/merge.py --base_model {self.config['base_model']} \
 --lora_init {self.config['lora_init']} \
 --lora_checkpoint {self.config['lora_checkpoint']} \
 --output {self.config['output']} \
 --type pissa"""
         elif self.config["merge_type"] == "lora":
-            return f"""{python_path} {self.working_directory}/merge/merge.py --base_model {self.config['base_model']} \
+            return f"""python merge/merge.py --base_model {self.config['base_model']} \
 --lora_checkpoint {self.config['lora_checkpoint']} \
 --output {self.config['output']} \
 --type lora \
@@ -61,20 +63,25 @@ class MergePage:
 
     def run_merge_command(self, command):
         try:
-            st.info(f"Executing command: {command}")
-            st.info(f"Working directory: {self.working_directory}")
+            os.environ['MKL_THREADING_LAYER'] = 'GNU'
             
-            result = subprocess.run(
-                command,
-                shell=True,
-                check=True,
-                text=True,
-                capture_output=True,
-                cwd=self.working_directory
-            )
+            # 使用st.spinner显示正在运行的状态
+            with st.spinner('Merging in progress... Please wait.'):
+                result = subprocess.run(
+                    command,
+                    shell=True,
+                    check=True,
+                    text=True,
+                    capture_output=True,
+                    cwd=self.working_directory
+                )
             
-            st.success("Merge completed successfully!")
-            st.code(result.stdout)
+            # 合并成功后显示成功消息
+            st.success("Merge completed successfully!✨✨✨")
+            
+            # 可选：显示命令输出
+            with st.expander("View command output"):
+                st.code(result.stdout)
         except subprocess.CalledProcessError as e:
             st.error(f"An error occurred during the merge process: {e}")
             st.error(f"Command output: {e.output}")

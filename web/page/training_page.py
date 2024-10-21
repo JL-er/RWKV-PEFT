@@ -326,3 +326,4 @@ class TrainingPage:
         self.stop_gpu_monitoring()
         st.success("Script has finished running.✨✨✨")
         st.session_state.process = None
+
