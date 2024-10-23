@@ -12,6 +12,10 @@ import pandas as pd
 import plotly.express as px
 import psutil
 
+# Add sidebar
+st.sidebar.page_link('home.py', label='Home', icon='🏠')
+st.sidebar.page_link('pages/training.py', label='Training', icon='🎈')
+st.sidebar.page_link('pages/merge.py', label='Merge', icon='🔀')
 
 def get_model_files(directory):
     model_files = []
