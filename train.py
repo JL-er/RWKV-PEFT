@@ -498,3 +498,5 @@ if __name__ == "__main__":
     data_loader = DataLoader(train_data, shuffle=args.data_shuffle, pin_memory=True, batch_size=args.micro_bsz, num_workers=1, persistent_workers=False, drop_last=True)
 
     trainer.fit(model, data_loader)
+    
+    print(" ✨✨✨ train finished ✨✨✨ ")
