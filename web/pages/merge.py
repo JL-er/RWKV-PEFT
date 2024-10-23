@@ -4,6 +4,11 @@ import os
 import subprocess
 import sys
 
+# Add sidebar
+st.sidebar.page_link('home.py', label='Home', icon='🏠')
+st.sidebar.page_link('pages/training.py', label='Training', icon='🎈')
+st.sidebar.page_link('pages/merge.py', label='Merge', icon='🔀')
+
 class Merge:
     def __init__(self):
         self.config = {}
