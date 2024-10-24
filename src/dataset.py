@@ -5,12 +5,62 @@
 import json, math, random, os, sys
 import numpy as np
 import torch
+import lightning as L
 from torch.utils.data import Dataset
-from pytorch_lightning.utilities import rank_zero_info
+from torch.utils.data import DataLoader
+from lightning_utilities.core.rank_zero import rank_zero_info
 from .binidx import MMapIndexedDataset
 from .utils import MaybeIsPrime
 from rwkv.utils import PIPELINE
 pipeline = PIPELINE('rwkv6', "rwkv_vocab_v20230424")
+
+def get_vocab_size(args: TrainingArgs) -> int:
+    train_data = MyDataset(args)
+    temp = train_data.vocab_size
+    del train_data
+    return int(temp)
+
+def get_data_by_l_version(trainer: L.Trainer, args: TrainingArgs):
+    if L.__version__[0] == '1':
+        train_data = MyDataset(args)
+        args.vocab_size = train_data.vocab_size
+        train_data.real_epoch = trainer.current_epoch
+        train_data.rank = trainer.global_rank
+        train_data.world_size = trainer.world_size
+        train_data = DataLoader(train_data, shuffle=args.data_shuffle, pin_memory=True, batch_size=args.micro_bsz, num_workers=1, persistent_workers=False, drop_last=True)
+    
+    elif L.__version__[0] == '2':
+        train_data = MyDataModule(args)
+    else:
+        raise ValueError(f"Unsupported PyTorch Lightning version: {L.__version__}")
+    return train_data
+
+class MyDataModule(L.LightningDataModule):
+    def __init__(self, args: TrainingArgs):
+        super().__init__()
+        self.args = args
+        self.train_data = None
+        
+    def setup(self, stage=None):
+        self.train_data = MyDataset(self.args)
+        self.args.vocab_size = self.train_data.vocab_size
+        self.train_data.real_epoch = self.trainer.current_epoch
+        self.train_data.rank = self.trainer.global_rank
+        self.train_data.world_size = self.trainer.world_size
+        
+    def train_dataloader(self):
+        # 处理shuffle逻辑
+        data_shuffle = True if self.args.data_shuffle == 1 else False
+        # must set shuffle=False, persistent_workers=False (because worker is in another thread)
+        return DataLoader(
+            self.train_data,
+            shuffle=data_shuffle,
+            pin_memory=True,
+            batch_size=self.args.micro_bsz,
+            num_workers=1,
+            persistent_workers=False,
+            drop_last=True
+        )
 
 class MyDataset(Dataset):
     def __init__(self, args):
