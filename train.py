@@ -108,6 +108,9 @@ if __name__ == "__main__":
     parser.add_argument("--fla", action="store_true")
     parser.add_argument("--train_type", default="none", type=str)
 
+    # NPU
+    parser.add_argument("--fla-npu", action="store_true")
+
     # loss_mask
     parser.add_argument("--loss_mask", default="none", type=str)  # pad qa se
     parser.add_argument("--mask_id", default='{"mask0":"0", "mask1":"1"}', type=json.loads)
@@ -170,6 +173,13 @@ if __name__ == "__main__":
             elif args.accelerator == "musa":
                 import torch_musa
                 torch.backends.mudnn.allow_tf32 = True
+        
+        # check --fla and --fla-npu
+        if args.fla and args.fla_npu:
+            raise ValueError("Cannot use both --fla and --fla-npu")
+
+        if args.accelerator == "npu":
+            args.fla_npu = True
 
     deepspeed_version = None
     def _set_env_var():
@@ -196,6 +206,11 @@ if __name__ == "__main__":
         if args.fla:
             os.system('pip uninstall fla -y')
             os.system('pip install --upgrade rwkv-fla')
+
+        if args.fla_npu:
+            import torch_npu
+            assert torch.npu.is_available(), "NPU is not available"
+            os.environ["WKV"] = 'fla-npu'
 
         os.environ["L2WRAP_SPARSE"] = str(args.l2warp_sparse)
 
@@ -540,17 +555,19 @@ if __name__ == "__main__":
 
     if args.accelerator.lower() == "gpu":
         actual_acc = args.accelerator  # work for NV, AMD, 沐曦
-        actual_strategy = _get_strategy(args.strategy, "cuda", accelerator=actual_acc)
     elif args.accelerator.lower() == "xpu":
         from devices.xpu import XPUAccelerator
         actual_acc = XPUAccelerator()  # work for Intel
-        actual_strategy = _get_strategy(args.strategy, "xpu", accelerator=actual_acc)
     elif args.accelerator.lower() == "musa":
         from devices.musa import MUSAAccelerator  # work for Morethreads
         actual_acc = MUSAAccelerator()
-        actual_strategy = _get_strategy(args.strategy, "musa", accelerator=actual_acc)
+    elif args.accelerator.lower() == "npu":
+        from devices.npu import NPUAccelerator
+        actual_acc = NPUAccelerator()
     else:
         raise ValueError(f"Unknown accelerator {args.accelerator}")
+    
+    actual_strategy = _get_strategy(args.strategy, args.accelerator.lower(), accelerator=actual_acc)
 
     if pl.__version__[0] == '2':
         trainer = Trainer(accelerator=actual_acc, strategy=actual_strategy, devices=args.devices, num_nodes=args.num_nodes, precision=args.precision,

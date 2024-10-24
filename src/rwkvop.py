@@ -1,7 +1,12 @@
 import os
 import torch
 from einops import rearrange
-from fla.ops.rwkv6 import chunk_rwkv6, fused_recurrent_rwkv6
+from src.rwkv6.wkv import naive_recurrent_rwkv6
+if os.environ["WKV"] == 'fla':
+    from fla.ops.rwkv6 import chunk_rwkv6, fused_recurrent_rwkv6
+elif os.environ["WKV"] == 'fla-npu':
+    # FIXME
+    pass
 
 
 RUN_WKV6_GENERAL = None
@@ -22,6 +27,14 @@ def RUN_CUDA_RWKV6_STATE_FLA(B, T, C, H, r, k, v, w, u, s=None):
     x = rearrange(o, 'b h l d -> b l (h d)')
     return x, state
 
+def RUN_CUDA_RWKV6_STATE_TORCH(B, T, C, H, r, k, v, w, u, s=None):
+    r = rearrange(r, 'b l (h d) -> b h l d', h=H)
+    k = rearrange(k, 'b l (h d) -> b h l d', h=H)
+    v = rearrange(v, 'b l (h d) -> b h l d', h=H)
+    w = rearrange(-torch.exp(w), 'b l (h d) -> b h l d', h=H)
+    o, state = naive_recurrent_rwkv6(r, k, v, w, u=u, scale=scale_factor, initial_state=s, output_final_state=True, u_2d=True)
+    x = rearrange(o, 'b h l d -> b l (h d)')
+    return x, state
 
 if os.environ["WKV"] == 'fla':
     if 'x060' in os.environ["RWKV_MY_TESTING"]:
@@ -29,10 +42,14 @@ if os.environ["WKV"] == 'fla':
     else:
         # 'fla only supports x060'
         raise NotImplementedError('fla only supports x060')
-
-
+elif os.environ["WKV"] == 'torch':
+    RUN_WKV6_GENERAL = RUN_CUDA_RWKV6_STATE_TORCH
+elif os.environ["WKV"] == 'fla-npu':
+    # FIXME
+    raise NotImplementedError('fla-npu not implemented')
 else:
     from torch.utils.cpp_extension import load
+    assert torch.cuda.is_available(), "CUDA is not available"
 
     HEAD_SIZE = int(os.environ["RWKV_HEAD_SIZE_A"])
 
