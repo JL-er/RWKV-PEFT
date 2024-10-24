@@ -69,6 +69,7 @@ class TrainingArgs:
     state_tune: bool = False
     chunk_ctx: int = 512
     fla: bool = False
+    fla_npu: bool = False
     train_type: str = "none"
     loss_mask: str = "none"
     mask_id: Dict = field(default_factory=lambda: json.loads(
