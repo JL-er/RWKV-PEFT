@@ -1,5 +1,8 @@
 import torch
-
+try:
+    import intel_extension_for_pytorch as ipex
+except ImportError:
+    assert torch.xpu.is_available(), "Intel Extension for PyTorch is not installed. Please install it from source."
 from functools import lru_cache
 from typing import Any, Dict, Union
 from lightning.pytorch.accelerators.accelerator import Accelerator
