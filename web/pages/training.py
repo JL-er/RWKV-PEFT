@@ -91,6 +91,34 @@ class Training:
                 self.config["work_dir"] = st.text_input("Working Directory", "/home/ryan/code/RWKV-PEFT-WEB")
                 self.config["quant"] = st.selectbox("Quant", ["none", "int8", "nf4"], index=0)
                 self.config["proj_dir"] = st.text_input("Project Directory", "/home/ryan/code/out_model/metabone")
+                if self.config["peft"] == "lora":
+                    lora_load = st.text_input("LoRA Load", "")
+                    lora_r = st.number_input("LoRA R", value=32, min_value=1)
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        lora_alpha = st.number_input("LoRA Alpha", value=32, min_value=1)
+                    with col2:
+                        lora_dropout = st.number_input("LoRA Dropout", value=0.0, min_value=0.0, max_value=1.0, format="%.2f")
+                    self.config["lora_config"] = json.dumps({
+                        "lora_load": lora_load,
+                        "lora_r": lora_r,
+                        "lora_alpha": lora_alpha,
+                        "lora_dropout": lora_dropout
+                    })
+                if self.config["peft"] == "pissa":
+                    pissa_load = st.text_input("PISSA Load", "")
+                    pissa_init = st.text_input("PISSA Init", "")
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        pissa_r = st.number_input("PISSA R", value=32, min_value=1)
+                    with col2:
+                        svd_niter = st.number_input("SVD Niter", value=4, min_value=1)
+                    self.config["pissa_config"] = json.dumps({
+                        "pissa_load": pissa_load,
+                        "pissa_init": pissa_init,
+                        "pissa_r": pissa_r,
+                        "svd_niter": svd_niter
+                    })
 
         with middle_column:
             # Data Configuration
@@ -130,12 +158,6 @@ class Training:
                 with col2:
                     self.config["loss_mask"] = st.selectbox("Loss Mask", ["pad", "qa"])
                     self.config["vocab_size"] = st.number_input("Vocab Size", value=65536, min_value=1, disabled=True)
-            
-            # PEFT-specific configurations
-            if self.config["peft"] == "lora":
-                self.setup_lora_config()
-            elif self.config["peft"] == "pissa":
-                self.setup_pissa_config()
 
         with right_column:
             # Model Configuration
@@ -167,7 +189,8 @@ class Training:
                     self.config["n_layer"] = st.number_input("Number of Layers", value=24, min_value=1)
                 with col2:
                     self.config["n_embd"] = st.number_input("Embedding Size", value=2048, min_value=1)
-        
+                self.config["train_parts"] = st.multiselect("Train Parts", ["emb", "head", "time", "ln" ], default=["time", "ln"])
+
         # Training Configuration
         with st.container(border=True):
             st.subheader("Training Configuration")
@@ -237,40 +260,6 @@ class Training:
             
         # 在 Streamlit 中显示 HTML 代码
         st.markdown(hover_html, unsafe_allow_html=True)
-        
-    def setup_lora_config(self):
-        with st.container(border=True):
-            st.subheader("LoRA Configuration")
-            lora_load = st.text_input("LoRA Load", "")
-            lora_r = st.number_input("LoRA R", value=32, min_value=1)
-            col1, col2 = st.columns(2)
-            with col1:
-                lora_alpha = st.number_input("LoRA Alpha", value=32, min_value=1)
-            with col2:
-                lora_dropout = st.number_input("LoRA Dropout", value=0.0, min_value=0.0, max_value=1.0, format="%.2f")
-            self.config["lora_config"] = json.dumps({
-                "lora_load": lora_load,
-                "lora_r": lora_r,
-                "lora_alpha": lora_alpha,
-                "lora_dropout": lora_dropout
-            })
-
-    def setup_pissa_config(self):
-        with st.container(border=True):
-            st.subheader("PISSA Configuration")
-            pissa_load = st.text_input("PISSA Load", "")
-            pissa_init = st.text_input("PISSA Init", "")
-            col1, col2 = st.columns(2)
-            with col1:
-                pissa_r = st.number_input("PISSA R", value=32, min_value=1)
-            with col2:
-                svd_niter = st.number_input("SVD Niter", value=4, min_value=1)
-            self.config["pissa_config"] = json.dumps({
-                "pissa_load": pissa_load,
-                "pissa_init": pissa_init,
-                "pissa_r": pissa_r,
-                "svd_niter": svd_niter
-            })
 
     def show_generated_script(self):
         st.subheader("Generated Script")
@@ -303,7 +292,7 @@ class Training:
 {'--my_testing "x060"' if self.config['my_testing'] == "v6" else ''} \\
 --dataload {self.config['data_load']} --loss_mask {self.config['loss_mask']} \\
 {f"--peft {self.config['peft']}" if self.config['peft'] != 'state' else ''} {f"--bone_config '{self.config['bone_config']}'" if self.config['peft'] == 'bone' else ''}{f" --lora_config '{self.config['lora_config']}'" if self.config['peft'] == 'lora' else ''} {f" --pissa_config '{self.config['pissa_config']}'" if self.config['peft'] == 'pissa' else ''} \\
-{f" --accumulate_grad_batches {self.config['accumulate_grad_batches']}" if self.config['accumulate_grad_batches'] > 0 else ''}{f"{' --train_type "state"' if self.config['peft'] == 'state' else ' --train_type "infctx"' if self.config['train_type'] else ''}"}{f" --chunk_ctx {self.config['chunk_ctx']}" if self.config['train_type'] else ""}{fla_arg}{f" --quant {self.config['quant']}" if self.config['quant'] else ''}{f" --train_parts {self.config['train_parts']}" if self.config.get('train_parts') else ''}{f" --wandb {self.config['wandb_project']}" if self.config['wandb'] else ''}{f" --data_shuffle 1" if self.config['data_shuffle'] == True else ' --data_shuffle 0'}"""
+{f"--data_shuffle 1" if self.config['data_shuffle'] == True else '--data_shuffle 0'}{f" --train_parts {self.config['train_parts']}" if self.config.get('train_parts') else ''}{f" --accumulate_grad_batches {self.config['accumulate_grad_batches']}" if self.config['accumulate_grad_batches'] > 0 else ''}{f"{' --train_type "state"' if self.config['peft'] == 'state' else ' --train_type "infctx"' if self.config['train_type'] else ''}"}{f" --chunk_ctx {self.config['chunk_ctx']}" if self.config['train_type'] else ""}{fla_arg}{f" --quant {self.config['quant']}" if self.config['quant'] else ''}{f" --wandb {self.config['wandb_project']}" if self.config['wandb'] else ''}"""
 
         return f"""python train.py {common_args}"""
     
