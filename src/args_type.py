@@ -52,7 +52,7 @@ class TrainingArgs:
     magic_prime: int = 0
     my_qa_mask: int = 0
     my_random_steps: int = 0
-    my_testing: str = 'x060'
+    rwkv_version: str = 'x060'
     my_exit: int = 99999999
     my_exit_tokens: int = 0
     peft: str = "none"

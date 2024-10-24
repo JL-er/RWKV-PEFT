@@ -26,9 +26,9 @@ from .block import Block
 from .l2warp import L2Wrap
 from .args_type import TrainingArgs
 try:
-    print('RWKV_MY_TESTING', os.environ["RWKV_MY_TESTING"])
+    print('RWKV_VERSION', os.environ["RWKV_VERSION"])
 except BaseException:
-    os.environ["RWKV_MY_TESTING"] = ''
+    os.environ["RWKV_VERSION"] = ''
 
 if os.environ.get("RWKV_OPTIM", None) == 'adam_mini':
     from adam_mini import Adam_mini
@@ -325,7 +325,7 @@ class RWKV(pl.LightningModule):
                 logits = self(idx)
                 loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1))
 
-                # if '0' in os.environ["RWKV_MY_TESTING"]:
+                # if '0' in os.environ["RWKV_VERSION"]:
                 #     print('logits', logits)
                 #     torch.set_printoptions(threshold=10000)
                 #     print('idx', idx)

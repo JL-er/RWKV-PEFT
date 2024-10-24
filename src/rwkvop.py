@@ -37,7 +37,7 @@ def RUN_CUDA_RWKV6_STATE_TORCH(B, T, C, H, r, k, v, w, u, s=None):
     return x, state
 
 if os.environ["WKV"] == 'fla':
-    if 'x060' in os.environ["RWKV_MY_TESTING"]:
+    if 'x060' in os.environ["RWKV_VERSION"]:
         RUN_WKV6_GENERAL = RUN_CUDA_RWKV6_STATE_FLA
     else:
         # 'fla only supports x060'
@@ -53,7 +53,7 @@ else:
 
     HEAD_SIZE = int(os.environ["RWKV_HEAD_SIZE_A"])
 
-    if 'x060' in os.environ["RWKV_MY_TESTING"]:
+    if 'x060' in os.environ["RWKV_VERSION"]:
         if (os.environ["RWKV_TRAIN_TYPE"] == 'infctx') or (os.environ["RWKV_TRAIN_TYPE"] == 'states'):
             if os.environ["RWKV_TRAIN_TYPE"] == 'infctx':
                 wkv6state_cuda = load(name="wkv6infctx", sources=["cuda/wkv6infctx_op.cpp", f"cuda/wkv6infctx_cuda.cu"],

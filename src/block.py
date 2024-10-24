@@ -75,7 +75,7 @@ class Block(nn.Module):
         if self.layer_id == 0 and self.args.pre_ffn > 0:
             self.ffnPre = RWKV_ChannelMix(args, 0)
         else:
-            if 'x060' in os.environ["RWKV_MY_TESTING"]:
+            if 'x060' in os.environ["RWKV_VERSION"]:
                 if os.environ["RWKV_TRAIN_TYPE"] == 'states':
                     self.att = RWKV_Tmix_x060_state(args, layer_id)
                 elif os.environ["RWKV_TRAIN_TYPE"] == 'infctx':
@@ -85,10 +85,10 @@ class Block(nn.Module):
             else:
                 self.att = RWKV_TimeMix_RWKV5(args, layer_id)
 
-        if 'g' in os.environ["RWKV_MY_TESTING"]:
+        if 'g' in os.environ["RWKV_VERSION"]:
             self.ffn = MishGLU(args, layer_id)
         else:
-            if 'x060' in os.environ["RWKV_MY_TESTING"]:
+            if 'x060' in os.environ["RWKV_VERSION"]:
                 if os.environ["RWKV_TRAIN_TYPE"] == 'infctx':
                     self.ffn = RWKV_CMix_x060_infctx(args, layer_id)
                 else:

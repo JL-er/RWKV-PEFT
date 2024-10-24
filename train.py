@@ -74,7 +74,7 @@ if __name__ == "__main__":
     parser.add_argument("--magic_prime", default=0, type=int)
     parser.add_argument("--my_qa_mask", default=0, type=int)
     parser.add_argument("--my_random_steps", default=0, type=int)
-    parser.add_argument("--my_testing", default='x060', type=str)
+    parser.add_argument("--rwkv_version", default='x060', type=str)
     parser.add_argument("--my_exit", default=99999999, type=int)
     parser.add_argument("--my_exit_tokens", default=0, type=int)
 
@@ -191,7 +191,7 @@ if __name__ == "__main__":
         
         if args.optim == 'adam_mini':
             os.environ["RWKV_OPTIM"] = 'adam_mini'
-        os.environ["RWKV_MY_TESTING"] = args.my_testing
+        os.environ["RWKV_VERSION"] = args.rwkv_version
         os.environ["RWKV_CTXLEN"] = str(args.ctx_len)
         os.environ["RWKV_HEAD_SIZE_A"] = str(args.head_size_a)
         # state tuning
