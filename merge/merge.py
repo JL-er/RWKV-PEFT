@@ -17,12 +17,12 @@ parser.add_argument("--quant", default="none", type=str)
 parser.add_argument("--device", default="cuda", type=str)
 parser.add_argument("--lora_alpha", default=16, type=int)
 args = parser.parse_args()
-device= args.device
+device = args.device
 base_model = args.base_model
-init_lora= args.lora_init
-lora= args.lora_checkpoint
-output= args.output
-quant= args.quant
+init_lora = args.lora_init
+lora = args.lora_checkpoint
+output = args.output
+quant = args.quant
 lora_alpha = args.lora_alpha
 
 with torch.no_grad():
@@ -30,7 +30,7 @@ with torch.no_grad():
     # merge LoRA-only slim checkpoint into the main weights
     w_lora: Dict[str, torch.Tensor] = torch.load(lora, map_location='cpu')
 
-    if args.type=='pissa':
+    if args.type == 'pissa':
         w_init_lora: Dict[str, torch.Tensor] = torch.load(init_lora, map_location='cpu')
     for k in w_lora.keys():
         w[k] = w_lora[k]
@@ -52,38 +52,38 @@ with torch.no_grad():
                 w[k] = w[k].to(device=device)
                 w[lora_A] = w[lora_A].to(device=device)
                 w[lora_B] = w[lora_B].to(device=device)
-                
-                if args.type=='pissa':
+
+                if args.type == 'pissa':
                     w_init_lora[init_lora_A] = w_init_lora[init_lora_A].to(device=device)
                     w_init_lora[init_lora_B] = w_init_lora[init_lora_B].to(device=device)
-                    if quant=='4bit':
-                        qw,qs = bnb.functional.quantize_4bit(w[k]- w_init_lora[init_lora_B] @ w_init_lora[init_lora_A])
-                        w[k] = (bnb.functional.dequantize_4bit(qw,quant_state=qs)).to(dtype=torch.bfloat16)
+                    if quant == '4bit':
+                        qw, qs = bnb.functional.quantize_4bit(w[k] - w_init_lora[init_lora_B] @ w_init_lora[init_lora_A])
+                        w[k] = (bnb.functional.dequantize_4bit(qw, quant_state=qs)).to(dtype=torch.bfloat16)
                     elif quant == 'nf4':
-                        qw,qs = bnb.functional.quantize_nf4(w[k]- w_init_lora[init_lora_B] @ w_init_lora[init_lora_A])
-                        w[k] = (bnb.functional.dequantize_nf4(qw,quant_state=qs)).to(dtype=torch.bfloat16)
+                        qw, qs = bnb.functional.quantize_nf4(w[k] - w_init_lora[init_lora_B] @ w_init_lora[init_lora_A])
+                        w[k] = (bnb.functional.dequantize_nf4(qw, quant_state=qs)).to(dtype=torch.bfloat16)
                     elif quant == 'fp4':
-                        qw,qs = bnb.functional.quantize_fp4(w[k]- w_init_lora[init_lora_B] @ w_init_lora[init_lora_A])
-                        w[k] = (bnb.functional.dequantize_fp4(qw,quant_state=qs)).to(dtype=torch.bfloat16)
+                        qw, qs = bnb.functional.quantize_fp4(w[k] - w_init_lora[init_lora_B] @ w_init_lora[init_lora_A])
+                        w[k] = (bnb.functional.dequantize_fp4(qw, quant_state=qs)).to(dtype=torch.bfloat16)
                     elif quant == 'int8':
-                        qw,qs = bnb.functional.quantize(w[k]- w_init_lora[init_lora_B] @ w_init_lora[init_lora_A])
-                        w[k] = (bnb.functional.dequantize(qw,state=qs)).to(dtype=torch.bfloat16)
+                        qw, qs = bnb.functional.quantize(w[k] - w_init_lora[init_lora_B] @ w_init_lora[init_lora_A])
+                        w[k] = (bnb.functional.dequantize(qw, state=qs)).to(dtype=torch.bfloat16)
                     else:
-                        w[k] = (w[k]- w_init_lora[init_lora_B] @ w_init_lora[init_lora_A]).to(dtype=torch.bfloat16)
-                    w[k] +=  w[lora_B] @ w[lora_A]
+                        w[k] = (w[k] - w_init_lora[init_lora_B] @ w_init_lora[init_lora_A]).to(dtype=torch.bfloat16)
+                    w[k] += w[lora_B] @ w[lora_A]
                 else:
-                    if quant=='4bit':
-                        qw,qs = bnb.functional.quantize_4bit(w[k])
-                        w[k] = (bnb.functional.dequantize_4bit(qw,quant_state=qs)).to(dtype=torch.bfloat16)
-                    elif quant=='nf4':
-                        qw,qs = bnb.functional.quantize_nf4(w[k])
-                        w[k] = (bnb.functional.dequantize_nf4(qw,quant_state=qs)).to(dtype=torch.bfloat16)
-                    elif quant=='fp4':
-                        qw,qs = bnb.functional.quantize_fp4(w[k])
-                        w[k] = (bnb.functional.dequantize_fp4(qw,quant_state=qs)).to(dtype=torch.bfloat16)
-                    elif quant=='int8':
-                        qw,qs = bnb.functional.quantize(w[k])
-                        w[k] = (bnb.functional.dequantize(qw,state=qs)).to(dtype=torch.bfloat16)
+                    if quant == '4bit':
+                        qw, qs = bnb.functional.quantize_4bit(w[k])
+                        w[k] = (bnb.functional.dequantize_4bit(qw, quant_state=qs)).to(dtype=torch.bfloat16)
+                    elif quant == 'nf4':
+                        qw, qs = bnb.functional.quantize_nf4(w[k])
+                        w[k] = (bnb.functional.dequantize_nf4(qw, quant_state=qs)).to(dtype=torch.bfloat16)
+                    elif quant == 'fp4':
+                        qw, qs = bnb.functional.quantize_fp4(w[k])
+                        w[k] = (bnb.functional.dequantize_fp4(qw, quant_state=qs)).to(dtype=torch.bfloat16)
+                    elif quant == 'int8':
+                        qw, qs = bnb.functional.quantize(w[k])
+                        w[k] = (bnb.functional.dequantize(qw, state=qs)).to(dtype=torch.bfloat16)
                     w[k] += w[lora_B] @ w[lora_A] * (lora_alpha / lora_r)
                 output_w[k] = w[k].to(device='cpu', copy=True)
                 del w[k]

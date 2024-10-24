@@ -1,10 +1,13 @@
 
-import os, math, gc, importlib
+import os
+import math
+import gc
+import importlib
 import torch
 import torch.nn as nn
 from src.infctx_module import *
 from src.rwkvLinear import make_linear_ffn
-
+from src.args_type import TrainingArgs
 
 def __nop(ob):
     return ob
@@ -15,8 +18,10 @@ MyFunction = __nop
 if os.environ["RWKV_JIT_ON"] == "1":
     MyModule = torch.jit.ScriptModule
     MyFunction = torch.jit.script_method
+
+
 class RWKV_CMix_x060(MyModule):
-    def __init__(self, args, layer_id):
+    def __init__(self, args: TrainingArgs, layer_id):
         super().__init__()
         self.args = args
         self.layer_id = layer_id
@@ -44,9 +49,10 @@ class RWKV_CMix_x060(MyModule):
         k = torch.relu(k) ** 2
         kv = self.value(k)
         return torch.sigmoid(self.receptance(xr)) * kv
-    
+
+
 class RWKV_CMix_x060(MyModule):
-    def __init__(self, args, layer_id):
+    def __init__(self, args: TrainingArgs, layer_id):
         super().__init__()
         self.args = args
         self.layer_id = layer_id
@@ -74,9 +80,10 @@ class RWKV_CMix_x060(MyModule):
         k = torch.relu(k) ** 2
         kv = self.value(k)
         return torch.sigmoid(self.receptance(xr)) * kv
+
 
 class RWKV_CMix_x060_infctx(MyModule):
-    def __init__(self, args, layer_id):
+    def __init__(self, args: TrainingArgs, layer_id):
         super().__init__()
         self.args = args
         self.layer_id = layer_id

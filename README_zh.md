@@ -75,6 +75,8 @@ deepspeed_stage_1
 采样训练长度，根据数据长度进行调整，ctx_len增大显存也会随之增大
 - micro_bsz  
 
+## GPU 支持情况
+NVIDIA, 沐曦，天数 支持Pytorch_lightning 1-2的所有版本， Intel XPU，摩尔线程只支持 2.x
 
 ## LoRA
 

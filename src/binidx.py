@@ -7,6 +7,7 @@ import struct
 from functools import lru_cache
 from itertools import accumulate
 
+
 def print_rank_0(*message):
     pass
     # """If distributed is initialized print only on rank 0."""
@@ -16,11 +17,13 @@ def print_rank_0(*message):
     # else:
     #     print(*message, flush=True)
 
+
 def _warmup_mmap_file(path):
     pass
     # with open(path, "rb") as stream:
     #     while stream.read(100 * 1024 * 1024):
     #         pass
+
 
 dtypes = {
     1: np.uint8,
@@ -33,17 +36,21 @@ dtypes = {
     8: np.uint16,
 }
 
+
 def code(dtype):
     for k in dtypes.keys():
         if dtypes[k] == dtype:
             return k
     raise ValueError(dtype)
 
+
 def index_file_path(prefix_path):
     return prefix_path + ".idx"
 
+
 def data_file_path(prefix_path):
     return prefix_path + ".bin"
+
 
 class MMapIndexedDataset(torch.utils.data.Dataset):
     class Index(object):
@@ -100,7 +107,7 @@ class MMapIndexedDataset(torch.utils.data.Dataset):
                     self._file.close()
 
             return _Writer()
-        
+
         def __init__(self, path, skip_warmup=False):
             with open(path, "rb") as stream:
                 magic_test = stream.read(9)
@@ -243,33 +250,32 @@ class MMapIndexedDataset(torch.utils.data.Dataset):
             self._bin_buffer, dtype=self._index.dtype, count=length, offset=ptr
         )
         return np_array
-    
-    
+
     def pad(self, idx, length=None):
         ptr, size = self._index[idx]
         try:
             np_array = np.frombuffer(
-                    self._bin_buffer, dtype=self._index.dtype, count=length, offset=ptr
-                )
-        except:
-            np_array = np.frombuffer(
-                    self._bin_buffer, dtype=self._index.dtype, count=size, offset=ptr
-                )
-            ptr0,_ = self._index[0]
-            np_array0 = np.frombuffer(
-                self._bin_buffer, dtype=self._index.dtype, count=length-size, offset=ptr0
+                self._bin_buffer, dtype=self._index.dtype, count=length, offset=ptr
             )
-            np_array = np.append(np_array, np_array0)
-        return np_array.astype(int), min(size,length)
-    
-    def only(self, idx, length=None):
-        ptr, size = self._index[idx]
-        if length<size:
-            size = length
-        np_array = np.frombuffer(
+        except BaseException:
+            np_array = np.frombuffer(
                 self._bin_buffer, dtype=self._index.dtype, count=size, offset=ptr
             )
-    
+            ptr0, _ = self._index[0]
+            np_array0 = np.frombuffer(
+                self._bin_buffer, dtype=self._index.dtype, count=length - size, offset=ptr0
+            )
+            np_array = np.append(np_array, np_array0)
+        return np_array.astype(int), min(size, length)
+
+    def only(self, idx, length=None):
+        ptr, size = self._index[idx]
+        if length < size:
+            size = length
+        np_array = np.frombuffer(
+            self._bin_buffer, dtype=self._index.dtype, count=size, offset=ptr
+        )
+
         return np_array
 
     @property

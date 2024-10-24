@@ -1,4 +1,7 @@
-import json, time, random, os
+import json
+import time
+import random
+import os
 import numpy as np
 import torch
 from torch.nn import functional as F
@@ -6,12 +9,14 @@ from torch.nn import functional as F
 time_slot = {}
 time_ref = time.time_ns()
 
+
 def record_time(name):
     if name not in time_slot:
         time_slot[name] = 1e20
     tt = (time.time_ns() - time_ref) / 1e9
     if tt < time_slot[name]:
         time_slot[name] = tt
+
 
 class TOKENIZER():
     def __init__(self, WORD_NAME, UNKNOWN_CHAR='\ue083'):
@@ -80,6 +85,7 @@ class TOKENIZER():
                 probs = probs.pow(1.0 / temperature)
             out = torch.multinomial(probs, num_samples=1)[0]
             return out
+
 
 def MaybeIsPrime(number):
     if FermatPrimalityTest(number) and MillerRabinPrimalityTest(number):
