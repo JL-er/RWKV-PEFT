@@ -9,10 +9,35 @@ st.sidebar.page_link('home.py', label='Home', icon='🏠')
 st.sidebar.page_link('pages/training.py', label='Training', icon='🎈')
 st.sidebar.page_link('pages/merge.py', label='Merge', icon='🔀')
 
+@st.cache_resource
+def get_cached_model_files(directory):
+    return get_model_files(directory)
+
 class Merge:
     def __init__(self):
         self.config = {}
-        self.working_directory = "/home/ryan/code/RWKV-PEFT-WEB"  # 添加工作目录设置
+        self.project_root = self.get_project_root()
+        # Initialize session state variables
+        if 'base_model_files' not in st.session_state:
+            st.session_state.base_model_files = []
+        if 'checkpoint_files' not in st.session_state:
+            st.session_state.checkpoint_files = []
+        if 'pissa_init_files' not in st.session_state:
+            st.session_state.pissa_init_files = []
+        print("oooooooooooo Merge init oooooooooooo")
+        
+    @staticmethod
+    def get_project_root():
+        # 获取当前文件的绝对路径
+        current_path = os.path.abspath(__file__)
+        # 向上遍历直到找到项目根目录（根目录包含 'train.py' 文件）
+        while True:
+            parent_path = os.path.dirname(current_path)
+            if os.path.exists(os.path.join(parent_path, 'train.py')):
+                return parent_path
+            if parent_path == current_path:  # 已经到达文件系统的根目录
+                raise Exception("Could not find project root directory")
+            current_path = parent_path
 
     def render(self):
         self.setup_page()
@@ -36,12 +61,10 @@ class Merge:
                 st.subheader("Model Configuration")
                 # Base Model Path
                 base_model_directory = st.text_input("Base Model Directory", "/home/ryan/code/model")
-                if 'base_model_files' not in st.session_state:
-                    st.session_state.base_model_files = []
                 if st.button("Check Base Model Directory"):
                     if os.path.exists(base_model_directory):
                         st.success("Base model directory exists!")
-                        st.session_state.base_model_files = get_model_files(base_model_directory)
+                        st.session_state.base_model_files = get_cached_model_files(base_model_directory)
                     else:
                         st.error("Base model directory does not exist!")
                         st.session_state.base_model_files = []
@@ -58,13 +81,11 @@ class Merge:
 
                 # Checkpoint Path (LoRA or State)
                 checkpoint_label = "State Checkpoint" if self.config["merge_type"] == "state" else "LoRA Checkpoint"
-                checkpoint_directory = st.text_input(f"{checkpoint_label} Directory", f"/home/ryan/code/out_model/meta{self.config['merge_type']}")
-                if 'checkpoint_files' not in st.session_state:
-                    st.session_state.checkpoint_files = []
+                checkpoint_directory = st.text_input(f"{checkpoint_label} Directory", f"/home/ryan/code/out_model/metabone")
                 if st.button(f"Check {checkpoint_label} Directory"):
                     if os.path.exists(checkpoint_directory):
                         st.success(f"{checkpoint_label} directory exists!")
-                        st.session_state.checkpoint_files = get_model_files(checkpoint_directory)
+                        st.session_state.checkpoint_files = get_cached_model_files(checkpoint_directory)
                     else:
                         st.error(f"{checkpoint_label} directory does not exist!")
                         st.session_state.checkpoint_files = []
@@ -84,12 +105,10 @@ class Merge:
                 # PISSA specific configuration
                 if self.config["merge_type"] == "pissa":
                     pissa_init_directory = st.text_input("PISSA Init Directory", "/home/ryan/code/out_model/metapissa")
-                    if 'pissa_init_files' not in st.session_state:
-                        st.session_state.pissa_init_files = []
                     if st.button("Check PISSA Init Directory"):
                         if os.path.exists(pissa_init_directory):
                             st.success("PISSA init directory exists!")
-                            st.session_state.pissa_init_files = get_model_files(pissa_init_directory)
+                            st.session_state.pissa_init_files = get_cached_model_files(pissa_init_directory)
                         else:
                             st.error("PISSA init directory does not exist!")
                             st.session_state.pissa_init_files = []
@@ -118,26 +137,41 @@ class Merge:
             self.run_merge_command(command)
 
     def generate_merge_command(self):
-        common_args = f"""--base_model {self.config['base_model']} \\
---output {self.config['output']} \\
---quant {self.config['quant']}"""
+        merge_types = {
+            "bone": {
+                "script": "merge/merge_bone.py",
+                "specific_args": lambda config: f"--lora_checkpoint {config['lora_checkpoint']}"
+            },
+            "pissa": {
+                "script": "merge/merge.py",
+                "specific_args": lambda config: f"--type {config['merge_type']} \\\n--lora_checkpoint {config['lora_checkpoint']} \\\n--lora_init {config['lora_init']}"
+            },
+            "lora": {
+                "script": "merge/merge.py",
+                "specific_args": lambda config: f"--type {config['merge_type']} \\\n--lora_checkpoint {config['lora_checkpoint']} \\\n--lora_alpha {config['lora_alpha']}"
+            },
+            "state": {
+                "script": "merge/merge_state.py",
+                "specific_args": lambda config: f"--state_checkpoint {config['state_checkpoint']}"
+            }
+        }
 
-        if self.config["merge_type"] == "bone":
-            specific_args = f"""--lora_checkpoint {self.config['lora_checkpoint']}"""
-            script = "merge/merge_bone.py"
-        elif self.config["merge_type"] in ["pissa", "lora", "state"]:
-            script = "merge/merge.py"
-            specific_args = f"""--type {self.config['merge_type']}"""
-            
-            if self.config["merge_type"] == "state":
-                specific_args += f" \\\n--state_checkpoint {self.config['state_checkpoint']}"
-            else:
-                specific_args += f" \\\n--lora_checkpoint {self.config['lora_checkpoint']}"
-            
-            if self.config["merge_type"] == "pissa":
-                specific_args += f" \\\n--lora_init {self.config['lora_init']}"
-            elif self.config["merge_type"] == "lora":
-                specific_args += f" \\\n--lora_alpha {self.config['lora_alpha']}"
+        merge_type = self.config["merge_type"]
+        if merge_type not in merge_types:
+            raise ValueError(f"Unsupported merge type: {merge_type}")
+
+        script = merge_types[merge_type]["script"]
+        specific_args = merge_types[merge_type]["specific_args"](self.config)
+
+        # 为非state类型的合并添加quant参数
+        quant_arg = f"--quant {self.config['quant']}" if merge_type != "state" else ""
+
+        common_args = f"""--base_model {self.config['base_model']} \\
+--output {self.config['output']}"""
+
+        # 如果有quant参数，添加到common_args中
+        if quant_arg:
+            common_args += f" \\\n{quant_arg}"
 
         return f"""python {script} \\
 {common_args} \\
@@ -155,7 +189,7 @@ class Merge:
                     check=True,
                     text=True,
                     capture_output=True,
-                    cwd=self.working_directory
+                    cwd=self.project_root
                 )
             
             # 合并成功后显示成功消息
