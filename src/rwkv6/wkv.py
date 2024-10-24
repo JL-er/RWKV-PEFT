@@ -43,6 +43,6 @@ def naive_recurrent_rwkv6(
         o[:, :, i] = o_i.sum(-2)
         h = h * w_i[..., None] + kv_i
 
-    ht = h if output_final_state else None
+    ht = h.to(orig_dtype) if output_final_state else None
     return o.to(orig_dtype), ht
 
