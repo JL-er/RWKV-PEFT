@@ -146,7 +146,7 @@ class Merge:
                 self.config["quant"] = st.selectbox("Quant", ["none", "int8", "nf4"], index=0)
                 output_path = st.text_input(
                     "Output Path", 
-                    self.cache.get('output_path', f"/home/ryan/code/model/meta{self.config['merge_type']}-1.6b.pth")
+                    self.cache.get('output_path', f"/home/rwkv/model/meta{self.config['merge_type']}-1.6b.pth")
                 )
                 if st.button(language_dict[lang_code]["save_output_path"]):
                     # Save to cache
@@ -160,7 +160,7 @@ class Merge:
                 # Base Model Path
                 base_model_directory = st.text_input(
                     "Base Model Directory", 
-                    self.cache.get('base_model_directory', "/home/ryan/code/model")
+                    self.cache.get('base_model_directory', "/home/rwkv/model")
                 )
                 if 'base_model_files' not in st.session_state:
                     st.session_state.base_model_files = []
@@ -189,7 +189,7 @@ class Merge:
                 checkpoint_label = "State Checkpoint" if self.config["merge_type"] == "state" else "LoRA Checkpoint"
                 checkpoint_directory = st.text_input(
                     f"{checkpoint_label} Directory", 
-                    self.cache.get('checkpoint_directory', "/home/ryan/code/out_model/metabone")
+                    self.cache.get('checkpoint_directory', "/home/rwkv/out_model/metabone")
                 )
                 if 'checkpoint_files' not in st.session_state:
                     st.session_state.checkpoint_files = []
@@ -220,7 +220,7 @@ class Merge:
                 if self.config["merge_type"] == "pissa":
                     pissa_init_directory = st.text_input(
                         "PISSA Init Directory", 
-                        self.cache.get('pissa_init_directory', "/home/ryan/code/out_model/metapissa")
+                        self.cache.get('pissa_init_directory', "/home/rwkv/out_model/metapissa")
                     )
                     if 'pissa_init_files' not in st.session_state:
                         st.session_state.pissa_init_files = []
