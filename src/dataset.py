@@ -40,6 +40,21 @@ def get_data_by_l_version(trainer: L.Trainer, args: TrainingArgs):
         raise ValueError(f"Unsupported PyTorch Lightning version: {L.__version__}")
     return train_data
 
+class GlobalIndexManager:
+    def __init__(self, rank=0, device_num=1, shuffle=True):
+        self.current_idx = 0
+        self.rank = rank
+        self.device_num = device_num
+        self.shuffle = shuffle
+        
+    def get_next_idx(self, idx_t):
+        if self.shuffle:
+            idx = idx_t * self.device_num + self.rank
+        else:
+            idx = self.current_idx * self.device_num + self.rank 
+            self.current_idx += 1
+        return idx
+
 class MyDataModule(L.LightningDataModule):
     def __init__(self, args: TrainingArgs):
         super().__init__()
@@ -52,14 +67,14 @@ class MyDataModule(L.LightningDataModule):
         self.train_data.real_epoch = self.trainer.current_epoch
         self.train_data.rank = self.trainer.global_rank
         self.train_data.world_size = self.trainer.world_size
+        self.train_data.setup(self.trainer.global_rank, self.trainer.world_size, 
+                              int(self.args.devices), self.args.data_shuffle)
         
     def train_dataloader(self):
-        # 处理shuffle逻辑
-        data_shuffle = True if self.args.data_shuffle == 1 else False
         # must set shuffle=False, persistent_workers=False (because worker is in another thread)
         return DataLoader(
             self.train_data,
-            shuffle=data_shuffle,
+            shuffle=self.args.data_shuffle,
             pin_memory=True,
             batch_size=self.args.micro_bsz,
             num_workers=1,
@@ -73,6 +88,8 @@ class MyDataset(Dataset):
         self.rank = 0
         self.real_epoch = 0
         self.world_size = 0
+        self.index_manager = None
+
 
         if args.data_type == "binidx":
             self.vocab_size = args.vocab_size
@@ -155,18 +172,21 @@ class MyDataset(Dataset):
             self.stoi = {ch: i for i, ch in enumerate(unique)}
             self.itos = {i: ch for i, ch in enumerate(unique)}
 
+    def setup(self, rank, world_size, devices, shuffle):
+        self.rank = rank
+        self.world_size = world_size
+        self.index_manager = GlobalIndexManager(rank=rank, device_num=devices, shuffle=shuffle)
+    
     def __len__(self):
         return self.args.epoch_steps * self.args.micro_bsz
 
     def __getitem__(self, idx):
+        idx = self.index_manager.get_next_idx(idx_t=idx) if self.index_manager else idx
+
         args = self.args
         rank = self.rank
         epoch = self.real_epoch
         world_size = self.world_size
-
-        devices = int(args.devices)
-        if devices > 1:
-            idx = idx * devices + rank
 
         if args.data_type == "uint16":
             i = np.random.randint(0, self.data_size - 1)
