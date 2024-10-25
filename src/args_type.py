@@ -74,7 +74,7 @@ class TrainingArgs:
     loss_mask: str = "none"
     mask_id: Dict = field(default_factory=lambda: json.loads(
         '{"mask0":"0", "mask1":"1"}'))
-    data_shuffle: int = 1
+    data_shuffle: int = 0
     optim: str = "none"
     avg_loss: int = 0
     compile: bool = False

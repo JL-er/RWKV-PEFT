@@ -6,7 +6,7 @@ from lightning_utilities.core.rank_zero import rank_zero_info
 from src.trainer import generate_init_weight
 
 
-def load_peft_model(args: TrainingArgs, model: RWKV):
+def load_peft_model(args: TrainingArgs):
     freeze = False
     if args.peft == 'lora':
         from src.rwkvLinear import LORA_CONFIG
@@ -25,6 +25,8 @@ def load_peft_model(args: TrainingArgs, model: RWKV):
         from src.rwkvLinear import BONE_CONFIG
         BONE_CONFIG["r"] = args.bone_config['bone_r']
 
+    model = RWKV(args)
+    print(model)
     if args.train_type == 'state':
         args.state_tune = True
 
@@ -98,10 +100,10 @@ def load_peft_model(args: TrainingArgs, model: RWKV):
         init_weight_name = f"{args.proj_dir}/rwkv-init.pth"
         generate_init_weight(model, init_weight_name)  # save initial weights
         args.load_model = init_weight_name
-
-    rank_zero_info(f"########## Loading {args.load_model}... ##########")
-    model.load_state_dict(torch.load(
-        args.load_model, map_location="cpu"), strict=(not freeze))
+    else:
+        rank_zero_info(f"########## Loading {args.load_model}... ##########")
+        model.load_state_dict(torch.load(
+            args.load_model, map_location="cpu"), strict=(not freeze))
 
     # Load peft checkpoint
     # multi-GPU training
