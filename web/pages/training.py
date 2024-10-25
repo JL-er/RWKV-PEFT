@@ -13,6 +13,58 @@ import plotly.express as px
 import psutil
 import yaml
 
+# Language dictionary
+language_dict = {
+    "en": {
+        "title": "🎈 RWKV-PEFT Training Interface",
+        "basic_config": "Basic Configuration",
+        "data_config": "Data Configuration",
+        "model_config": "Model Configuration",
+        "training_config": "Training Configuration",
+        "save_output_path": "Save Output Path",
+        "output_saved": "Output path saved!",
+        "data_found": "Found {} unique file prefixes in the directory.",
+        "no_files_found": "No files found in the specified directory.",
+        "data_dir_not_exist": "Data directory does not exist!",
+        "model_dir_exists": "Model directory exists!",
+        "model_dir_not_exist": "Model directory does not exist!",
+        "no_pth_files": "No .pth files found. Please check the model directory.",
+        "run_script": "Run Script",
+        "stop_script": "Stop Script",
+        "generated_script": "Generated Script",
+        "fixed_parameters": "Fixed Parameters",
+        "activity_monitor": "Activity Monitor",
+        "script_running": "Script is running. GPU memory usage is being updated.",
+        "training_success": "Training completed successfully!✨✨✨",
+        "output_dir_not_empty": "Error: Output directory '{output_dir}' already contains .pth files.",
+        "config_reference": "Config Reference"
+    },
+    "zh": {
+        "title": "🎈 RWKV-PEFT 训练界面",
+        "basic_config": "基本配置",
+        "data_config": "数据配置",
+        "model_config": "模型配置",
+        "training_config": "训练配置",
+        "save_output_path": "保存输出路径",
+        "output_saved": "输出路径已保存！",
+        "data_found": "在目录中找到 {} 个唯一文件前缀。",
+        "no_files_found": "在指定目录中未找到文件。",
+        "data_dir_not_exist": "数据目录不存在！",
+        "model_dir_exists": "基底模型目录存在！",
+        "model_dir_not_exist": "基底模型目录不存在！",
+        "no_pth_files": "未找到 .pth 文件。请检查模型目录。",
+        "run_script": "运行脚本",
+        "stop_script": "停止脚本",
+        "generated_script": "脚本预览",
+        "fixed_parameters": "固定参数",
+        "activity_monitor": "活动监控",
+        "script_running": "脚本正在运行。GPU 内存使用情况正在更新。",
+        "training_success": "训练完成！✨✨✨",
+        "output_dir_not_empty": "错误：输出目录 '{output_dir}' 已包含 .pth 文件。",
+        "config_reference": "配置参考"
+    }
+}
+
 # Add sidebar
 st.sidebar.page_link('home.py', label='Home', icon='🏠')
 st.sidebar.page_link('pages/training.py', label='Training', icon='🎈')
@@ -30,9 +82,7 @@ def get_data_files(directory):
     data_files = set()
     for root, dirs, files in os.walk(directory):
         for file in files:
-            # 获取文件名（不包括扩展名）
             file_prefix = os.path.splitext(file)[0]
-            # 如果文件名包含点号，取第一个点号之前的部分作为前缀
             if '.' in file_prefix:
                 file_prefix = file_prefix.split('.')[0]
             data_files.add(os.path.join(root, file_prefix))
@@ -45,14 +95,47 @@ def read_cache(cache_file):
     except FileNotFoundError:
         return {}
 
-def write_cache(data, cache_file):
+def write_cache(data, cache_file, is_public=False):
     # Read existing cache
     cache = read_cache(cache_file)
-    # Update the training section
-    cache['training'] = data
+    if is_public:
+        cache['public'] = data
+    else:
+        # Ensure the 'training' section exists
+        if 'training' not in cache:
+            cache['training'] = {}
+        # Update only the specified keys in the 'training' section
+        cache['training'].update(data)
     # Write back to the cache file
     with open(cache_file, 'w') as file:
         yaml.safe_dump(cache, file)
+        
+def get_project_root():
+    # 获取当前文件的绝对路径
+    current_path = os.path.abspath(__file__)
+    # 向上遍历直到找到项目根目录（根目录包含 'train.py' 文件）
+    while True:
+        parent_path = os.path.dirname(current_path)
+        if os.path.exists(os.path.join(parent_path, 'train.py')):
+            return parent_path
+        if parent_path == current_path:
+            raise Exception("Could not find project root directory")
+        current_path = parent_path
+
+def update_language_cache():
+    lang_code = "en" if st.session_state.language == "English" else "zh"
+    # Update only the 'language' key in the 'training' section
+    write_cache({'language': lang_code}, os.path.join(get_project_root() + '/web', 'cache.yml'), is_public=True)
+        
+# Language selection in the sidebar
+language = st.sidebar.selectbox(
+    "Language", 
+    ["English", "中文"], 
+    index=0 if read_cache(os.path.join(get_project_root() + '/web', 'cache.yml')).get("public", {}).get('language', 'en') == 'en' else 1,
+    key='language',
+    on_change=update_language_cache
+)
+lang_code = "en" if language == "English" else "zh"
 
 class Training:
     def __init__(self):
@@ -62,24 +145,11 @@ class Training:
         self.gpu_memory_usage = 0
         self.gpu_memory_total = 0
         self.stop_monitoring = False
-        self.project_root = self.get_project_root()
+        self.project_root = get_project_root()
         self.cache_name = 'cache.yml'
         # Load the training section from the cache
         self.cache = read_cache(os.path.join(self.project_root + '/web', self.cache_name)).get('training', {})
     
-    @staticmethod
-    def get_project_root():
-        # 获取当前文件的绝对路径
-        current_path = os.path.abspath(__file__)
-        # 向上遍历直到找到项目根目录（根目录包含 'train.py' 文件）
-        while True:
-            parent_path = os.path.dirname(current_path)
-            if os.path.exists(os.path.join(parent_path, 'train.py')):
-                return parent_path
-            if parent_path == current_path:  # 已经到达文件系统的根目录
-                raise Exception("Could not find project root directory")
-            current_path = parent_path
-
     def render(self):
         self.setup_page()
         self.setup_config()
@@ -89,13 +159,17 @@ class Training:
             self.show_generated_script()
         with col2:
             self.show_fixed_parameters()
-            run_button = st.button("Run Script", disabled=st.session_state.process is not None)
+            run_button = st.button(language_dict[lang_code]["run_script"], disabled=st.session_state.process is not None)
             if run_button:
                 output_dir = self.config["proj_dir"]
                 if os.path.exists(output_dir):
                     files = os.listdir(output_dir)
                     if any(file.endswith('.pth') for file in files):
-                        st.error(f"Error: Output directory '{output_dir}' already contains .pth files.")
+                        # Ensure output_dir is defined before this block
+                        output_dir = self.config.get("proj_dir", "")
+
+                        # Use the correct placeholder name in the format method
+                        st.error(language_dict[lang_code]["output_dir_not_empty"].format(output_dir=output_dir))
                         # proceed = st.button("仍然继续")
                         # new_output_dir = st.text_input("或指定一个新的输出路径：", output_dir)
                         # if proceed:
@@ -108,7 +182,7 @@ class Training:
                 else:
                     self.run_script(self.generate_script())
             
-            stop_button = st.button("Stop Script", disabled=st.session_state.process is None)
+            stop_button = st.button(language_dict[lang_code]["stop_script"], disabled=st.session_state.process is None)
             if stop_button:
                 self.stop_script()
 
@@ -119,7 +193,7 @@ class Training:
             self.update_displays()
 
     def setup_page(self):
-        st.title("🎈 RWKV-PEFT Training Interface")
+        st.title(language_dict[lang_code]["title"])
 
     def setup_config(self):
         # 创建三列布局
@@ -128,7 +202,7 @@ class Training:
         with left_column:
             # Basic Configuration
             with st.container(border=True):
-                st.subheader("Basic Configuration")
+                st.subheader(language_dict[lang_code]["basic_config"])
                 self.config["my_testing"] = st.selectbox("RWKV Version", ["v5", "v6"], index=1)
                 self.config["peft"] = st.selectbox("Select PEFT Method", ("bone", "lora", "pissa", "state"), index=0)
                 if self.config["peft"] == "bone":
@@ -143,10 +217,10 @@ class Training:
                     "Output Path", 
                     self.cache.get('proj_dir', "/home/ryan/code/out_model/metabone")
                 )
-                if st.button("Save Output Path"):
+                if st.button(language_dict[lang_code]["save_output_path"]):
                     self.cache['proj_dir'] = proj_dir
                     write_cache(self.cache, os.path.join(self.project_root + '/web', self.cache_name))
-                    st.success("Output path saved!")
+                    st.success(language_dict[lang_code]["output_saved"])
                 self.config["proj_dir"] = proj_dir
                 if self.config["peft"] == "lora":
                     lora_load = st.text_input("LoRA Load", "")
@@ -180,8 +254,8 @@ class Training:
         with middle_column:
             # Data Configuration
             with st.container(border=True):
-                st.subheader("Data Configuration")
-                st.markdown("[配置参考](https://rwkv.cn/RWKV-Fine-Tuning/FT-Dataset)")
+                st.subheader(language_dict[lang_code]["data_config"])
+                st.markdown(f"[{language_dict[lang_code]['config_reference']}](https://rwkv.cn/RWKV-Fine-Tuning/FT-Dataset)")
                 data_file_dir = st.text_input(
                     "Data File Path", 
                     self.cache.get('data_file_dir', "/home/ryan/code/data/")
@@ -190,13 +264,13 @@ class Training:
                     if os.path.exists(data_file_dir):
                         st.session_state.data_files = get_data_files(data_file_dir)
                         if st.session_state.data_files:
-                            st.success(f"Found {len(st.session_state.data_files)} unique file prefixes in the directory.")
+                            st.success(language_dict[lang_code]["data_found"].format(len(st.session_state.data_files)))
                             self.cache['data_file_dir'] = data_file_dir
                             write_cache(self.cache, os.path.join(self.project_root + '/web', self.cache_name))
                         else:
-                            st.warning("No files found in the specified directory.")
+                            st.warning(language_dict[lang_code]["no_files_found"])
                     else:
-                        st.error("Data directory does not exist!")
+                        st.error(language_dict[lang_code]["data_dir_not_exist"])
                         st.session_state.data_files = []
                 
                 if 'data_files' not in st.session_state:
@@ -209,7 +283,7 @@ class Training:
                         format_func=lambda x: os.path.basename(x)
                     )
                 else:
-                    st.warning("No data files found. Please check the data directory.")
+                    st.warning(language_dict[lang_code]["no_files_found"])
                     self.config["data_file"] = st.text_input("Data File", data_file_dir)
                     
                 col1, col2 = st.columns(2)
@@ -224,20 +298,20 @@ class Training:
         with right_column:
             # Model Configuration
             with st.container(border=True):
-                st.subheader("Model Configuration")
-                st.markdown("[配置参考](https://rwkv.cn/RWKV-Wiki/Model-Download)")
+                st.subheader(language_dict[lang_code]["model_config"])
+                st.markdown(f"[{language_dict[lang_code]['config_reference']}](https://rwkv.cn/RWKV-Wiki/Model-Download)")
                 model_directory = st.text_input(
-                    "Model Directory", 
+                    "Base Model Directory", 
                     self.cache.get('model_directory', "/home/ryan/code/model")
                 )
-                if st.button("Check Model Directory"):
+                if st.button("Check Base Model Directory"):
                     if os.path.exists(model_directory):
-                        st.success("Model directory exists!")
+                        st.success(language_dict[lang_code]["model_dir_exists"])
                         st.session_state.model_files = get_model_files(model_directory)
                         self.cache['model_directory'] = model_directory
                         write_cache(self.cache, os.path.join(self.project_root + '/web', self.cache_name))
                     else:
-                        st.error("Model directory does not exist!")
+                        st.error(language_dict[lang_code]["model_dir_not_exist"])
                         st.session_state.model_files = []
                 if 'model_files' not in st.session_state:
                     st.session_state.model_files = []
@@ -250,7 +324,7 @@ class Training:
                         format_func=lambda x: os.path.basename(x)
                     )
                 else:
-                    st.warning("No .pth files found. Please check the model directory.")
+                    st.warning(language_dict[lang_code]["no_pth_files"])
                     self.config["load_model"] = st.text_input("Load Model Path", "")
                 col1, col2 = st.columns(2)
                 with col1:
@@ -261,8 +335,8 @@ class Training:
 
         # Training Configuration
         with st.container(border=True):
-            st.subheader("Training Configuration")
-            st.markdown("[配置参考](https://rwkv.cn/RWKV-Fine-Tuning/Full-ft-Simple#%E8%B0%83%E6%95%B4%E5%85%B6%E4%BB%96%E8%AE%AD%E7%BB%83%E5%8F%82%E6%95%B0)")
+            st.subheader(language_dict[lang_code]["training_config"])
+            st.markdown(f"[{language_dict[lang_code]['config_reference']}](https://rwkv.cn/RWKV-Fine-Tuning/Full-ft-Simple#%E8%B0%83%E6%95%B4%E5%85%B6%E4%BB%96%E8%AE%AD%E7%BB%83%E5%8F%82%E6%95%B0)")
             
             col1, col2 = st.columns(2)
             with col1:
@@ -293,7 +367,7 @@ class Training:
                     self.config["chunk_ctx"] = st.selectbox("Chunk Context", ["128", "256", "512", "1024"], index=2)
                 if self.config["wandb"]:
                     self.config["wandb_project"] = st.text_input("Wandb Project", "peft-loss")
-    
+
     def show_hover_image(self):
         image1 = "https://rwkv.cn/images/RWKV-Wiki-Cover.png"
         image2 = "https://rwkv.cn/images/RWKV-Prompt-Cover.png"
@@ -332,12 +406,12 @@ class Training:
         st.markdown(hover_html, unsafe_allow_html=True)
 
     def show_generated_script(self):
-        st.subheader("Generated Script")
+        st.subheader(language_dict[lang_code]["generated_script"])
         script = self.generate_script()
         st.code(script, language="bash")
 
     def show_fixed_parameters(self):
-        st.subheader("Fixed Parameters")
+        st.subheader(language_dict[lang_code]["fixed_parameters"])
         # st.write("The following parameters are fixed and cannot be changed:")
         st.code("""
         pre_ffn = 0
@@ -425,7 +499,7 @@ class Training:
             time.sleep(1)
 
     def activity_monitor(self):
-        st.subheader("Activity Monitor")
+        st.subheader(language_dict[lang_code]["activity_monitor"])
         self.setup_gpu_monitoring()
         self.setup_loss_chart()
         self.setup_training_progress()
@@ -476,7 +550,7 @@ class Training:
             memory_percentage = self.gpu_memory_usage / self.gpu_memory_total if self.gpu_memory_total > 0 else 0
             self.memory_text.text(f"GPU Memory: {self.gpu_memory_usage:.2f} MB / {self.gpu_memory_total:.2f} MB")
             self.memory_bar.progress(memory_percentage)
-            placeholder.text("Script is running. GPU memory usage is being updated.")
+            placeholder.text(language_dict[lang_code]["script_running"])
             
             new_loss_data, t_cost, kt_s, loss = self.read_data(self.config['proj_dir'])
             
@@ -514,7 +588,7 @@ class Training:
         
         self.stop_gpu_monitoring()
         st.balloons()
-        st.success("Script has finished running.✨✨✨")
+        st.success(language_dict[lang_code]["training_success"])
         st.session_state.process = None
 
 if __name__ == "__main__":
