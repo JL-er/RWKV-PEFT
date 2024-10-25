@@ -65,10 +65,6 @@ language_dict = {
     }
 }
 
-# Add sidebar
-st.sidebar.page_link('home.py', label='Home', icon='🏠')
-st.sidebar.page_link('pages/training.py', label='Training', icon='🎈')
-st.sidebar.page_link('pages/merge.py', label='Merge', icon='🔀')
 
 def get_model_files(directory):
     model_files = []
@@ -129,7 +125,7 @@ def update_language_cache():
         
 # Language selection in the sidebar
 language = st.sidebar.selectbox(
-    "Language", 
+    "", 
     ["English", "中文"], 
     index=0 if read_cache(os.path.join(get_project_root() + '/web', 'cache.yml')).get("public", {}).get('language', 'en') == 'en' else 1,
     key='language',
@@ -142,6 +138,7 @@ class Training:
         self.config = {}
         if 'process' not in st.session_state:
             st.session_state.process = None
+        self.show_sidebar()
         self.gpu_memory_usage = 0
         self.gpu_memory_total = 0
         self.stop_monitoring = False
@@ -149,7 +146,12 @@ class Training:
         self.cache_name = 'cache.yml'
         # Load the training section from the cache
         self.cache = read_cache(os.path.join(self.project_root + '/web', self.cache_name)).get('training', {})
-    
+        
+    def show_sidebar(self):
+        st.sidebar.page_link('home.py', label='Home', icon='🏠', disabled=st.session_state.process is not None)
+        st.sidebar.page_link('pages/training.py', label='Training', icon='🎈', disabled=st.session_state.process is not None)
+        st.sidebar.page_link('pages/merge.py', label='Merge', icon='🔀', disabled=st.session_state.process is not None)
+        
     def render(self):
         self.setup_page()
         self.setup_config()
@@ -167,7 +169,6 @@ class Training:
                     if any(file.endswith('.pth') for file in files):
                         # Ensure output_dir is defined before this block
                         output_dir = self.config.get("proj_dir", "")
-
                         # Use the correct placeholder name in the format method
                         st.error(language_dict[lang_code]["output_dir_not_empty"].format(output_dir=output_dir))
                         # proceed = st.button("仍然继续")
@@ -215,7 +216,7 @@ class Training:
                 self.config["quant"] = st.selectbox("Quant", ["none", "int8", "nf4"], index=0)
                 proj_dir = st.text_input(
                     "Output Path", 
-                    self.cache.get('proj_dir', "/home/ryan/code/out_model/metabone")
+                    self.cache.get('proj_dir', "/home/rwkv/out_model/")
                 )
                 if st.button(language_dict[lang_code]["save_output_path"]):
                     self.cache['proj_dir'] = proj_dir
@@ -258,7 +259,7 @@ class Training:
                 st.markdown(f"[{language_dict[lang_code]['config_reference']}](https://rwkv.cn/RWKV-Fine-Tuning/FT-Dataset)")
                 data_file_dir = st.text_input(
                     "Data File Path", 
-                    self.cache.get('data_file_dir', "/home/ryan/code/data/")
+                    self.cache.get('data_file_dir', "/home/rwkv/data/")
                 )
                 if st.button("Check Data File"):
                     if os.path.exists(data_file_dir):
@@ -302,7 +303,7 @@ class Training:
                 st.markdown(f"[{language_dict[lang_code]['config_reference']}](https://rwkv.cn/RWKV-Wiki/Model-Download)")
                 model_directory = st.text_input(
                     "Base Model Directory", 
-                    self.cache.get('model_directory', "/home/ryan/code/model")
+                    self.cache.get('model_directory', "/home/rwkv/model")
                 )
                 if st.button("Check Base Model Directory"):
                     if os.path.exists(model_directory):
