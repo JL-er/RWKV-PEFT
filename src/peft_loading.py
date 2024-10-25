@@ -103,20 +103,20 @@ def load_peft_model(args: TrainingArgs):
     else:
         rank_zero_info(f"########## Loading {args.load_model}... ##########")
         model.load_state_dict(torch.load(
-            args.load_model, map_location="cpu"), strict=(not freeze))
+            args.load_model, map_location="cpu", weights_only=True), strict=(not freeze))
 
     # Load peft checkpoint
     # multi-GPU training
     if args.peft == 'lora':
         if os.path.isfile(args.lora_config['lora_load']):
-            model.load_state_dict(torch.load(args.lora_config['lora_load'], map_location="cpu"),
+            model.load_state_dict(torch.load(args.lora_config['lora_load'], map_location="cpu", weights_only=True),
                                   strict=False)
     elif args.peft == 'pissa':
         if int(args.devices) == 1 and os.path.isfile(f'{args.proj_dir}/init_pissa.pth'):
             assert os.path.isfile(f'{args.proj_dir}/init_pissa.pth') == False
         if os.path.isfile(f'{args.proj_dir}/init_pissa.pth') and int(args.devices) > 1 and args.pissa_config['pissa_load'] == "":
             pissa_init = torch.load(
-                f'{args.proj_dir}/init_pissa.pth', map_location="cpu")
+                f'{args.proj_dir}/init_pissa.pth', map_location="cpu", weights_only=True)
             rank_zero_info(f"########## Load Init PISSA... ##########")
             for name, m in model.named_modules():
                 if hasattr(m, "pissa_load") and callable(getattr(m, "pissa_load")):
@@ -133,10 +133,10 @@ def load_peft_model(args: TrainingArgs):
                     init_dict[f'{name}.init_lora_B'] = m.lora_B.data
             torch.save(init_dict, f'{args.proj_dir}/init_pissa.pth')
         if os.path.isfile(args.pissa_config['pissa_load']):
-            model.load_state_dict(torch.load(args.pissa_config['pissa_load'], map_location="cpu"),
+            model.load_state_dict(torch.load(args.pissa_config['pissa_load'], map_location="cpu", weights_only=True),
                                   strict=False)
             pissa_init = torch.load(
-                args.pissa_config['pissa_init'], map_location="cpu")
+                args.pissa_config['pissa_init'], map_location="cpu", weights_only=True)
             rank_zero_info(f"########## Load PISSA... ##########")
             for name, m in model.named_modules():
                 if hasattr(m, "pissa_load") and callable(getattr(m, "pissa_load")):

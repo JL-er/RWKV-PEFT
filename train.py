@@ -213,9 +213,6 @@ if __name__ == "__main__":
             os.environ["RWKV_TRAIN_TYPE"] = 'infctx'
 
         os.environ["WKV"] = 'fla' if args.fla else ''
-        if args.fla:
-            os.system('pip uninstall fla -y')
-            os.system('pip install --upgrade rwkv-fla')
 
         if args.fla_npu:
             import torch_npu
