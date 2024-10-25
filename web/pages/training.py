@@ -1,5 +1,5 @@
 import streamlit as st
-st.set_page_config(layout="wide", page_title="RWKV-PEFT Training")
+st.set_page_config(layout="wide", page_title="RWKV-PEFT-Training")
 import os
 import json
 import subprocess
@@ -11,6 +11,7 @@ import GPUtil
 import pandas as pd
 import plotly.express as px
 import psutil
+import yaml
 
 # Add sidebar
 st.sidebar.page_link('home.py', label='Home', icon='🏠')
@@ -37,6 +38,22 @@ def get_data_files(directory):
             data_files.add(os.path.join(root, file_prefix))
     return sorted(list(data_files))
 
+def read_cache(cache_file):
+    try:
+        with open(cache_file, 'r') as file:
+            return yaml.safe_load(file) or {}
+    except FileNotFoundError:
+        return {}
+
+def write_cache(data, cache_file):
+    # Read existing cache
+    cache = read_cache(cache_file)
+    # Update the training section
+    cache['training'] = data
+    # Write back to the cache file
+    with open(cache_file, 'w') as file:
+        yaml.safe_dump(cache, file)
+
 class Training:
     def __init__(self):
         self.config = {}
@@ -45,6 +62,23 @@ class Training:
         self.gpu_memory_usage = 0
         self.gpu_memory_total = 0
         self.stop_monitoring = False
+        self.project_root = self.get_project_root()
+        self.cache_name = 'cache.yml'
+        # Load the training section from the cache
+        self.cache = read_cache(os.path.join(self.project_root + '/web', self.cache_name)).get('training', {})
+    
+    @staticmethod
+    def get_project_root():
+        # 获取当前文件的绝对路径
+        current_path = os.path.abspath(__file__)
+        # 向上遍历直到找到项目根目录（根目录包含 'train.py' 文件）
+        while True:
+            parent_path = os.path.dirname(current_path)
+            if os.path.exists(os.path.join(parent_path, 'train.py')):
+                return parent_path
+            if parent_path == current_path:  # 已经到达文件系统的根目录
+                raise Exception("Could not find project root directory")
+            current_path = parent_path
 
     def render(self):
         self.setup_page()
@@ -57,7 +91,23 @@ class Training:
             self.show_fixed_parameters()
             run_button = st.button("Run Script", disabled=st.session_state.process is not None)
             if run_button:
-                self.run_script(self.generate_script(), self.config['work_dir'])
+                output_dir = self.config["proj_dir"]
+                if os.path.exists(output_dir):
+                    files = os.listdir(output_dir)
+                    if any(file.endswith('.pth') for file in files):
+                        st.error(f"Error: Output directory '{output_dir}' already contains .pth files.")
+                        # proceed = st.button("仍然继续")
+                        # new_output_dir = st.text_input("或指定一个新的输出路径：", output_dir)
+                        # if proceed:
+                        # self.run_script(self.generate_script())
+                        # elif new_output_dir != output_dir:
+                        #     self.config["proj_dir"] = new_output_dir
+                        #     self.run_script(self.generate_script())
+                    else:
+                        self.run_script(self.generate_script())
+                else:
+                    self.run_script(self.generate_script())
+            
             stop_button = st.button("Stop Script", disabled=st.session_state.process is None)
             if stop_button:
                 self.stop_script()
@@ -88,9 +138,16 @@ class Training:
                     with col2:
                         bone_r = st.number_input("Bone R", value=64, min_value=1)
                     self.config["bone_config"] = json.dumps({"bone_load": bone_load, "bone_r": bone_r})
-                self.config["work_dir"] = st.text_input("Working Directory", "/home/ryan/code/RWKV-PEFT-WEB")
                 self.config["quant"] = st.selectbox("Quant", ["none", "int8", "nf4"], index=0)
-                self.config["proj_dir"] = st.text_input("Project Directory", "/home/ryan/code/out_model/metabone")
+                proj_dir = st.text_input(
+                    "Output Path", 
+                    self.cache.get('proj_dir', "/home/ryan/code/out_model/metabone")
+                )
+                if st.button("Save Output Path"):
+                    self.cache['proj_dir'] = proj_dir
+                    write_cache(self.cache, os.path.join(self.project_root + '/web', self.cache_name))
+                    st.success("Output path saved!")
+                self.config["proj_dir"] = proj_dir
                 if self.config["peft"] == "lora":
                     lora_load = st.text_input("LoRA Load", "")
                     lora_r = st.number_input("LoRA R", value=32, min_value=1)
@@ -125,12 +182,17 @@ class Training:
             with st.container(border=True):
                 st.subheader("Data Configuration")
                 st.markdown("[配置参考](https://rwkv.cn/RWKV-Fine-Tuning/FT-Dataset)")
-                data_file_dir = st.text_input("Data File Path", "/home/ryan/code/data/")
-                if st.button("Verify Data File"):
+                data_file_dir = st.text_input(
+                    "Data File Path", 
+                    self.cache.get('data_file_dir', "/home/ryan/code/data/")
+                )
+                if st.button("Check Data File"):
                     if os.path.exists(data_file_dir):
                         st.session_state.data_files = get_data_files(data_file_dir)
                         if st.session_state.data_files:
                             st.success(f"Found {len(st.session_state.data_files)} unique file prefixes in the directory.")
+                            self.cache['data_file_dir'] = data_file_dir
+                            write_cache(self.cache, os.path.join(self.project_root + '/web', self.cache_name))
                         else:
                             st.warning("No files found in the specified directory.")
                     else:
@@ -156,7 +218,7 @@ class Training:
                     self.config["data_type"] = st.selectbox("Data Type", ["binidx", "jsonl"])
                     self.config["data_shuffle"] = st.toggle("Data Shuffle", value=1)
                 with col2:
-                    self.config["loss_mask"] = st.selectbox("Loss Mask", ["pad", "qa"])
+                    self.config["loss_mask"] = st.selectbox("Loss Mask", ["none", "pad", "qa"], index=0)
                     self.config["vocab_size"] = st.number_input("Vocab Size", value=65536, min_value=1, disabled=True)
 
         with right_column:
@@ -164,16 +226,22 @@ class Training:
             with st.container(border=True):
                 st.subheader("Model Configuration")
                 st.markdown("[配置参考](https://rwkv.cn/RWKV-Wiki/Model-Download)")
-                model_directory = st.text_input("Model Directory", "/home/ryan/code/model")
-                if 'model_files' not in st.session_state:
-                    st.session_state.model_files = []
+                model_directory = st.text_input(
+                    "Model Directory", 
+                    self.cache.get('model_directory', "/home/ryan/code/model")
+                )
                 if st.button("Check Model Directory"):
                     if os.path.exists(model_directory):
                         st.success("Model directory exists!")
                         st.session_state.model_files = get_model_files(model_directory)
+                        self.cache['model_directory'] = model_directory
+                        write_cache(self.cache, os.path.join(self.project_root + '/web', self.cache_name))
                     else:
                         st.error("Model directory does not exist!")
                         st.session_state.model_files = []
+                if 'model_files' not in st.session_state:
+                    st.session_state.model_files = []
+                
                 if st.session_state.model_files:
                     self.config["load_model"] = st.selectbox(
                         "Load Model Path",
@@ -202,14 +270,16 @@ class Training:
                 self.config["epoch_steps"] = st.number_input("Epoch Steps", value=50, min_value=1)
                 self.config["epoch_begin"] = st.number_input("Epoch Begin", value=0, min_value=0)
                 self.config["lr_init"] = st.number_input("Initial Learning Rate", value=2e-5, format="%.1e")
-                self.config["grad_cp"] = st.number_input("Gradient Checkpoint", value=1, min_value=0)
                 self.config["strategy"] = st.selectbox("Strategy", ["deepspeed_stage_1", "deepspeed_stage_2", "deepspeed_stage_2_offload", "deepspeed_stage_3", "deepspeed_stage_3_offload"])
                 self.config["warmup_steps"] = st.number_input("Warmup Steps", value=0, min_value=0)
-                
-                default_use_fla = True if self.config["peft"] == "state" else False
-                self.config["use_fla"] = st.toggle("Use FLA", value=default_use_fla)
-                self.config["train_type"] = st.toggle("Infctx", value=False)
-                self.config["wandb"] = st.toggle("Wandb", value=False)
+                _col1, _col2 = st.columns(2)
+                with _col1:
+                    default_use_fla = True if self.config["peft"] == "state" else False
+                    self.config["use_fla"] = st.toggle("Use FLA", value=default_use_fla)
+                    self.config["grad_cp"] = st.toggle("Gradient Checkpoint", value=True)
+                with _col2:
+                    self.config["wandb"] = st.toggle("Wandb", value=False)
+                    self.config["train_type"] = st.toggle("Infctx", value=False)
 
             with col2:
                 self.config["epoch_count"] = st.number_input("Epoch Count", value=1, min_value=1)
@@ -288,7 +358,7 @@ class Training:
 --n_layer {self.config['n_layer']} --n_embd {self.config['n_embd']} \\
 --lr_init {self.config['lr_init']} --lr_final {self.config['lr_final']} --warmup_steps {self.config['warmup_steps']} \\
 {fixed_args} \\
---devices {self.config['devices']} --precision {self.config['precision']} --strategy {self.config['strategy']} --grad_cp {self.config['grad_cp']} \\
+--devices {self.config['devices']} --precision {self.config['precision']} --strategy {self.config['strategy']} {'--grad_cp 0' if not self.config['grad_cp'] else '--grad_cp 1'} \\
 {'--my_testing "x060"' if self.config['my_testing'] == "v6" else ''} \\
 --dataload {self.config['data_load']} --loss_mask {self.config['loss_mask']} \\
 {f"--peft {self.config['peft']}" if self.config['peft'] != 'state' else ''} {f"--bone_config '{self.config['bone_config']}'" if self.config['peft'] == 'bone' else ''}{f" --lora_config '{self.config['lora_config']}'" if self.config['peft'] == 'lora' else ''} {f" --pissa_config '{self.config['pissa_config']}'" if self.config['peft'] == 'pissa' else ''} \\
@@ -296,7 +366,7 @@ class Training:
 
         return f"""python train.py {common_args}"""
     
-    def run_script(self, script, working_directory):
+    def run_script(self, script):
         with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.sh') as temp_file:
             temp_file.write(script)
             temp_file_path = temp_file.name
@@ -304,7 +374,7 @@ class Training:
         try:
             os.chmod(temp_file_path, 0o755)
             st.session_state.process = subprocess.Popen(['bash', temp_file_path], 
-                                   cwd=working_directory,
+                                   cwd=self.project_root,
                                    preexec_fn=os.setsid)
             self.start_gpu_monitoring()
         except Exception as e:
@@ -450,3 +520,4 @@ class Training:
 if __name__ == "__main__":
     training = Training()
     training.render()
+
