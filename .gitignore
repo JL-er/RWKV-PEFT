@@ -3,5 +3,5 @@ wandb/
 src/__pycache__/
 demo/
 fla/
-test/*
-.vscode/launch.json
+web/page/merge_page.py
+web/cache.yml

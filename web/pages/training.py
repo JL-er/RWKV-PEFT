@@ -11,6 +11,7 @@ import GPUtil
 import pandas as pd
 import plotly.express as px
 import psutil
+import yaml
 
 # Add sidebar
 st.sidebar.page_link('home.py', label='Home', icon='🏠')
@@ -37,6 +38,22 @@ def get_data_files(directory):
             data_files.add(os.path.join(root, file_prefix))
     return sorted(list(data_files))
 
+def read_cache(cache_file):
+    try:
+        with open(cache_file, 'r') as file:
+            return yaml.safe_load(file) or {}
+    except FileNotFoundError:
+        return {}
+
+def write_cache(data, cache_file):
+    # Read existing cache
+    cache = read_cache(cache_file)
+    # Update the training section
+    cache['training'] = data
+    # Write back to the cache file
+    with open(cache_file, 'w') as file:
+        yaml.safe_dump(cache, file)
+
 class Training:
     def __init__(self):
         self.config = {}
@@ -45,8 +62,10 @@ class Training:
         self.gpu_memory_usage = 0
         self.gpu_memory_total = 0
         self.stop_monitoring = False
-        # 自动获取项目根目录
         self.project_root = self.get_project_root()
+        self.cache_name = 'cache.yml'
+        # Load the training section from the cache
+        self.cache = read_cache(os.path.join(self.project_root + '/web', self.cache_name)).get('training', {})
     
     @staticmethod
     def get_project_root():
@@ -76,7 +95,7 @@ class Training:
                 if os.path.exists(output_dir):
                     files = os.listdir(output_dir)
                     if any(file.endswith('.pth') for file in files):
-                        st.error(f"Warning: The output directory '{output_dir}' already contains .pth files.")
+                        st.error(f"Error: Output directory '{output_dir}' already contains .pth files.")
                         # proceed = st.button("仍然继续")
                         # new_output_dir = st.text_input("或指定一个新的输出路径：", output_dir)
                         # if proceed:
@@ -120,7 +139,15 @@ class Training:
                         bone_r = st.number_input("Bone R", value=64, min_value=1)
                     self.config["bone_config"] = json.dumps({"bone_load": bone_load, "bone_r": bone_r})
                 self.config["quant"] = st.selectbox("Quant", ["none", "int8", "nf4"], index=0)
-                self.config["proj_dir"] = st.text_input("Output Path", "/home/ryan/code/out_model/metabone")
+                proj_dir = st.text_input(
+                    "Output Path", 
+                    self.cache.get('proj_dir', "/home/ryan/code/out_model/metabone")
+                )
+                if st.button("Save Output Path"):
+                    self.cache['proj_dir'] = proj_dir
+                    write_cache(self.cache, os.path.join(self.project_root + '/web', self.cache_name))
+                    st.success("Output path saved!")
+                self.config["proj_dir"] = proj_dir
                 if self.config["peft"] == "lora":
                     lora_load = st.text_input("LoRA Load", "")
                     lora_r = st.number_input("LoRA R", value=32, min_value=1)
@@ -155,12 +182,17 @@ class Training:
             with st.container(border=True):
                 st.subheader("Data Configuration")
                 st.markdown("[配置参考](https://rwkv.cn/RWKV-Fine-Tuning/FT-Dataset)")
-                data_file_dir = st.text_input("Data File Path", "/home/ryan/code/data/")
+                data_file_dir = st.text_input(
+                    "Data File Path", 
+                    self.cache.get('data_file_dir', "/home/ryan/code/data/")
+                )
                 if st.button("Check Data File"):
                     if os.path.exists(data_file_dir):
                         st.session_state.data_files = get_data_files(data_file_dir)
                         if st.session_state.data_files:
                             st.success(f"Found {len(st.session_state.data_files)} unique file prefixes in the directory.")
+                            self.cache['data_file_dir'] = data_file_dir
+                            write_cache(self.cache, os.path.join(self.project_root + '/web', self.cache_name))
                         else:
                             st.warning("No files found in the specified directory.")
                     else:
@@ -194,16 +226,22 @@ class Training:
             with st.container(border=True):
                 st.subheader("Model Configuration")
                 st.markdown("[配置参考](https://rwkv.cn/RWKV-Wiki/Model-Download)")
-                model_directory = st.text_input("Model Directory", "/home/ryan/code/model")
-                if 'model_files' not in st.session_state:
-                    st.session_state.model_files = []
+                model_directory = st.text_input(
+                    "Model Directory", 
+                    self.cache.get('model_directory', "/home/ryan/code/model")
+                )
                 if st.button("Check Model Directory"):
                     if os.path.exists(model_directory):
                         st.success("Model directory exists!")
                         st.session_state.model_files = get_model_files(model_directory)
+                        self.cache['model_directory'] = model_directory
+                        write_cache(self.cache, os.path.join(self.project_root + '/web', self.cache_name))
                     else:
                         st.error("Model directory does not exist!")
                         st.session_state.model_files = []
+                if 'model_files' not in st.session_state:
+                    st.session_state.model_files = []
+                
                 if st.session_state.model_files:
                     self.config["load_model"] = st.selectbox(
                         "Load Model Path",

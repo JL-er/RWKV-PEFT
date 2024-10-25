@@ -3,28 +3,36 @@ st.set_page_config(layout="wide", page_title="RWKV-PEFT Merge")
 import os
 import subprocess
 import sys
+import yaml
 
 # Add sidebar
 st.sidebar.page_link('home.py', label='Home', icon='🏠')
 st.sidebar.page_link('pages/training.py', label='Training', icon='🎈')
 st.sidebar.page_link('pages/merge.py', label='Merge', icon='🔀')
 
-@st.cache_resource
-def get_cached_model_files(directory):
-    return get_model_files(directory)
+def read_cache(cache_file):
+    try:
+        with open(cache_file, 'r') as file:
+            return yaml.safe_load(file) or {}
+    except FileNotFoundError:
+        return {}
+
+def write_cache(data, cache_file):
+    # Read existing cache
+    cache = read_cache(cache_file)
+    # Update the merge section
+    cache['merge'] = data
+    # Write back to the cache file
+    with open(cache_file, 'w') as file:
+        yaml.safe_dump(cache, file)
 
 class Merge:
     def __init__(self):
         self.config = {}
         self.project_root = self.get_project_root()
-        # Initialize session state variables
-        if 'base_model_files' not in st.session_state:
-            st.session_state.base_model_files = []
-        if 'checkpoint_files' not in st.session_state:
-            st.session_state.checkpoint_files = []
-        if 'pissa_init_files' not in st.session_state:
-            st.session_state.pissa_init_files = []
-        print("oooooooooooo Merge init oooooooooooo")
+        self.cache_name = 'cache.yml'
+        # Load the merge section from the cache
+        self.cache = read_cache(os.path.join(self.project_root + '/web', self.cache_name)).get('merge', {})
         
     @staticmethod
     def get_project_root():
@@ -55,16 +63,33 @@ class Merge:
                 st.subheader("Basic Configuration")
                 self.config["merge_type"] = st.selectbox("Select Merge Type", ("bone", "pissa", "lora", "state"))
                 self.config["quant"] = st.selectbox("Quant", ["none", "int8", "nf4"], index=0)
-                self.config["output"] = st.text_input("Output Path", f"/home/ryan/code/model/meta{self.config['merge_type']}-1.6b.pth")
+                output_path = st.text_input(
+                    "Output Path", 
+                    self.cache.get('output_path', f"/home/ryan/code/model/meta{self.config['merge_type']}-1.6b.pth")
+                )
+                if st.button("Save Output Path"):
+                    # Save to cache
+                    self.cache['output_path'] = output_path
+                    write_cache(self.cache, os.path.join(self.project_root + '/web', self.cache_name))
+                    st.success("Output path saved!")
+                self.config["output"] = output_path
         with col2:
             with st.container(border=True):
                 st.subheader("Model Configuration")
                 # Base Model Path
-                base_model_directory = st.text_input("Base Model Directory", "/home/ryan/code/model")
+                base_model_directory = st.text_input(
+                    "Base Model Directory", 
+                    self.cache.get('base_model_directory', "/home/ryan/code/model")
+                )
+                if 'base_model_files' not in st.session_state:
+                    st.session_state.base_model_files = []
                 if st.button("Check Base Model Directory"):
                     if os.path.exists(base_model_directory):
                         st.success("Base model directory exists!")
-                        st.session_state.base_model_files = get_cached_model_files(base_model_directory)
+                        st.session_state.base_model_files = get_model_files(base_model_directory)
+                        # Save to cache
+                        self.cache['base_model_directory'] = base_model_directory
+                        write_cache(self.cache, os.path.join(self.project_root + '/web', self.cache_name))
                     else:
                         st.error("Base model directory does not exist!")
                         st.session_state.base_model_files = []
@@ -81,11 +106,19 @@ class Merge:
 
                 # Checkpoint Path (LoRA or State)
                 checkpoint_label = "State Checkpoint" if self.config["merge_type"] == "state" else "LoRA Checkpoint"
-                checkpoint_directory = st.text_input(f"{checkpoint_label} Directory", f"/home/ryan/code/out_model/metabone")
+                checkpoint_directory = st.text_input(
+                    f"{checkpoint_label} Directory", 
+                    self.cache.get('checkpoint_directory', "/home/ryan/code/out_model/metabone")
+                )
+                if 'checkpoint_files' not in st.session_state:
+                    st.session_state.checkpoint_files = []
                 if st.button(f"Check {checkpoint_label} Directory"):
                     if os.path.exists(checkpoint_directory):
                         st.success(f"{checkpoint_label} directory exists!")
-                        st.session_state.checkpoint_files = get_cached_model_files(checkpoint_directory)
+                        st.session_state.checkpoint_files = get_model_files(checkpoint_directory)
+                        # Save to cache
+                        self.cache['checkpoint_directory'] = checkpoint_directory
+                        write_cache(self.cache, os.path.join(self.project_root + '/web', self.cache_name))
                     else:
                         st.error(f"{checkpoint_label} directory does not exist!")
                         st.session_state.checkpoint_files = []
@@ -104,11 +137,19 @@ class Merge:
 
                 # PISSA specific configuration
                 if self.config["merge_type"] == "pissa":
-                    pissa_init_directory = st.text_input("PISSA Init Directory", "/home/ryan/code/out_model/metapissa")
+                    pissa_init_directory = st.text_input(
+                        "PISSA Init Directory", 
+                        self.cache.get('pissa_init_directory', "/home/ryan/code/out_model/metapissa")
+                    )
+                    if 'pissa_init_files' not in st.session_state:
+                        st.session_state.pissa_init_files = []
                     if st.button("Check PISSA Init Directory"):
                         if os.path.exists(pissa_init_directory):
                             st.success("PISSA init directory exists!")
-                            st.session_state.pissa_init_files = get_cached_model_files(pissa_init_directory)
+                            st.session_state.pissa_init_files = get_model_files(pissa_init_directory)
+                            # Save to cache
+                            self.cache['pissa_init_directory'] = pissa_init_directory
+                            write_cache(self.cache, os.path.join(self.project_root + '/web', self.cache_name))
                         else:
                             st.error("PISSA init directory does not exist!")
                             st.session_state.pissa_init_files = []
