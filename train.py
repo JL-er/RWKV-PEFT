@@ -12,7 +12,7 @@ if __name__ == "__main__":
     from lightning.pytorch import seed_everything
     from lightning_utilities.core.rank_zero import rank_zero_info
     import lightning as pl
-    from src.devices.check import get_accelerator, get_strategy
+    from src.devices.check import get_accerator_and_strategy
     import json
     from src.args_type import TrainingArgs
     from src.dataset import get_data_by_l_version, get_vocab_size
@@ -74,7 +74,13 @@ if __name__ == "__main__":
     parser.add_argument("--magic_prime", default=0, type=int)
     parser.add_argument("--my_qa_mask", default=0, type=int)
     parser.add_argument("--my_random_steps", default=0, type=int)
-    parser.add_argument("--rwkv_version", default='x060', type=str)
+    parser.add_argument(
+                        "--rwkv_version", 
+                        "--my_testing",  
+                        dest="rwkv_version",  
+                        default='x060', 
+                        type=str
+                    )
     parser.add_argument("--my_exit", default=99999999, type=int)
     parser.add_argument("--my_exit_tokens", default=0, type=int)
 
@@ -367,9 +373,8 @@ if __name__ == "__main__":
 
     args, model = load_peft_model(args)
 
-    actual_acc = get_accelerator(args)
-    actual_strategy = get_strategy(args, args.accelerator.lower(), accelerator=actual_acc)
-
+    actual_acc, actual_strategy = get_accerator_and_strategy(args)
+    
     if pl.__version__[0] == '2':
         trainer = Trainer(accelerator=actual_acc, strategy=actual_strategy, devices=args.devices, num_nodes=args.num_nodes, precision=args.precision,
                           logger=args.logger, callbacks=[train_callback(args)], max_epochs=args.max_epochs, check_val_every_n_epoch=args.check_val_every_n_epoch, num_sanity_val_steps=args.num_sanity_val_steps,

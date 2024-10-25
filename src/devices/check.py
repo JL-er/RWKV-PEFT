@@ -26,7 +26,7 @@ def get_strategy(args: TrainingArgs, devices: int, accelerator: Accelerator):
                 "offload_params_device": None,
                 "offload_optimizer_device": None,
                 "allgather_bucket_size": args.ds_bucket_mb * 1000 * 1000,
-                "reduce_bucket_size": args.ds_bucket_mb * 1000 * 1000
+                "reduce_bucket_size": args.ds_bucket_mb * 1000 * 1000,
             }
 
             if strategy == "deepspeed":
@@ -59,7 +59,8 @@ def get_strategy(args: TrainingArgs, devices: int, accelerator: Accelerator):
 
 def get_accelerator(args: TrainingArgs):
     if args.accelerator.lower() == "gpu":
-        actual_acc = args.accelerator  # work for NV, AMD, 沐曦
+        from src.devices.cuda import CUDAAccelerator
+        actual_acc = CUDAAccelerator()  # work for NV, AMD, 沐曦
     elif args.accelerator.lower() == "xpu":
         from src.devices.xpu import XPUAccelerator
         actual_acc = XPUAccelerator()  # work for Intel
@@ -72,3 +73,8 @@ def get_accelerator(args: TrainingArgs):
     else:
         raise ValueError(f"Unknown accelerator {args.accelerator}")
     return actual_acc
+
+def get_accerator_and_strategy(args: TrainingArgs):
+    accelerator = get_accelerator(args)
+    strategy = get_strategy(args, args.accelerator.lower(), accelerator)
+    return accelerator, strategy
