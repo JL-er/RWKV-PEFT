@@ -301,15 +301,8 @@ if __name__ == "__main__":
 
     from src.trainer import train_callback
     from src.peft_loading import load_peft_model
-    
 
-    from src.model import RWKV
-
-    model = RWKV(args)
-    print(model)
-    
-
-    args, model = load_peft_model(args, model)
+    args, model = load_peft_model(args)
 
 
     if pl.__version__[0]=='2':
