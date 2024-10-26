@@ -129,36 +129,31 @@ class train_callback(pl.Callback):
             try:
                 t_cost = (t_now - trainer.my_time_ns) / 1e9
                 kt_s = token_per_step / t_cost / 1000
-                self.log("REAL it/s", 1.0 / t_cost, prog_bar=True, on_step=True)
+                self.log("REAL it/s", 1.0 / t_cost,
+                         prog_bar=True, on_step=True)
                 self.log("Kt/s", kt_s, prog_bar=True, on_step=True)
-            except BaseException:
+            except:
                 pass
             trainer.my_time_ns = t_now
-            if pl.__version__[0] == '2':
-                trainer.my_loss = outputs["loss"]
-            else:
-                trainer.my_loss = trainer.my_loss_all.float().mean().item()
+            trainer.my_loss = outputs["loss"]*trainer.accumulate_grad_batches
             trainer.my_loss_sum += trainer.my_loss
             trainer.my_loss_count += 1
             trainer.my_epoch_loss = trainer.my_loss_sum / trainer.my_loss_count
             self.log("lr", trainer.my_lr, prog_bar=True, on_step=True)
-            self.log("loss", trainer.my_epoch_loss, prog_bar=True, on_step=True)
+            self.log("loss", trainer.my_epoch_loss,
+                     prog_bar=True, on_step=True)
             # self.log("s", real_step, prog_bar=True, on_step=True)
 
             if len(args.wandb) > 0:
-                if trainer.accumulate_grad_batches is not None:
-                    args.avg_loss += trainer.my_loss / trainer.accumulate_grad_batches
-                    if (batch_idx + 1) % trainer.accumulate_grad_batches == 0:
-                        lll = {"loss": args.avg_loss, "lr": trainer.my_lr, "wd": trainer.my_wd, "Gtokens": real_step * token_per_step / 1e9}
-                        if kt_s > 0:
-                            lll["kt/s"] = kt_s
-                        trainer.my_wandb.log(lll, step=int(real_step))
-                        args.avg_loss = 0
-                else:
-                    lll = {"loss": trainer.my_loss, "lr": trainer.my_lr, "wd": trainer.my_wd, "Gtokens": real_step * token_per_step / 1e9}
+                args.avg_loss += trainer.my_loss/trainer.accumulate_grad_batches
+                if (batch_idx+1) % trainer.accumulate_grad_batches == 0:
+                    lll = {"loss": args.avg_loss, "lr": trainer.my_lr,
+                           "wd": trainer.my_wd, "Gtokens": real_step * token_per_step / 1e9}
                     if kt_s > 0:
                         lll["kt/s"] = kt_s
                     trainer.my_wandb.log(lll, step=int(real_step))
+                    args.avg_loss = 0
+
         if (trainer.is_global_zero) or ('deepspeed_stage_3' in args.strategy):  # save pth
             if args.magic_prime > 0:
                 expand_factor = 2 if args.my_qa_mask > 0 else 1
@@ -170,42 +165,9 @@ class train_callback(pl.Callback):
                         f"{args.proj_dir}/rwkv-final.pth",
                     )
 
-        # if args.LISA and (batch_idx+1)%args.lisa_k==0:
-        #     pl_module.requires_grad_(False)
-        #     select_layers = np.random.choice(range(args.n_layer), args.lisa_r, replace=False)
-
-        #     for name, module in pl_module.named_modules():
-        #         for pname, param in module.named_parameters():
-        #             if 'emb' in pname or 'head' in pname or '.ln' in pname or 'time' in pname:
-        #                 param.requires_grad = True
-        #             elif 'ln_out' in pname:
-        #                 param.requires_grad = True
-        #             match = re.search(r'\d+', pname)
-        #             if match:
-        #                 number = int(match.group())
-        #                 if number in select_layers:
-        #                     param.requires_grad  = True
-        #         break
-        # if args.batch_save==batch_idx :
-        #     to_save_dict = pl_module.state_dict()
-        #     for name, state in to_save_dict.items():
-        #         if 'img' in name:
-        #             to_save_dict[name] = state
-        #     try:
-        #             my_save(
-        #                 args, trainer,
-        #                 to_save_dict,
-        #                 f"{args.proj_dir}/rwkv-{args.epoch_begin + trainer.current_epoch}-{batch_idx}.pth",
-        #             )
-        #     except Exception as e:
-        #         print('Error\n\n', e, '\n\n')
-
     def on_train_epoch_start(self, trainer, pl_module):
         args = self.args
-        if pl.__version__[0] == '2':
-            dataset = trainer.train_dataloader.dataset
-        else:
-            dataset = trainer.train_dataloader.dataset.datasets
+        dataset = trainer.train_dataloader.dataset
         assert "MyDataset" in str(dataset)
         dataset.global_rank = trainer.global_rank
         dataset.real_epoch = int(args.epoch_begin + trainer.current_epoch)
@@ -245,18 +207,7 @@ class train_callback(pl.Callback):
                             peft_dict[name] = state
                         elif args.peft in name:
                             peft_dict[name] = state
-                    # if args.peft=='lora' or args.peft=='pissa':
-                    #     for name, state in to_save_dict.items():
 
-                    #         if ('.lora_' in name):
-                    #             peft_dict[name] = state
-                    # if args.peft=='bone':
-                    #     for name, state in to_save_dict.items():
-                    #         if len(args.load_model) == 0:
-                    #             if 'emb' in name or 'head' in name or 'ln' in name:
-                    #                 peft_dict[name] = state
-                    #         if ('.gbmm' in name):
-                    #             peft_dict[name] = state
                     to_save_dict = peft_dict
 
                 try:

@@ -130,15 +130,14 @@ if __name__ == "__main__":
 
     parser.add_argument("--compile", action="store_true")
 
-    if pl.__version__[0] == '2':
-        parser.add_argument("--accelerator", default="gpu", type=str)
-        parser.add_argument("--strategy", default="auto", type=str)
-        parser.add_argument("--devices", default=1, type=int)
-        parser.add_argument("--num_nodes", default=1, type=int)
-        parser.add_argument("--precision", default="fp16", type=str)
-        parser.add_argument("--accumulate_grad_batches", default=1, type=int)
-    else:
-        parser = Trainer.add_argparse_args(parser)
+    # lightning 2
+    parser.add_argument("--accelerator", default="gpu", type=str)
+    parser.add_argument("--strategy", default="auto", type=str)
+    parser.add_argument("--devices", default=1, type=int)
+    parser.add_argument("--num_nodes", default=1, type=int)
+    parser.add_argument("--precision", default="fp16", type=str)
+    parser.add_argument("--accumulate_grad_batches", default=1, type=int)
+
     args = TrainingArgs(**vars(parser.parse_args()))
 
     ########################################################################################################
@@ -159,6 +158,7 @@ if __name__ == "__main__":
         assert args.strategy in ["auto", "single-device", "fsdp", "ddp", "deepspeed", "deepspeed_stage_1", "deepspeed_stage_2", "deepspeed_stage_3"]
         assert args.train_type in ['none', 'state', 'infctx', 'finetune']
         assert args.data_type in ["utf-8", "utf-16le", "numpy", "binidx", "dummy", "uint16"]
+        assert args.accumulate_grad_batches >= 1
         if "32" in args.precision:
             args.precision = "32"
             torch.backends.cudnn.allow_tf32 = False
@@ -377,10 +377,7 @@ if __name__ == "__main__":
                           logger=args.logger, callbacks=[train_callback(args)], max_epochs=args.max_epochs, check_val_every_n_epoch=args.check_val_every_n_epoch, num_sanity_val_steps=args.num_sanity_val_steps,
                           log_every_n_steps=args.log_every_n_steps, enable_checkpointing=args.enable_checkpointing, accumulate_grad_batches=args.accumulate_grad_batches, gradient_clip_val=args.gradient_clip_val)
     else:
-        trainer = Trainer.from_argparse_args(
-            args,
-            callbacks=[train_callback(args)],
-        )
+        raise ValueError("Please use pytorch-lightning 2.4.0 or newer")
 
     if trainer.global_rank == 0:
         for n in model.state_dict():

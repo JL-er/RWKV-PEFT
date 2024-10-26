@@ -1,4 +1,4 @@
-lightning==1.9.5
+lightning==2.4.0
 bitsandbytes
 deepspeed
 einops

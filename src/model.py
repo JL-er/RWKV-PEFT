@@ -361,10 +361,7 @@ class RWKV(pl.LightningModule):
             return L2Wrap.apply(loss, logits)
 
     def training_step_end(self, batch_parts):
-        if pl.__version__[0] != '2':
-            all = self.all_gather(batch_parts)
-            if self.trainer.is_global_zero:
-                self.trainer.my_loss_all = all
+        pass
 
     def generate_init_weight(self):
         print(
