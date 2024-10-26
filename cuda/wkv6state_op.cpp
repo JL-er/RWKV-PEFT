@@ -11,12 +11,14 @@ void forward(int64_t B, int64_t T, int64_t C, int64_t H, torch::Tensor &r, torch
 void backward(int64_t B, int64_t T, int64_t C, int64_t H, torch::Tensor &r, torch::Tensor &k, torch::Tensor &v, torch::Tensor &w, torch::Tensor &u, torch::Tensor &s, torch::Tensor &gy, torch::Tensor &gr, torch::Tensor &gk, torch::Tensor &gv, torch::Tensor &gw, torch::Tensor &gu, torch::Tensor &gs) {
     cuda_backward(B, T, C, H, r.data_ptr<bf16>(), k.data_ptr<bf16>(), v.data_ptr<bf16>(), w.data_ptr<bf16>(), u.data_ptr<bf16>(), s.data_ptr<bf16>(), gy.data_ptr<bf16>(), gr.data_ptr<bf16>(), gk.data_ptr<bf16>(), gv.data_ptr<bf16>(), gw.data_ptr<bf16>(), gu.data_ptr<bf16>(), gs.data_ptr<bf16>());
 }
-PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
-    m.def("forward", &forward, "wkv6state forward");
-    m.def("backward", &backward, "wkv6state backward");
-}
+
 
 TORCH_LIBRARY(wkv6state, m) {
-    m.def("forward", forward);
-    m.def("backward", backward);
+    m.def("forward(int B, int T, int C, int H, Tensor r, Tensor k, Tensor v, Tensor w, Tensor u, Tensor s, Tensor(a!) y) -> ()");
+    m.def("backward(int B, int T, int C, int H, Tensor r, Tensor k, Tensor v, Tensor w, Tensor u, Tensor s, Tensor gy, Tensor(a!) gr, Tensor(b!) gk, Tensor(c!) gv, Tensor(d!) gw, Tensor(e!) gu, Tensor(f!) gs) -> ()");
+}
+
+TORCH_LIBRARY_IMPL(wkv6state, CUDA, m) {
+    m.impl("forward", &forward);
+    m.impl("backward", &backward);
 }

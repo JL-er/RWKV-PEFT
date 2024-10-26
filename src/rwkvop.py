@@ -16,8 +16,7 @@ RUN_WKV5_GENERAL = None
 ########################################################################################################
 scale_factor = 1.0 if os.environ["RWKV_FLOAT_MODE"] != "fp16" else -1.0
 
-@torch.compiler.disable(recursive=True) 
-# torch.compiler introduces errors in numerical precision (torch 2.4)
+
 def RUN_CUDA_RWKV6_STATE_FLA(B, T, C, H, r, k, v, w, u, s=None):
     r = rearrange(r, 'b l (h d) -> b h l d', h=H)
     k = rearrange(k, 'b l (h d) -> b h l d', h=H)
@@ -56,36 +55,27 @@ else:
     if 'x060' in os.environ["RWKV_VERSION"]:
         if (os.environ["RWKV_TRAIN_TYPE"] == 'infctx') or (os.environ["RWKV_TRAIN_TYPE"] == 'states'):
             if os.environ["RWKV_TRAIN_TYPE"] == 'infctx':
-                wkv6state_cuda = load(name="wkv6infctx", sources=["cuda/wkv6infctx_op.cpp", f"cuda/wkv6infctx_cuda.cu"],
-                                      verbose=True, extra_cuda_cflags=["-res-usage", "--use_fast_math", "-O3", "-Xptxas -O3", "--extra-device-vectorization", f"-D_N_={HEAD_SIZE}", f"-D_T_={int(os.environ['RWKV_CTXLEN'])}"])
+                load(name="wkv6state", sources=["cuda/wkv6infctx_op.cpp", f"cuda/wkv6infctx_cuda.cu"], is_python_module=False,
+                    verbose=True, extra_cuda_cflags=["-res-usage", "--use_fast_math", "-O3", "-Xptxas -O3", "--extra-device-vectorization", f"-D_N_={HEAD_SIZE}", f"-D_T_={int(os.environ['RWKV_CTXLEN'])}"])
             else:
-                wkv6state_cuda = load(name="wkv6state", sources=["cuda/wkv6state_op.cpp", f"cuda/wkv6state_cuda.cu"],
-                                      verbose=True, extra_cuda_cflags=["-res-usage", "--use_fast_math", "-O3", "-Xptxas -O3", "--extra-device-vectorization", f"-D_N_={HEAD_SIZE}", f"-D_T_={int(os.environ['RWKV_CTXLEN'])}"])
-
+                load(name="wkv6state", sources=["cuda/wkv6state_op.cpp", f"cuda/wkv6state_cuda.cu"], is_python_module=False,
+                    verbose=True, extra_cuda_cflags=["-res-usage", "--use_fast_math", "-O3", "-Xptxas -O3", "--extra-device-vectorization", f"-D_N_={HEAD_SIZE}", f"-D_T_={int(os.environ['RWKV_CTXLEN'])}"])
             class WKV_6STATE(torch.autograd.Function):
                 @staticmethod
                 def forward(ctx, B, T, C, H, r, k, v, w, u, s):
                     with torch.no_grad():
-                        assert r.dtype == torch.bfloat16
-                        assert k.dtype == torch.bfloat16
-                        assert v.dtype == torch.bfloat16
-                        assert w.dtype == torch.bfloat16
-                        assert u.dtype == torch.bfloat16
-                        assert s.dtype == torch.bfloat16
+                        assert all(i.dtype == torch.bfloat16 for i in [
+                                   r, k, v, w, u, s])
                         assert HEAD_SIZE == C // H
                         ctx.B = B
                         ctx.T = T
                         ctx.C = C
                         ctx.H = H
-                        assert r.is_contiguous()
-                        assert k.is_contiguous()
-                        assert v.is_contiguous()
-                        assert w.is_contiguous()
-                        assert u.is_contiguous()
-                        assert s.is_contiguous()
+                        r, k, v, w, u, s = [i.contiguous()
+                                         for i in [r, k, v, w, u, s]]
                         ctx.save_for_backward(r, k, v, w, u, s)
                         y = torch.empty((B, T, C), device=r.device, dtype=torch.bfloat16, memory_format=torch.contiguous_format)  # .uniform_(-100, 100)
-                        wkv6state_cuda.forward(B, T, C, H, r, k, v, w, u, s, y)
+                        torch.ops.wkv6state.forward(B, T, C, H, r, k, v, w, u, s, y)
                         return y
 
                 @staticmethod
@@ -96,7 +86,7 @@ else:
                         T = ctx.T
                         C = ctx.C
                         H = ctx.H
-                        assert gy.is_contiguous()
+                        gy = gy.contiguous()
                         r, k, v, w, u, s = ctx.saved_tensors
                         gr = torch.empty((B, T, C), device=gy.device, requires_grad=False, dtype=torch.bfloat16, memory_format=torch.contiguous_format)  # .uniform_(-100, 100)
                         gk = torch.empty((B, T, C), device=gy.device, requires_grad=False, dtype=torch.bfloat16, memory_format=torch.contiguous_format)  # .uniform_(-100, 100)
@@ -104,7 +94,7 @@ else:
                         gw = torch.empty((B, T, C), device=gy.device, requires_grad=False, dtype=torch.bfloat16, memory_format=torch.contiguous_format)  # .uniform_(-100, 100)
                         gu = torch.empty((B, C), device=gy.device, requires_grad=False, dtype=torch.bfloat16, memory_format=torch.contiguous_format)  # .uniform_(-100, 100)
                         gs = torch.empty((B, H, C // H, C // H), device=gy.device, requires_grad=False, dtype=torch.bfloat16, memory_format=torch.contiguous_format)  # .uniform_(-100, 100)
-                        wkv6state_cuda.backward(B, T, C, H, r, k, v, w, u, s, gy, gr, gk, gv, gw, gu, gs)
+                        torch.ops.wkv6state.backward(B, T, C, H, r, k, v, w, u, s, gy, gr, gk, gv, gw, gu, gs)
                         gu = torch.sum(gu, 0).view(H, C // H)
                         gs = torch.sum(gs, 0).view(H, C // H, C // H)
                         return (None, None, None, None, gr, gk, gv, gw, gu, gs)
@@ -114,32 +104,26 @@ else:
                 return x, s
             RUN_WKV6_GENERAL = RUN_CUDA_RWKV6_STATE
         else:
-            wkv6_cuda = load(name="wkv6", sources=["cuda/wkv6_op.cpp", f"cuda/wkv6_cuda.cu"],
-                             verbose=True, extra_cuda_cflags=["-res-usage", "--use_fast_math", "-O3", "-Xptxas -O3", "--extra-device-vectorization", f"-D_N_={HEAD_SIZE}", f"-D_T_={int(os.environ['RWKV_CTXLEN'])}"])
+            load(name="wkv6", sources=["cuda/wkv6_op.cpp", f"cuda/wkv6_cuda.cu"], is_python_module=False,
+                verbose=True, extra_cuda_cflags=["-res-usage", "--use_fast_math", "-O3", "-Xptxas -O3", "--extra-device-vectorization", f"-D_N_={HEAD_SIZE}", f"-D_T_={int(os.environ['RWKV_CTXLEN'])}"])
 
             class WKV_6_NO_STATE(torch.autograd.Function):
                 @staticmethod
                 def forward(ctx, B, T, C, H, r, k, v, w, u):
                     with torch.no_grad():
-                        assert r.dtype == torch.bfloat16
-                        assert k.dtype == torch.bfloat16
-                        assert v.dtype == torch.bfloat16
-                        assert w.dtype == torch.bfloat16
-                        assert u.dtype == torch.bfloat16
+                        assert all(i.dtype == torch.bfloat16 for i in [
+                                   r, k, v, w, u])
                         assert HEAD_SIZE == C // H
                         ctx.B = B
                         ctx.T = T
                         ctx.C = C
                         ctx.H = H
-                        assert r.is_contiguous()
-                        assert k.is_contiguous()
-                        assert v.is_contiguous()
-                        assert w.is_contiguous()
-                        assert u.is_contiguous()
+                        r, k, v, w, u = [i.contiguous()
+                                         for i in [r, k, v, w, u]]
                         ew = (-torch.exp(w.float())).contiguous()
                         ctx.save_for_backward(r, k, v, ew, u)
                         y = torch.empty((B, T, C), device=r.device, dtype=torch.bfloat16, memory_format=torch.contiguous_format)  # .uniform_(-100, 100)
-                        wkv6_cuda.forward(B, T, C, H, r, k, v, ew, u, y)
+                        torch.ops.wkv6.forward(B, T, C, H, r, k, v, ew, u, y)
                         return y
 
                 @staticmethod
@@ -150,14 +134,14 @@ else:
                         T = ctx.T
                         C = ctx.C
                         H = ctx.H
-                        assert gy.is_contiguous()
+                        gy = gy.contiguous()
                         r, k, v, ew, u = ctx.saved_tensors
                         gr = torch.empty((B, T, C), device=gy.device, requires_grad=False, dtype=torch.bfloat16, memory_format=torch.contiguous_format)  # .uniform_(-100, 100)
                         gk = torch.empty((B, T, C), device=gy.device, requires_grad=False, dtype=torch.bfloat16, memory_format=torch.contiguous_format)  # .uniform_(-100, 100)
                         gv = torch.empty((B, T, C), device=gy.device, requires_grad=False, dtype=torch.bfloat16, memory_format=torch.contiguous_format)  # .uniform_(-100, 100)
                         gw = torch.empty((B, T, C), device=gy.device, requires_grad=False, dtype=torch.bfloat16, memory_format=torch.contiguous_format)  # .uniform_(-100, 100)
                         gu = torch.empty((B, C), device=gy.device, requires_grad=False, dtype=torch.bfloat16, memory_format=torch.contiguous_format)  # .uniform_(-100, 100)
-                        wkv6_cuda.backward(B, T, C, H, r, k, v, ew, u, gy, gr, gk, gv, gw, gu)
+                        torch.ops.wkv6.backward(B, T, C, H, r, k, v, ew, u, gy, gr, gk, gv, gw, gu)
                         gu = torch.sum(gu, 0).view(H, C // H)
                         return (None, None, None, None, gr, gk, gv, gw, gu)
 
@@ -173,21 +157,15 @@ else:
             @staticmethod
             def forward(ctx, B, T, C, H, r, k, v, w, u):
                 with torch.no_grad():
-                    assert r.dtype == torch.bfloat16
-                    assert k.dtype == torch.bfloat16
-                    assert v.dtype == torch.bfloat16
-                    assert w.dtype == torch.bfloat16
-                    assert u.dtype == torch.bfloat16
+                    assert all(i.dtype == torch.bfloat16 for i in [
+                                   r, k, v, w, u])
                     assert HEAD_SIZE == C // H
                     ctx.B = B
                     ctx.T = T
                     ctx.C = C
                     ctx.H = H
-                    assert r.is_contiguous()
-                    assert k.is_contiguous()
-                    assert v.is_contiguous()
-                    assert w.is_contiguous()
-                    assert u.is_contiguous()
+                    r, k, v, w, u = [i.contiguous()
+                                         for i in [r, k, v, w, u]]
                     ew = (-torch.exp(w.float())).contiguous()
                     eew = (torch.exp(ew)).contiguous()
                     ctx.save_for_backward(r, k, v, eew, ew, u)
@@ -203,7 +181,7 @@ else:
                     T = ctx.T
                     C = ctx.C
                     H = ctx.H
-                    assert gy.is_contiguous()
+                    gy = gy.contiguous()
                     r, k, v, eew, ew, u = ctx.saved_tensors
                     gr = torch.empty((B, T, C), device=gy.device, requires_grad=False, dtype=torch.bfloat16, memory_format=torch.contiguous_format)  # .uniform_(-1, 1)
                     gk = torch.empty((B, T, C), device=gy.device, requires_grad=False, dtype=torch.bfloat16, memory_format=torch.contiguous_format)  # .uniform_(-1, 1)
