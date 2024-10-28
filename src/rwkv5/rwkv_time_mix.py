@@ -14,20 +14,10 @@ from src.args_type import TrainingArgs
 from torch.nn import functional as F
 
 
-def __nop(ob):
-    return ob
-
-
-MyModule = nn.Module
-MyFunction = __nop
-if os.environ["RWKV_JIT_ON"] == "1":
-    MyModule = torch.jit.ScriptModule
-    MyFunction = torch.jit.script_method
-
 HEAD_SIZE = int(os.environ["RWKV_HEAD_SIZE_A"])
 
 
-class RWKV_TimeMix_RWKV5(MyModule):
+class RWKV_TimeMix_RWKV5(nn.Module):
     def __init__(self, args: TrainingArgs, layer_id):
         super().__init__()
         self.args = args
@@ -75,7 +65,6 @@ class RWKV_TimeMix_RWKV5(MyModule):
         self.gate = make_linear_att(args.n_embd, args.dim_att, bias=False)
         self.ln_x = nn.GroupNorm(self.n_head, args.dim_att)
 
-    @MyFunction
     def jit_func(self, x):
         B, T, C = x.size()
 
@@ -92,7 +81,6 @@ class RWKV_TimeMix_RWKV5(MyModule):
 
         return r, k, v, g
 
-    @MyFunction
     def jit_func_2(self, x, g):
         B, T, C = x.size()
         x = x.view(B * T, C)

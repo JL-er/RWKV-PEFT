@@ -11,19 +11,8 @@ from src.args_type import TrainingArgs
 from src.rwkvLinear import make_linear_ffn
 
 
-def __nop(ob):
-    return ob
-
-
-MyModule = nn.Module
-MyFunction = __nop
-if os.environ["RWKV_JIT_ON"] == "1":
-    MyModule = torch.jit.ScriptModule
-    MyFunction = torch.jit.script_method
-
-
-class RWKV_ChannelMix(MyModule):
-    def __init__(self, args: TrainingArgs, layer_id):
+class RWKV_ChannelMix(nn.Module):
+    def __init__(self, args, layer_id):
         super().__init__()
         self.args = args
         self.layer_id = layer_id
@@ -41,7 +30,6 @@ class RWKV_ChannelMix(MyModule):
         self.receptance = make_linear_ffn(args.n_embd, args.n_embd, bias=False)
         self.value = make_linear_ffn(args.dim_ffn, args.n_embd, bias=False)
 
-    @MyFunction
     def forward(self, x):
         xx = self.time_shift(x)
         xk = x * self.time_mix_k + xx * (1 - self.time_mix_k)
