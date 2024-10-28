@@ -27,7 +27,7 @@ To use the RWKV-PEFT Web Interface, follow these steps:
    ```
 2. Run the Streamlit app:
    ```
-   streamlit run home.py
+   streamlit run app.py
    ```
 3. Open your web browser and go to `http://localhost:8501` (or the URL provided in the terminal).
 

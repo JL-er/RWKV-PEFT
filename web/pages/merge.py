@@ -67,9 +67,10 @@ language_dict = {
 }
 
 # Add sidebar
-st.sidebar.page_link('home.py', label='Home', icon='🏠')
-st.sidebar.page_link('pages/training.py', label='Training', icon='🎈')
-st.sidebar.page_link('pages/merge.py', label='Merge', icon='🔀')
+with st.sidebar:
+    st.sidebar.page_link('app.py', label='Home', icon='🏠')
+    st.sidebar.page_link('pages/training.py', label='Training', icon='🎈')
+    st.sidebar.page_link('pages/merge.py', label='Merge', icon='🔀')
 
 def read_cache(cache_file):
     try:
@@ -113,7 +114,7 @@ def update_language_cache():
         
 # Language selection in the sidebar
 language = st.sidebar.selectbox(
-    "Language", 
+    "", 
     ["English", "中文"], 
     index=0 if read_cache(os.path.join(get_project_root() + '/web', 'cache.yml')).get('public', {}).get('language', 'en') == 'en' else 1,
     key='language',
