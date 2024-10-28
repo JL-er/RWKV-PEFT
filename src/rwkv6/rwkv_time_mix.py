@@ -10,17 +10,7 @@ from src.rwkvop import RUN_CUDA_RWKV6, RUN_CUDA_RWKV6_STATE
 from torch.nn import functional as F
 
 
-def __nop(ob):
-    return ob
-
-
-MyModule = nn.Module
-MyFunction = __nop
-if os.environ["RWKV_JIT_ON"] == "1":
-    MyModule = torch.jit.ScriptModule
-    MyFunction = torch.jit.script_method
-
-class RWKV_Tmix_x060(MyModule):
+class RWKV_Tmix_x060(nn.Module):
     def __init__(self, args, layer_id):
         super().__init__()
         self.args = args
@@ -78,7 +68,6 @@ class RWKV_Tmix_x060(MyModule):
         self.gate = make_linear_att(args.n_embd, args.dim_att, bias=False)
         self.ln_x = nn.GroupNorm(self.n_head, args.dim_att, eps=(1e-5)*(args.head_size_divisor**2))
 
-    @MyFunction
     def jit_func(self, x):
         B, T, C = x.size()
 
@@ -105,7 +94,6 @@ class RWKV_Tmix_x060(MyModule):
 
         return r, k, v, g, w
 
-    @MyFunction
     def jit_func_2(self, x, g):
         B, T, C = x.size()
         x = x.view(B * T, C)
@@ -124,7 +112,7 @@ class RWKV_Tmix_x060(MyModule):
         return self.jit_func_2(x, g)
 
 
-class RWKV_Tmix_x060_state(MyModule):
+class RWKV_Tmix_x060_state(nn.Module):
     def __init__(self, args, layer_id):
         super().__init__()
         self.args = args
@@ -184,7 +172,6 @@ class RWKV_Tmix_x060_state(MyModule):
         self.gate = make_linear_att(args.n_embd, args.dim_att, bias=False)
         self.ln_x = nn.GroupNorm(self.n_head, args.dim_att, eps=(1e-5)*(args.head_size_divisor**2))
 
-    @MyFunction
     def jit_func(self, x):
         B, T, C = x.size()
 
@@ -211,7 +198,6 @@ class RWKV_Tmix_x060_state(MyModule):
 
         return r, k, v, g, w
 
-    @MyFunction
     def jit_func_2(self, x, g):
         B, T, C = x.size()
         x = x.view(B * T, C)
@@ -229,7 +215,7 @@ class RWKV_Tmix_x060_state(MyModule):
 
         return self.jit_func_2(x, g)
     
-class RWKV_Tmix_x060_infctx(MyModule):
+class RWKV_Tmix_x060_infctx(nn.Module):
     def __init__(self, args, layer_id):
         super().__init__()
         self.args = args
@@ -289,7 +275,6 @@ class RWKV_Tmix_x060_infctx(MyModule):
         self.gate = make_linear_att(args.n_embd, args.dim_att, bias=False)
         self.ln_x = nn.GroupNorm(self.n_head, args.dim_att, eps=(1e-5)*(args.head_size_divisor**2))
 
-    @MyFunction
     def jit_func(self, x, shift_state):
         B, T, C = x.size()
         xx = torch.concat((shift_state.unsqueeze(1), x[:, :-1]), dim=1) - x
@@ -315,7 +300,6 @@ class RWKV_Tmix_x060_infctx(MyModule):
 
         return r, k, v, g, w, x[:, -1]
 
-    @MyFunction
     def jit_func_2(self, x, g, timemixstate:TimeMixState):
         B, T, C = x.size()
         x = x.view(B * T, C)

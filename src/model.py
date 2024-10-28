@@ -11,9 +11,9 @@ import torch
 # torch._C._jit_set_profiling_mode(True)
 import torch.nn as nn
 from torch.nn import functional as F
-import pytorch_lightning as pl
-from pytorch_lightning.utilities import rank_zero_info, rank_zero_only
-from pytorch_lightning.strategies import DeepSpeedStrategy
+from lightning_utilities.core.rank_zero import rank_zero_info, rank_zero_only
+import lightning as pl
+from lightning.pytorch.strategies import DeepSpeedStrategy
 if importlib.util.find_spec('deepspeed'):
     import deepspeed
     from deepspeed.ops.adam import DeepSpeedCPUAdam, FusedAdam
@@ -24,17 +24,6 @@ try:
     print('RWKV_MY_TESTING', os.environ["RWKV_MY_TESTING"])
 except:
     os.environ["RWKV_MY_TESTING"] = ''
-
-def __nop(ob):
-    return ob
-
-
-MyModule = nn.Module
-MyFunction = __nop
-if os.environ["RWKV_JIT_ON"] == "1":
-    MyModule = torch.jit.ScriptModule
-    MyFunction = torch.jit.script_method
-
 
 
 if os.environ["RWKV_TRAIN_TYPE"] == 'infctx':

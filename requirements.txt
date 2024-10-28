@@ -10,3 +10,4 @@ streamlit
 GPUtil
 plotly
 psutil
+lightning
