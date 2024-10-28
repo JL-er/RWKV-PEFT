@@ -33,6 +33,8 @@ def get_data_by_l_version(trainer: L.Trainer, args: TrainingArgs):
         train_data.real_epoch = trainer.current_epoch
         train_data.rank = trainer.global_rank
         train_data.world_size = trainer.world_size
+        train_data.setup(trainer.global_rank, trainer.world_size, 
+                        int(args.devices), args.data_shuffle)
         train_data = DataLoader(train_data, shuffle=args.data_shuffle, pin_memory=True, batch_size=args.micro_bsz, num_workers=1, persistent_workers=False, drop_last=True)
     
     elif L.__version__[0] == '2':
