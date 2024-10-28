@@ -118,39 +118,59 @@ def get_project_root():
             raise Exception("Could not find project root directory")
         current_path = parent_path
 
-def update_language_cache():
-    lang_code = "en" if st.session_state.language == "English" else "zh"
-    # Update only the 'language' key in the 'training' section
-    write_cache({'language': lang_code}, os.path.join(get_project_root() + '/web', 'cache.yml'), is_public=True)
-        
-# Language selection in the sidebar
-language = st.sidebar.selectbox(
-    "", 
-    ["English", "中文"], 
-    index=0 if read_cache(os.path.join(get_project_root() + '/web', 'cache.yml')).get("public", {}).get('language', 'en') == 'en' else 1,
-    key='language',
-    on_change=update_language_cache
-)
-lang_code = "en" if language == "English" else "zh"
-
 class Training:
     def __init__(self):
         self.config = {}
         if 'process' not in st.session_state:
             st.session_state.process = None
         self.show_sidebar()
+        self.lang_code = self.show_language_selection()
         self.gpu_memory_usage = 0
         self.gpu_memory_total = 0
+        self.memory_text = ""
+        self.memory_bar = None
         self.stop_monitoring = False
         self.project_root = get_project_root()
         self.cache_name = 'cache.yml'
         # Load the training section from the cache
         self.cache = read_cache(os.path.join(self.project_root + '/web', self.cache_name)).get('training', {})
-        
+    
+    def show_language_selection(self):
+        # Language selection in the sidebar
+        language = st.sidebar.selectbox(
+        "", 
+        ["English", "中文"], 
+        index=0 if read_cache(os.path.join(get_project_root() + '/web', 'cache.yml')).get("public", {}).get('language', 'en') == 'en' else 1,
+        key='language',
+        on_change=self.update_language_cache
+        )
+        self.lang_code = "en" if language == "English" else "zh"
+        return self.lang_code
+    
+    def update_language_cache(self):
+        self.lang_code = "en" if st.session_state.language == "English" else "zh"
+        # Update only the 'language' key in the 'training' section
+        write_cache({'language': self.lang_code}, os.path.join(get_project_root() + '/web', 'cache.yml'), is_public=True)
+
     def show_sidebar(self):
-        st.sidebar.page_link('home.py', label='Home', icon='🏠', disabled=st.session_state.process is not None)
-        st.sidebar.page_link('pages/training.py', label='Training', icon='🎈', disabled=st.session_state.process is not None)
-        st.sidebar.page_link('pages/merge.py', label='Merge', icon='🔀', disabled=st.session_state.process is not None)
+        # 确保 process 存在于 session_state 中
+        if 'process' not in st.session_state:
+            st.session_state.process = None
+        
+        # 检查进程是否在运行
+        if st.session_state.process is not None:
+            try:
+                # 检查进程是否还活着
+                is_running = st.session_state.process.poll() is None
+            except:
+                is_running = False
+        else:
+            is_running = False
+
+        with st.sidebar:
+            st.sidebar.page_link('app.py', label='Home', icon='🏠', disabled=is_running)
+            st.sidebar.page_link('pages/training.py', label='Training', icon='🎈', disabled=is_running)
+            st.sidebar.page_link('pages/merge.py', label='Merge', icon='🔀', disabled=is_running)
         
     def render(self):
         self.setup_page()
@@ -161,7 +181,7 @@ class Training:
             self.show_generated_script()
         with col2:
             self.show_fixed_parameters()
-            run_button = st.button(language_dict[lang_code]["run_script"], disabled=st.session_state.process is not None)
+            run_button = st.button(language_dict[self.lang_code]["run_script"], disabled=st.session_state.process is not None)
             if run_button:
                 output_dir = self.config["proj_dir"]
                 if os.path.exists(output_dir):
@@ -170,7 +190,7 @@ class Training:
                         # Ensure output_dir is defined before this block
                         output_dir = self.config.get("proj_dir", "")
                         # Use the correct placeholder name in the format method
-                        st.error(language_dict[lang_code]["output_dir_not_empty"].format(output_dir=output_dir))
+                        st.error(language_dict[self.lang_code]["output_dir_not_empty"].format(output_dir=output_dir))
                         # proceed = st.button("仍然继续")
                         # new_output_dir = st.text_input("或指定一个新的输出路径：", output_dir)
                         # if proceed:
@@ -183,7 +203,7 @@ class Training:
                 else:
                     self.run_script(self.generate_script())
             
-            stop_button = st.button(language_dict[lang_code]["stop_script"], disabled=st.session_state.process is None)
+            stop_button = st.button(language_dict[self.lang_code]["stop_script"], disabled=st.session_state.process is None)
             if stop_button:
                 self.stop_script()
 
@@ -194,7 +214,7 @@ class Training:
             self.update_displays()
 
     def setup_page(self):
-        st.title(language_dict[lang_code]["title"])
+        st.title(language_dict[self.lang_code]["title"])
 
     def setup_config(self):
         # 创建三列布局
@@ -203,7 +223,7 @@ class Training:
         with left_column:
             # Basic Configuration
             with st.container(border=True):
-                st.subheader(language_dict[lang_code]["basic_config"])
+                st.subheader(language_dict[self.lang_code]["basic_config"])
                 self.config["my_testing"] = st.selectbox("RWKV Version", ["v5", "v6"], index=1)
                 self.config["peft"] = st.selectbox("Select PEFT Method", ("bone", "lora", "pissa", "state"), index=0)
                 if self.config["peft"] == "bone":
@@ -218,10 +238,10 @@ class Training:
                     "Output Path", 
                     self.cache.get('proj_dir', "/home/rwkv/out_model/")
                 )
-                if st.button(language_dict[lang_code]["save_output_path"]):
+                if st.button(language_dict[self.lang_code]["save_output_path"]):
                     self.cache['proj_dir'] = proj_dir
                     write_cache(self.cache, os.path.join(self.project_root + '/web', self.cache_name))
-                    st.success(language_dict[lang_code]["output_saved"])
+                    st.success(language_dict[self.lang_code]["output_saved"])
                 self.config["proj_dir"] = proj_dir
                 if self.config["peft"] == "lora":
                     lora_load = st.text_input("LoRA Load", "")
@@ -255,8 +275,8 @@ class Training:
         with middle_column:
             # Data Configuration
             with st.container(border=True):
-                st.subheader(language_dict[lang_code]["data_config"])
-                st.markdown(f"[{language_dict[lang_code]['config_reference']}](https://rwkv.cn/RWKV-Fine-Tuning/FT-Dataset)")
+                st.subheader(language_dict[self.lang_code]["data_config"])
+                st.markdown(f"[{language_dict[self.lang_code]['config_reference']}](https://rwkv.cn/RWKV-Fine-Tuning/FT-Dataset)")
                 data_file_dir = st.text_input(
                     "Data File Path", 
                     self.cache.get('data_file_dir', "/home/rwkv/data/")
@@ -265,13 +285,13 @@ class Training:
                     if os.path.exists(data_file_dir):
                         st.session_state.data_files = get_data_files(data_file_dir)
                         if st.session_state.data_files:
-                            st.success(language_dict[lang_code]["data_found"].format(len(st.session_state.data_files)))
+                            st.success(language_dict[self.lang_code]["data_found"].format(len(st.session_state.data_files)))
                             self.cache['data_file_dir'] = data_file_dir
                             write_cache(self.cache, os.path.join(self.project_root + '/web', self.cache_name))
                         else:
-                            st.warning(language_dict[lang_code]["no_files_found"])
+                            st.warning(language_dict[self.lang_code]["no_files_found"])
                     else:
-                        st.error(language_dict[lang_code]["data_dir_not_exist"])
+                        st.error(language_dict[self.lang_code]["data_dir_not_exist"])
                         st.session_state.data_files = []
                 
                 if 'data_files' not in st.session_state:
@@ -284,8 +304,8 @@ class Training:
                         format_func=lambda x: os.path.basename(x)
                     )
                 else:
-                    st.warning(language_dict[lang_code]["no_files_found"])
-                    self.config["data_file"] = st.text_input("Data File", data_file_dir)
+                    st.warning(language_dict[self.lang_code]["no_files_found"])
+                    self.config["data_file"] = st.text_input("Data File", "")
                     
                 col1, col2 = st.columns(2)
                 with col1:
@@ -299,20 +319,20 @@ class Training:
         with right_column:
             # Model Configuration
             with st.container(border=True):
-                st.subheader(language_dict[lang_code]["model_config"])
-                st.markdown(f"[{language_dict[lang_code]['config_reference']}](https://rwkv.cn/RWKV-Wiki/Model-Download)")
+                st.subheader(language_dict[self.lang_code]["model_config"])
+                st.markdown(f"[{language_dict[self.lang_code]['config_reference']}](https://rwkv.cn/RWKV-Wiki/Model-Download)")
                 model_directory = st.text_input(
                     "Base Model Directory", 
                     self.cache.get('model_directory', "/home/rwkv/model")
                 )
                 if st.button("Check Base Model Directory"):
                     if os.path.exists(model_directory):
-                        st.success(language_dict[lang_code]["model_dir_exists"])
+                        st.success(language_dict[self.lang_code]["model_dir_exists"])
                         st.session_state.model_files = get_model_files(model_directory)
                         self.cache['model_directory'] = model_directory
                         write_cache(self.cache, os.path.join(self.project_root + '/web', self.cache_name))
                     else:
-                        st.error(language_dict[lang_code]["model_dir_not_exist"])
+                        st.error(language_dict[self.lang_code]["model_dir_not_exist"])
                         st.session_state.model_files = []
                 if 'model_files' not in st.session_state:
                     st.session_state.model_files = []
@@ -325,7 +345,7 @@ class Training:
                         format_func=lambda x: os.path.basename(x)
                     )
                 else:
-                    st.warning(language_dict[lang_code]["no_pth_files"])
+                    st.warning(language_dict[self.lang_code]["no_pth_files"])
                     self.config["load_model"] = st.text_input("Load Model Path", "")
                 col1, col2 = st.columns(2)
                 with col1:
@@ -336,8 +356,8 @@ class Training:
 
         # Training Configuration
         with st.container(border=True):
-            st.subheader(language_dict[lang_code]["training_config"])
-            st.markdown(f"[{language_dict[lang_code]['config_reference']}](https://rwkv.cn/RWKV-Fine-Tuning/Full-ft-Simple#%E8%B0%83%E6%95%B4%E5%85%B6%E4%BB%96%E8%AE%AD%E7%BB%83%E5%8F%82%E6%95%B0)")
+            st.subheader(language_dict[self.lang_code]["training_config"])
+            st.markdown(f"[{language_dict[self.lang_code]['config_reference']}](https://rwkv.cn/RWKV-Fine-Tuning/Full-ft-Simple#%E8%B0%83%E6%95%B4%E5%85%B6%E4%BB%96%E8%AE%AD%E7%BB%83%E5%8F%82%E6%95%B0)")
             
             col1, col2 = st.columns(2)
             with col1:
@@ -407,12 +427,12 @@ class Training:
         st.markdown(hover_html, unsafe_allow_html=True)
 
     def show_generated_script(self):
-        st.subheader(language_dict[lang_code]["generated_script"])
+        st.subheader(language_dict[self.lang_code]["generated_script"])
         script = self.generate_script()
         st.code(script, language="bash")
 
     def show_fixed_parameters(self):
-        st.subheader(language_dict[lang_code]["fixed_parameters"])
+        st.subheader(language_dict[self.lang_code]["fixed_parameters"])
         # st.write("The following parameters are fixed and cannot be changed:")
         st.code("""
         pre_ffn = 0
@@ -442,20 +462,21 @@ class Training:
         return f"""python train.py {common_args}"""
     
     def run_script(self, script):
-        with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.sh') as temp_file:
-            temp_file.write(script)
-            temp_file_path = temp_file.name
+        st.session_state.process = True
+        # with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.sh') as temp_file:
+        #     temp_file.write(script)
+        #     temp_file_path = temp_file.name
 
-        try:
-            os.chmod(temp_file_path, 0o755)
-            st.session_state.process = subprocess.Popen(['bash', temp_file_path], 
-                                   cwd=self.project_root,
-                                   preexec_fn=os.setsid)
-            self.start_gpu_monitoring()
-        except Exception as e:
-            st.error(f"An error occurred: {str(e)}")
-        finally:
-            os.unlink(temp_file_path)
+        # try:
+        #     os.chmod(temp_file_path, 0o755)
+        #     st.session_state.process = subprocess.Popen(['bash', temp_file_path], 
+        #                            cwd=self.project_root,
+        #                            preexec_fn=os.setsid)
+        #     self.start_gpu_monitoring()
+        # except Exception as e:
+        #     st.error(f"An error occurred: {str(e)}")
+        # finally:
+        #     os.unlink(temp_file_path)
 
     def stop_script(self):
         print("Attempting to stop script", st.session_state.process)
@@ -500,7 +521,7 @@ class Training:
             time.sleep(1)
 
     def activity_monitor(self):
-        st.subheader(language_dict[lang_code]["activity_monitor"])
+        st.subheader(language_dict[self.lang_code]["activity_monitor"])
         self.setup_gpu_monitoring()
         self.setup_loss_chart()
         self.setup_training_progress()
@@ -547,11 +568,12 @@ class Training:
         last_t_cost = 0
         last_kt_s = 0
         last_loss = 0
-        while st.session_state.process and st.session_state.process.poll() is None:
+        while st.session_state.process:
+            print(1111)
             memory_percentage = self.gpu_memory_usage / self.gpu_memory_total if self.gpu_memory_total > 0 else 0
             self.memory_text.text(f"GPU Memory: {self.gpu_memory_usage:.2f} MB / {self.gpu_memory_total:.2f} MB")
             self.memory_bar.progress(memory_percentage)
-            placeholder.text(language_dict[lang_code]["script_running"])
+            placeholder.text(language_dict[self.lang_code]["script_running"])
             
             new_loss_data, t_cost, kt_s, loss = self.read_data(self.config['proj_dir'])
             
@@ -589,7 +611,7 @@ class Training:
         
         self.stop_gpu_monitoring()
         st.balloons()
-        st.success(language_dict[lang_code]["training_success"])
+        st.success(language_dict[self.lang_code]["training_success"])
         st.session_state.process = None
 
 if __name__ == "__main__":

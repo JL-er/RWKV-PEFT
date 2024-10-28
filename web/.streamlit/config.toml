@@ -1,2 +1,4 @@
 [client]
 showSidebarNavigation = false
+[ui]
+hideStreamlitBanner = true
