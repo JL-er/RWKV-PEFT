@@ -34,8 +34,8 @@ Consider the memory requirements for training the following models with an 4090 
 | RWKV6-3B | 9.1GB GPU | 6.5GB GPU | 5.2GB GPU |
 | RWKV6-7B | 17.8GB GPU | 11.9GB GPU | 8.5GB GPU |
 | RWKV6-14B | xxGB GPU | xxGB GPU | xxGB GPU |
-# 快速开始
-按照必要依赖
+# Quick Start
+According to Necessary Dependencies
 ```
 pip install requirements.txt
 ```
@@ -43,10 +43,9 @@ Refer to the examples in the scripts folder to modify the paths and required par
 ```
 sh scripts/run_lora.sh
 ```
-# 具体使用
+# Parameter Description
 - peft  
 The parameter 'peft' contains multiple methods. Refer to the detailed description, choose the required method, and then configure the corresponding 'config'.
-例如：
 ```
 --peft bone --bone_config $bone_config
 ```
