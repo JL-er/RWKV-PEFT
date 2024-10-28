@@ -25,17 +25,6 @@ try:
 except:
     os.environ["RWKV_MY_TESTING"] = ''
 
-def __nop(ob):
-    return ob
-
-
-MyModule = nn.Module
-MyFunction = __nop
-if os.environ["RWKV_JIT_ON"] == "1":
-    MyModule = torch.jit.ScriptModule
-    MyFunction = torch.jit.script_method
-
-
 
 if os.environ["RWKV_TRAIN_TYPE"] == 'infctx':
     class L2Wrap(torch.autograd.Function):
