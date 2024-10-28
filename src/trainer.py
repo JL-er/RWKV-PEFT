@@ -1,8 +1,8 @@
 import os, math, time, datetime, subprocess
 import torch
 from torch.utils.data import DataLoader
-import pytorch_lightning as pl
-from pytorch_lightning.utilities import rank_zero_info, rank_zero_only
+from lightning_utilities.core.rank_zero import rank_zero_info, rank_zero_only
+import lightning as pl
 from .rwkvLinear import LORA_CONFIG, BONE_CONFIG
 import re
 import numpy as np
@@ -129,7 +129,7 @@ class train_callback(pl.Callback):
                 pass
             trainer.my_time_ns = t_now
             if pl.__version__[0]=='2':
-                trainer.my_loss = outputs["loss"]
+                trainer.my_loss = outputs["loss"]*trainer.accumulate_grad_batches
             else:
                 trainer.my_loss = trainer.my_loss_all.float().mean().item()
             trainer.my_loss_sum += trainer.my_loss
@@ -163,36 +163,6 @@ class train_callback(pl.Callback):
                         to_save_dict,
                         f"{args.proj_dir}/rwkv-final.pth",
                     )
-
-        # if args.LISA and (batch_idx+1)%args.lisa_k==0:
-        #     pl_module.requires_grad_(False)
-        #     select_layers = np.random.choice(range(args.n_layer), args.lisa_r, replace=False)
-            
-        #     for name, module in pl_module.named_modules():
-        #         for pname, param in module.named_parameters():
-        #             if 'emb' in pname or 'head' in pname or '.ln' in pname or 'time' in pname:
-        #                 param.requires_grad = True
-        #             elif 'ln_out' in pname:
-        #                 param.requires_grad = True
-        #             match = re.search(r'\d+', pname)
-        #             if match:
-        #                 number = int(match.group())
-        #                 if number in select_layers:
-        #                     param.requires_grad  = True
-        #         break
-        # if args.batch_save==batch_idx :
-        #     to_save_dict = pl_module.state_dict()
-        #     for name, state in to_save_dict.items():
-        #         if 'img' in name:
-        #             to_save_dict[name] = state
-        #     try:
-        #             my_save(
-        #                 args, trainer,
-        #                 to_save_dict,
-        #                 f"{args.proj_dir}/rwkv-{args.epoch_begin + trainer.current_epoch}-{batch_idx}.pth",
-        #             )
-        #     except Exception as e:
-        #         print('Error\n\n', e, '\n\n')
                 
 
     def on_train_epoch_start(self, trainer, pl_module):

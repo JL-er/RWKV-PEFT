@@ -8,9 +8,10 @@ logging.basicConfig(level=logging.INFO)
 
 if __name__ == "__main__":
     from argparse import ArgumentParser
-    from pytorch_lightning import Trainer
-    from pytorch_lightning.utilities import rank_zero_info, rank_zero_only
-    import pytorch_lightning as pl
+    from lightning import Trainer
+    from lightning.pytorch import seed_everything
+    from lightning_utilities.core.rank_zero import rank_zero_info
+    import lightning as pl
     import json
     from src.args_type import TrainingArgs
     from src.dataset import get_data_by_l_version, get_vocab_size
@@ -140,7 +141,7 @@ if __name__ == "__main__":
     from torch.utils.data import DataLoader
     if "deepspeed" in args.strategy:
         import deepspeed
-    from pytorch_lightning import seed_everything
+    # from pytorch_lightning import seed_everything
 
     if args.random_seed >= 0:
         print(f"########## WARNING: GLOBAL SEED {args.random_seed} THIS WILL AFFECT MULTIGPU SAMPLING ##########\n" * 3)
