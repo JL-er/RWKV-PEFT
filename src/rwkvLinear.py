@@ -248,7 +248,7 @@ def make_linear_att(*args, **kwargs):
 def make_linear_ffn(*args, **kwargs):
     if "ffn" in LORA_CONFIG["parts"] and LORA_CONFIG["r"] > 0:
         return LoraLinear(*args, **kwargs)
-    elif "att" in BONE_CONFIG["parts"] and BONE_CONFIG["r"] > 0:
+    elif "ffn" in BONE_CONFIG["parts"] and BONE_CONFIG["r"] > 0:
         return BoneLinear(*args, **kwargs)
     elif LORA_CONFIG["quant"]:
         return QuantLinear(*args, **kwargs)
