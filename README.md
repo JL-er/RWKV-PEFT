@@ -1,6 +1,5 @@
-<h1 style="display:flex;align-item:center;">
-  <img src="assert/logo.jpg" alt="RWKV-PEFT" width="40px"/>
-  <p>RWKV-PEFT</p> 
+<h1 align="center">
+  <p><img src="assert/logo.jpg" alt="RWKV-PEFT" width="60px"  style="vertical-align: middle; margin-right: 10px;"/>RWKV-PEFT</p>
 </h1>
 
 \[ English | [中文](README_zh.md) \]
