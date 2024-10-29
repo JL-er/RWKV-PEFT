@@ -12,11 +12,14 @@ import pandas as pd
 import plotly.express as px
 import psutil
 import yaml
-
+# 导入图片
+from PIL import Image
+from common.utils import get_project_root
+from components.sidebar import Sidebar
 # Language dictionary
 language_dict = {
     "en": {
-        "title": "🎈 RWKV-PEFT Training Interface",
+        "title": "Training",
         "basic_config": "Basic Configuration",
         "data_config": "Data Configuration",
         "model_config": "Model Configuration",
@@ -40,7 +43,7 @@ language_dict = {
         "config_reference": "Config Reference"
     },
     "zh": {
-        "title": "🎈 RWKV-PEFT 训练界面",
+        "title": "训练界面",
         "basic_config": "基本配置",
         "data_config": "数据配置",
         "model_config": "模型配置",
@@ -64,7 +67,6 @@ language_dict = {
         "config_reference": "配置参考"
     }
 }
-
 
 def get_model_files(directory):
     model_files = []
@@ -105,33 +107,20 @@ def write_cache(data, cache_file, is_public=False):
     # Write back to the cache file
     with open(cache_file, 'w') as file:
         yaml.safe_dump(cache, file)
-        
-def get_project_root():
-    # 获取当前文件的绝对路径
-    current_path = os.path.abspath(__file__)
-    # 向上遍历直到找到项目根目录（根目录包含 'train.py' 文件）
-    while True:
-        parent_path = os.path.dirname(current_path)
-        if os.path.exists(os.path.join(parent_path, 'train.py')):
-            return parent_path
-        if parent_path == current_path:
-            raise Exception("Could not find project root directory")
-        current_path = parent_path
 
 class Training:
     def __init__(self):
         self.config = {}
         if 'process' not in st.session_state:
             st.session_state.process = None
-        self.show_sidebar()
+        self.project_root = get_project_root()
+        Sidebar().show(is_running=bool(st.session_state.get('process')))
         self.lang_code = self.show_language_selection()
         self.gpu_memory_usage = 0
         self.gpu_memory_total = 0
-        self.memory_text = ""
-        self.memory_bar = None
         self.stop_monitoring = False
-        self.project_root = get_project_root()
         self.cache_name = 'cache.yml'
+        self.model_config = {"0.1B":{"n_layer": 12, "n_embd": 768}, "0.4B":{"n_layer": 24, "n_embd": 1024}, "1.6B":{"n_layer": 24, "n_embd": 2048}, "3B":{"n_layer": 32, "n_embd": 2560}, "7B":{"n_layer": 32, "n_embd": 4096}, "14B":{"n_layer": 61, "n_embd": 4096}}
         # Load the training section from the cache
         self.cache = read_cache(os.path.join(self.project_root + '/web', self.cache_name)).get('training', {})
     
@@ -152,26 +141,6 @@ class Training:
         # Update only the 'language' key in the 'training' section
         write_cache({'language': self.lang_code}, os.path.join(get_project_root() + '/web', 'cache.yml'), is_public=True)
 
-    def show_sidebar(self):
-        # 确保 process 存在于 session_state 中
-        if 'process' not in st.session_state:
-            st.session_state.process = None
-        
-        # 检查进程是否在运行
-        if st.session_state.process is not None:
-            try:
-                # 检查进程是否还活着
-                is_running = st.session_state.process.poll() is None
-            except:
-                is_running = False
-        else:
-            is_running = False
-
-        with st.sidebar:
-            st.sidebar.page_link('app.py', label='Home', icon='🏠', disabled=is_running)
-            st.sidebar.page_link('pages/training.py', label='Training', icon='🎈', disabled=is_running)
-            st.sidebar.page_link('pages/merge.py', label='Merge', icon='🔀', disabled=is_running)
-        
     def render(self):
         self.setup_page()
         self.setup_config()
@@ -187,25 +156,16 @@ class Training:
                 if os.path.exists(output_dir):
                     files = os.listdir(output_dir)
                     if any(file.endswith('.pth') for file in files):
-                        # Ensure output_dir is defined before this block
                         output_dir = self.config.get("proj_dir", "")
-                        # Use the correct placeholder name in the format method
                         st.error(language_dict[self.lang_code]["output_dir_not_empty"].format(output_dir=output_dir))
-                        # proceed = st.button("仍然继续")
-                        # new_output_dir = st.text_input("或指定一个新的输出路径：", output_dir)
-                        # if proceed:
-                        # self.run_script(self.generate_script())
-                        # elif new_output_dir != output_dir:
-                        #     self.config["proj_dir"] = new_output_dir
-                        #     self.run_script(self.generate_script())
-                    else:
-                        self.run_script(self.generate_script())
-                else:
-                    self.run_script(self.generate_script())
+                        st.stop()
+                self.run_script(self.generate_script())
+                st.rerun()
             
             stop_button = st.button(language_dict[self.lang_code]["stop_script"], disabled=st.session_state.process is None)
             if stop_button:
                 self.stop_script()
+                st.rerun()
 
         # 监控GPU、loss、训练进度
         self.activity_monitor()
@@ -215,6 +175,22 @@ class Training:
 
     def setup_page(self):
         st.title(language_dict[self.lang_code]["title"])
+        # 插入css
+        st.markdown("""
+        <style>
+        div[data-testid="stSidebarHeader"]{
+            align-items:center !important;
+        }
+        img[data-testid="stLogo"] {
+            height: 3.5rem;
+            width: 3.5rem;
+            background-color: #fff;
+            border-radius: 50%;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
+        st.logo(Image.open(os.path.join(self.project_root + '/web', 'assets/peft-logo.png')))
 
     def setup_config(self):
         # 创建三列布局
@@ -347,11 +323,33 @@ class Training:
                 else:
                     st.warning(language_dict[self.lang_code]["no_pth_files"])
                     self.config["load_model"] = st.text_input("Load Model Path", "")
+                
+                # 添加模型大小选择框
+                model_size = st.selectbox(
+                    "Model Size",
+                    options=list(self.model_config.keys()),
+                    index=2,  # 默认选择1.6B
+                    key="model_size"
+                )
+                
+                # 获取选中大小的默认配置
+                default_config = self.model_config[model_size]
+                
                 col1, col2 = st.columns(2)
                 with col1:
-                    self.config["n_layer"] = st.number_input("Number of Layers", value=24, min_value=1)
+                    self.config["n_layer"] = st.number_input(
+                        "Number of Layers", 
+                        value=default_config["n_layer"],
+                        min_value=1,
+                        help=f"Default for {model_size} model"
+                    )
                 with col2:
-                    self.config["n_embd"] = st.number_input("Embedding Size", value=2048, min_value=1)
+                    self.config["n_embd"] = st.number_input(
+                        "Embedding Size", 
+                        value=default_config["n_embd"],
+                        min_value=1,
+                        help=f"Default for {model_size} model"
+                    )
                 self.config["train_parts"] = st.multiselect("Train Parts", ["emb", "head", "time", "ln" ], default=["time", "ln"])
 
         # Training Configuration
@@ -390,8 +388,8 @@ class Training:
                     self.config["wandb_project"] = st.text_input("Wandb Project", "peft-loss")
 
     def show_hover_image(self):
-        image1 = "https://rwkv.cn/images/RWKV-Wiki-Cover.png"
-        image2 = "https://rwkv.cn/images/RWKV-Prompt-Cover.png"
+        image1 = ""
+        image2 = ""
         # HTML 和 CSS 代码
         hover_html = f"""
                 <style>
@@ -422,7 +420,6 @@ class Training:
                     <img src="{image2}" class="image-b" alt="Image B">
                 </div>
                 """
-            
         # 在 Streamlit 中显示 HTML 代码
         st.markdown(hover_html, unsafe_allow_html=True)
 
@@ -462,46 +459,52 @@ class Training:
         return f"""python train.py {common_args}"""
     
     def run_script(self, script):
-        st.session_state.process = True
-        # with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.sh') as temp_file:
-        #     temp_file.write(script)
-        #     temp_file_path = temp_file.name
+        with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.sh') as temp_file:
+            temp_file.write(script)
+            temp_file_path = temp_file.name
 
-        # try:
-        #     os.chmod(temp_file_path, 0o755)
-        #     st.session_state.process = subprocess.Popen(['bash', temp_file_path], 
-        #                            cwd=self.project_root,
-        #                            preexec_fn=os.setsid)
-        #     self.start_gpu_monitoring()
-        # except Exception as e:
-        #     st.error(f"An error occurred: {str(e)}")
-        # finally:
-        #     os.unlink(temp_file_path)
+        try:
+            os.chmod(temp_file_path, 0o755)
+            process = subprocess.Popen(['bash', temp_file_path], 
+                                   cwd=self.project_root,
+                                   preexec_fn=os.setsid)
+            st.session_state.process = process
+            self.start_gpu_monitoring()
+        except Exception as e:
+            st.error(f"An error occurred: {str(e)}")
+        finally:
+            os.unlink(temp_file_path)
 
     def stop_script(self):
-        print("Attempting to stop script", st.session_state.process)
         if st.session_state.process:
             try:
+                # 获取进程组ID
+                pgid = os.getpgid(st.session_state.process.pid)
+                
+                # 终止整个进程组
+                os.killpg(pgid, signal.SIGTERM)
+                
+                try:
+                    # 等待主进程终止，设置超时时间
+                    st.session_state.process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    # 如果超时，强制终止进程组
+                    os.killpg(pgid, signal.SIGKILL)
+                
+                # 确保所有相关进程都被终止
                 parent = psutil.Process(st.session_state.process.pid)
+                for child in parent.children(recursive=True):
+                    try:
+                        child.kill()
+                    except psutil.NoSuchProcess:
+                        pass
                 
-                children = parent.children(recursive=True)
-                
-                for child in children:
-                    child.terminate()
-                
-                gone, alive = psutil.wait_procs(children, timeout=3)
-                
-                for p in alive:
-                    p.kill()
-                
-                parent.terminate()
-                parent.wait(5)
-                
-                if parent.is_running():
+                try:
                     parent.kill()
-                    parent.wait(5)
-            
-            except psutil.NoSuchProcess:
+                except psutil.NoSuchProcess:
+                    pass
+                
+            except (psutil.NoSuchProcess, ProcessLookupError):
                 print("Process already terminated")
             except Exception as e:
                 print(f"Error stopping script: {e}")
@@ -513,12 +516,19 @@ class Training:
             print("No script running")
 
     def monitor_gpu_memory(self):
-        while not self.stop_monitoring:
-            gpus = GPUtil.getGPUs()
-            if gpus:
-                self.gpu_memory_usage = gpus[0].memoryUsed
-                self.gpu_memory_total = gpus[0].memoryTotal
+        while not self.stop_monitoring and st.session_state.process is not None:
+            try:
+                gpus = GPUtil.getGPUs()
+                if gpus:
+                    self.gpu_memory_usage = gpus[0].memoryUsed
+                    self.gpu_memory_total = gpus[0].memoryTotal
+                    print(f"#### GPU Memory: {self.gpu_memory_usage:.2f} MB / {self.gpu_memory_total:.2f} MB")
+            except (ValueError, Exception) as e:
+                self.gpu_memory_usage = 0
+                self.gpu_memory_total = 0
+                print(f"GPU monitoring error: {str(e)}")
             time.sleep(1)
+        print("GPU monitoring stopped")
 
     def activity_monitor(self):
         st.subheader(language_dict[self.lang_code]["activity_monitor"])
@@ -532,6 +542,14 @@ class Training:
 
     def stop_gpu_monitoring(self):
         self.stop_monitoring = True
+        # 等待监控线程实际停止
+        time.sleep(2)
+        # 重置显示
+        if hasattr(self, 'memory_text') and self.memory_text is not None:
+            self.memory_text.text("GPU monitoring stopped")
+        if hasattr(self, 'memory_bar') and self.memory_bar is not None:
+            self.memory_bar.progress(0)
+
 
     def read_data(self, proj_dir):
         loss_file = os.path.join(proj_dir, "loss_data.json")
@@ -569,10 +587,15 @@ class Training:
         last_kt_s = 0
         last_loss = 0
         while st.session_state.process:
-            print(1111)
-            memory_percentage = self.gpu_memory_usage / self.gpu_memory_total if self.gpu_memory_total > 0 else 0
-            self.memory_text.text(f"GPU Memory: {self.gpu_memory_usage:.2f} MB / {self.gpu_memory_total:.2f} MB")
-            self.memory_bar.progress(memory_percentage)
+            # 添加条件检查
+            if self.gpu_memory_total > 0:
+                memory_percentage = self.gpu_memory_usage / self.gpu_memory_total
+                self.memory_text.text(f"GPU Memory: {self.gpu_memory_usage:.2f} MB / {self.gpu_memory_total:.2f} MB")
+                self.memory_bar.progress(memory_percentage)
+            else:
+                self.memory_text.text("GPU monitoring not available")
+                self.memory_bar.progress(0)
+
             placeholder.text(language_dict[self.lang_code]["script_running"])
             
             new_loss_data, t_cost, kt_s, loss = self.read_data(self.config['proj_dir'])
@@ -617,4 +640,3 @@ class Training:
 if __name__ == "__main__":
     training = Training()
     training.render()
-
