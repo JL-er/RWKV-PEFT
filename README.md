@@ -2,8 +2,9 @@
 <h1 align="center">
   <p><img src="assert/logo.jpg" alt="RWKV-PEFT" width="60px"  style="vertical-align: middle; margin-right: 10px;"/>RWKV-PEFT</p>
 </h1>
+
 \[ English | [中文](README_zh.md) \]
-### Installation
+# Installation
 
 > [!IMPORTANT]
 > Installation is mandatory.
@@ -12,6 +13,11 @@
 git clone https://github.com/JL-er/RWKV-PEFT.git
 cd RWKV-PEFT
 pip install -r requirements.txt
+```
+
+## Web Run
+```bash
+streamlit run web/home.py
 ```
 
 # Release
