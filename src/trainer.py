@@ -153,23 +153,6 @@ class train_callback(pl.Callback):
             self.log("lr", trainer.my_lr, prog_bar=True, on_step=True)
             self.log("loss", trainer.my_epoch_loss, prog_bar=True, on_step=True)
            
-            # self.log("s", real_step, prog_bar=True, on_step=True)
-
-            # if len(args.wandb) > 0:
-            #     if trainer.accumulate_grad_batches!=None:
-            #         args.avg_loss += trainer.my_loss/trainer.accumulate_grad_batches
-            #         if (batch_idx+1)%trainer.accumulate_grad_batches==0:
-            #             lll = {"loss": args.avg_loss, "lr": trainer.my_lr, "wd": trainer.my_wd, "Gtokens": real_step * token_per_step / 1e9}
-            #             if kt_s > 0:
-            #                 lll["kt/s"] = kt_s
-            #             trainer.my_wandb.log(lll, step=int(real_step))
-            #             args.avg_loss = 0
-            #     else:
-            #         lll = {"loss": trainer.my_loss, "lr": trainer.my_lr, "wd": trainer.my_wd, "Gtokens": real_step * token_per_step / 1e9}
-            #         if kt_s > 0:
-            #             lll["kt/s"] = kt_s
-            #         trainer.my_wandb.log(lll, step=int(real_step))
-            # else:
             # 将loss、t_cost、kt_s写入data.json
             if trainer.accumulate_grad_batches!=None:
                 args.avg_loss += trainer.my_loss / trainer.accumulate_grad_batches

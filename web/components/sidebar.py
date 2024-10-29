@@ -1,6 +1,4 @@
 import streamlit as st
-from PIL import Image
-import os
 from common.utils import get_project_root
 
 class Sidebar:
@@ -17,3 +15,4 @@ class Sidebar:
             st.page_link('app.py', label='Home', disabled=is_running)
             st.page_link('pages/training.py', label='Training', disabled=is_running)
             st.page_link('pages/merge.py', label='Merge', disabled=is_running)
+            st.page_link('pages/data.py', label='Data', disabled=is_running)
