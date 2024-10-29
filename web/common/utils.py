@@ -1,6 +1,5 @@
 import os
 
-
 def get_project_root():
     # 获取当前文件的绝对路径
     current_path = os.path.abspath(__file__)
