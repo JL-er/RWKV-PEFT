@@ -3,12 +3,13 @@ st.set_page_config(layout="wide", page_title="RWKV-PEFT Merge")
 import os
 import subprocess
 import yaml
-
+from PIL import Image
+from common.utils import get_project_root
+from components.sidebar import Sidebar
 # Language dictionary
 language_dict = {
     "en": {
-        "title": "🔀 RWKV-PEFT Model Merge Interface",
-        "welcome": "Welcome to the RWKV-PEFT model merge interface!",
+        "title": "Merge",
         "basic_config": "Basic Configuration",
         "save_output_path": "Save Output Path",
         "output_saved": "Output path saved!",
@@ -36,8 +37,7 @@ language_dict = {
         "unexpected_error": "An unexpected error occurred: {}"
     },
     "zh": {
-        "title": "🔀 RWKV-PEFT 模型合并界面",
-        "welcome": "欢迎使用 RWKV-PEFT 模型合并界面！",
+        "title": "模型合并界面",
         "basic_config": "基本配置",
         "save_output_path": "保存输出路径",
         "output_saved": "输出路径已保存！",
@@ -66,12 +66,6 @@ language_dict = {
     }
 }
 
-# Add sidebar
-with st.sidebar:
-    st.sidebar.page_link('app.py', label='Home', icon='🏠')
-    st.sidebar.page_link('pages/training.py', label='Training', icon='🎈')
-    st.sidebar.page_link('pages/merge.py', label='Merge', icon='🔀')
-
 def read_cache(cache_file):
     try:
         with open(cache_file, 'r') as file:
@@ -94,40 +88,32 @@ def write_cache(data, cache_file, is_public=False):
     with open(cache_file, 'w') as file:
         yaml.safe_dump(cache, file)
 
-
-def get_project_root():
-    # 获取当前文件的绝对路径
-    current_path = os.path.abspath(__file__)
-    # 向上遍历直到找到项目根目录（根目录包含 'train.py' 文件）
-    while True:
-        parent_path = os.path.dirname(current_path)
-        if os.path.exists(os.path.join(parent_path, 'train.py')):
-            return parent_path
-        if parent_path == current_path:  # 已经到达文件系统的根目录
-            raise Exception("Could not find project root directory")
-        current_path = parent_path
-
-def update_language_cache():
-    lang_code = "en" if st.session_state.language == "English" else "zh"
-    # Update only the 'language' key in the 'training' section
-    write_cache({'language': lang_code}, os.path.join(get_project_root() + '/web', 'cache.yml'), is_public=True)
-        
-# Language selection in the sidebar
-language = st.sidebar.selectbox(
-    "", 
-    ["English", "中文"], 
-    index=0 if read_cache(os.path.join(get_project_root() + '/web', 'cache.yml')).get('public', {}).get('language', 'en') == 'en' else 1,
-    key='language',
-    on_change=update_language_cache
-)
-lang_code = "en" if language == "English" else "zh"
 class Merge:
     def __init__(self):
         self.config = {}
         self.project_root = get_project_root()
         self.cache_name = 'cache.yml'
+        Sidebar().show()
+        self.lang_code = self.show_language_selection()
         # Load the merge section from the cache
         self.cache = read_cache(os.path.join(self.project_root + '/web', self.cache_name)).get('merge', {})
+    
+    def show_language_selection(self):
+        # Language selection in the sidebar
+        language = st.sidebar.selectbox(
+        "", 
+        ["English", "中文"], 
+        index=0 if read_cache(os.path.join(get_project_root() + '/web', 'cache.yml')).get("public", {}).get('language', 'en') == 'en' else 1,
+        key='language',
+        on_change=self.update_language_cache
+        )
+        self.lang_code = "en" if language == "English" else "zh"
+        return self.lang_code
+
+    def update_language_cache(self):
+        self.lang_code = "en" if st.session_state.language == "English" else "zh"
+        # Update only the 'language' key in the 'training' section
+        write_cache({'language': self.lang_code}, os.path.join(get_project_root() + '/web', 'cache.yml'), is_public=True)
 
     def render(self):
         self.setup_page()
@@ -135,29 +121,44 @@ class Merge:
         self.show_merge_command()
 
     def setup_page(self):
-        st.title(language_dict[lang_code]["title"])
-        st.write(language_dict[lang_code]["welcome"])
+        st.title(language_dict[self.lang_code]["title"])
+        # 插入css
+        st.markdown("""
+        <style>
+        div[data-testid="stSidebarHeader"]{
+            align-items:center !important;
+        }
+        img[data-testid="stLogo"] {
+            height: 3.5rem;
+            width: 3.5rem;
+            background-color: #fff;
+            border-radius: 50%;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
+        st.logo(Image.open(os.path.join(self.project_root + '/web', 'assets/peft-logo.png')))
 
     def setup_config(self):
         col1, col2 = st.columns([1,2])
         with col1:
             with st.container(border=True):
-                st.subheader(language_dict[lang_code]["basic_config"])
+                st.subheader(language_dict[self.lang_code]["basic_config"])
                 self.config["merge_type"] = st.selectbox("Select Merge Type", ("bone", "pissa", "lora", "state"))
                 self.config["quant"] = st.selectbox("Quant", ["none", "int8", "nf4"], index=0)
                 output_path = st.text_input(
                     "Output Path", 
                     self.cache.get('output_path', f"/home/rwkv/model/meta{self.config['merge_type']}-1.6b.pth")
                 )
-                if st.button(language_dict[lang_code]["save_output_path"]):
+                if st.button(language_dict[self.lang_code]["save_output_path"]):
                     # Save to cache
                     self.cache['output_path'] = output_path
                     write_cache(self.cache, os.path.join(self.project_root + '/web', self.cache_name))
-                    st.success(language_dict[lang_code]["output_saved"])
+                    st.success(language_dict[self.lang_code]["output_saved"])
                 self.config["output"] = output_path
         with col2:
             with st.container(border=True):
-                st.subheader(language_dict[lang_code]["model_config"])
+                st.subheader(language_dict[self.lang_code]["model_config"])
                 # Base Model Path
                 base_model_directory = st.text_input(
                     "Base Model Directory", 
@@ -165,15 +166,15 @@ class Merge:
                 )
                 if 'base_model_files' not in st.session_state:
                     st.session_state.base_model_files = []
-                if st.button(language_dict[lang_code]["check_base_model_dir"]):
+                if st.button(language_dict[self.lang_code]["check_base_model_dir"]):
                     if os.path.exists(base_model_directory):
-                        st.success(language_dict[lang_code]["base_model_exists"])
+                        st.success(language_dict[self.lang_code]["base_model_exists"])
                         st.session_state.base_model_files = get_model_files(base_model_directory)
                         # Save to cache
                         self.cache['base_model_directory'] = base_model_directory
                         write_cache(self.cache, os.path.join(self.project_root + '/web', self.cache_name))
                     else:
-                        st.error(language_dict[lang_code]["base_model_not_exists"])
+                        st.error(language_dict[self.lang_code]["base_model_not_exists"])
                         st.session_state.base_model_files = []
                 if st.session_state.base_model_files:
                     self.config["base_model"] = st.selectbox(
@@ -183,7 +184,7 @@ class Merge:
                         format_func=lambda x: os.path.basename(x)
                     )
                 else:
-                    st.warning(language_dict[lang_code]["no_pth_files"])
+                    st.warning(language_dict[self.lang_code]["no_pth_files"])
                     self.config["base_model"] = st.text_input("Base Model Path", "")
 
                 # Checkpoint Path (LoRA or State)
@@ -194,15 +195,15 @@ class Merge:
                 )
                 if 'checkpoint_files' not in st.session_state:
                     st.session_state.checkpoint_files = []
-                if st.button(language_dict[lang_code]["check_checkpoint_dir"].format(checkpoint_label)):
+                if st.button(language_dict[self.lang_code]["check_checkpoint_dir"].format(checkpoint_label)):
                     if os.path.exists(checkpoint_directory):
-                        st.success(language_dict[lang_code]["checkpoint_exists"].format(checkpoint_label))
+                        st.success(language_dict[self.lang_code]["checkpoint_exists"].format(checkpoint_label))
                         st.session_state.checkpoint_files = get_model_files(checkpoint_directory)
                         # Save to cache
                         self.cache['checkpoint_directory'] = checkpoint_directory
                         write_cache(self.cache, os.path.join(self.project_root + '/web', self.cache_name))
                     else:
-                        st.error(language_dict[lang_code]["checkpoint_not_exists"].format(checkpoint_label))
+                        st.error(language_dict[self.lang_code]["checkpoint_not_exists"].format(checkpoint_label))
                         st.session_state.checkpoint_files = []
                 if st.session_state.checkpoint_files:
                     checkpoint_key = "state_checkpoint" if self.config["merge_type"] == "state" else "lora_checkpoint"
@@ -213,7 +214,7 @@ class Merge:
                         format_func=lambda x: os.path.basename(x)
                     )
                 else:
-                    st.warning(language_dict[lang_code]["no_checkpoint_files"].format(checkpoint_label.lower()))
+                    st.warning(language_dict[self.lang_code]["no_checkpoint_files"].format(checkpoint_label.lower()))
                     checkpoint_key = "state_checkpoint" if self.config["merge_type"] == "state" else "lora_checkpoint"
                     self.config[checkpoint_key] = st.text_input(f"{checkpoint_label} Path", "")
 
@@ -225,15 +226,15 @@ class Merge:
                     )
                     if 'pissa_init_files' not in st.session_state:
                         st.session_state.pissa_init_files = []
-                    if st.button(language_dict[lang_code]["check_pissa_init_dir"]):
+                    if st.button(language_dict[self.lang_code]["check_pissa_init_dir"]):
                         if os.path.exists(pissa_init_directory):
-                            st.success(language_dict[lang_code]["pissa_init_exists"])
+                            st.success(language_dict[self.lang_code]["pissa_init_exists"])
                             st.session_state.pissa_init_files = get_model_files(pissa_init_directory)
                             # Save to cache
                             self.cache['pissa_init_directory'] = pissa_init_directory
                             write_cache(self.cache, os.path.join(self.project_root + '/web', self.cache_name))
                         else:
-                            st.error(language_dict[lang_code]["pissa_init_not_exists"])
+                            st.error(language_dict[self.lang_code]["pissa_init_not_exists"])
                             st.session_state.pissa_init_files = []
                     if st.session_state.pissa_init_files:
                         self.config["lora_init"] = st.selectbox(
@@ -243,7 +244,7 @@ class Merge:
                             format_func=lambda x: os.path.basename(x)
                         )
                     else:
-                        st.warning(language_dict[lang_code]["no_pissa_files"])
+                        st.warning(language_dict[self.lang_code]["no_pissa_files"])
                         self.config["lora_init"] = st.text_input("PISSA Init Path", "")
 
                 # LoRA specific configuration
@@ -252,11 +253,11 @@ class Merge:
 
     def show_merge_command(self):
         with st.container():
-            st.subheader(language_dict[lang_code]["merge_command"])
+            st.subheader(language_dict[self.lang_code]["merge_command"])
             command = self.generate_merge_command()
             st.code(command, language="bash")
 
-        if st.button(language_dict[lang_code]["run_merge"]):
+        if st.button(language_dict[self.lang_code]["run_merge"]):
             self.run_merge_command(command)
 
     def generate_merge_command(self):
@@ -305,7 +306,7 @@ class Merge:
             os.environ['MKL_THREADING_LAYER'] = 'GNU'
             
             # 使用st.spinner显示正在运行的状态
-            with st.spinner(language_dict[lang_code]["merging"]):
+            with st.spinner(language_dict[self.lang_code]["merging"]):
                 result = subprocess.run(
                     command,
                     shell=True,
@@ -317,17 +318,17 @@ class Merge:
             
             # 合并成功后显示成功消息
             st.balloons()
-            st.success(language_dict[lang_code]["merge_success"])
+            st.success(language_dict[self.lang_code]["merge_success"])
             
             # 可选：显示命令输出
-            with st.expander(language_dict[lang_code]["command_output"]):
+            with st.expander(language_dict[self.lang_code]["command_output"]):
                 st.code(result.stdout)
         except subprocess.CalledProcessError as e:
-            st.error(language_dict[lang_code]["error"].format(e))
-            st.error(language_dict[lang_code]["command_output_error"].format(e.output))
-            st.error(language_dict[lang_code]["command_stderr_error"].format(e.stderr))
+            st.error(language_dict[self.lang_code]["error"].format(e))
+            st.error(language_dict[self.lang_code]["command_output_error"].format(e.output))
+            st.error(language_dict[self.lang_code]["command_stderr_error"].format(e.stderr))
         except Exception as e:
-            st.error(language_dict[lang_code]["unexpected_error"].format(str(e)))
+            st.error(language_dict[self.lang_code]["unexpected_error"].format(str(e)))
 
 def get_model_files(directory):
     return [os.path.join(directory, f) for f in os.listdir(directory) if f.endswith('.pth')]
