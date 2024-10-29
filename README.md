@@ -16,6 +16,9 @@ pip install -r requirements.txt
 ```
 
 ## Web Run
+> [!TIP]
+> If you are using a cloud server (such as [Vast](https://vast.ai/) or [AutoDL](https://www.autodl.com/)), you can start the Streamlit service by referring to the help documentation on the cloud server's official website.
+
 ```bash
 streamlit run web/home.py
 ```
@@ -27,7 +30,6 @@ streamlit run web/home.py
 - Quant(QPissa,QLora) --quant int8/nf4
 - Bone
 - Pissa
-- Lisa
 - Lora
 - dataload(get、pad、only)
 ### High performance on consumer hardware
