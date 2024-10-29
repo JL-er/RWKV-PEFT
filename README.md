@@ -1,5 +1,5 @@
 <h1 align="center">
-  <p><img src="assert/logo.jpg" alt="RWKV-PEFT" width="40px"/>RWKV-PEFT</p>
+  <p style="align:center;"><img src="assert/logo.jpg" alt="RWKV-PEFT" width="40px"/>RWKV-PEFT</p>
 </h1>
 
 \[ English | [中文](README_zh.md) \]
