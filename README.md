@@ -1,7 +1,27 @@
 
-<h1 align="center"> <p>🦚 RWKV-PEFT</p></h1>
+<h1 align="center">
+  <p><img src="assert/logo.jpg" alt="RWKV-PEFT" width="60px"  style="vertical-align: middle; margin-right: 10px;"/>RWKV-PEFT</p>
+</h1>
 
 \[ English | [中文](README_zh.md) \]
+# Installation
+
+> [!IMPORTANT]
+> Installation is mandatory.
+
+```bash
+git clone https://github.com/JL-er/RWKV-PEFT.git
+cd RWKV-PEFT
+pip install -r requirements.txt
+```
+
+## Web Run
+> [!TIP]
+> If you are using a cloud server (such as [Vast](https://vast.ai/) or [AutoDL](https://www.autodl.com/)), you can start the Streamlit service by referring to the help documentation on the cloud server's official website.
+
+```bash
+streamlit run web/home.py
+```
 
 # Release
 - infctx
@@ -10,7 +30,6 @@
 - Quant(QPissa,QLora) --quant int8/nf4
 - Bone
 - Pissa
-- Lisa
 - Lora
 - dataload(get、pad、only)
 ### High performance on consumer hardware
@@ -37,7 +56,7 @@ Consider the memory requirements for training the following models with an 4090 
 # Quick Start
 According to Necessary Dependencies
 ```
-pip install requirements.txt
+pip install -r requirements.txt
 ```
 Refer to the examples in the scripts folder to modify the paths and required parameters (for detailed data preparation, please refer to the official RWKV tutorial).
 ```
