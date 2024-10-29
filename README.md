@@ -2,6 +2,16 @@
 <h1 align="center"> <p>🦚 RWKV-PEFT</p></h1>
 
 \[ English | [中文](README_zh.md) \]
+### Installation
+
+> [!IMPORTANT]
+> Installation is mandatory.
+
+```bash
+git clone https://github.com/JL-er/RWKV-PEFT.git
+cd RWKV-PEFT
+pip install -r requirements.txt
+```
 
 # Release
 - infctx
@@ -37,7 +47,7 @@ Consider the memory requirements for training the following models with an 4090 
 # Quick Start
 According to Necessary Dependencies
 ```
-pip install requirements.txt
+pip install -r requirements.txt
 ```
 Refer to the examples in the scripts folder to modify the paths and required parameters (for detailed data preparation, please refer to the official RWKV tutorial).
 ```
