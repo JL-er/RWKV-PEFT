@@ -68,19 +68,7 @@ def load_peft_model(args: TrainingArgs):
                         print(f'  Parts additionally training module {name}')
                         param.requires_grad = True
             break
-        # if args.peft=='lisa':
-        #     import re
-        #     select_layers = np.random.choice(range(args.n_layer), args.lisa_r, replace=False)
-        #     for name, module in model.named_modules():
-        #         for pname, param in module.named_parameters():
-        #             if 'emb' in pname or 'head' in pname or '.ln' in pname or 'time' in pname :
-        #                 param.requires_grad = True
-        #             match = re.search(r'\d+', pname)
-        #             if match:
-        #                 number = int(match.group())
-        #                 if number in select_layers:
-        #                     param.requires_grad  = True
-        #         break
+
         if args.peft == 'lora' or args.peft == 'pissa':
             for name, module in model.named_modules():
                 if any(n.startswith("lora_") for n, _ in module.named_parameters()):
@@ -107,7 +95,11 @@ def load_peft_model(args: TrainingArgs):
 
     # Load peft checkpoint
     # multi-GPU training
-    if args.peft == 'lora':
+    if args.peft == 'bone':
+        if os.path.isfile(args.lora_config['bone_load']):
+            model.load_state_dict(torch.load(args.lora_config['bone_load'], map_location="cpu", weights_only=True),
+                                  strict=False)
+    elif args.peft == 'lora':
         if os.path.isfile(args.lora_config['lora_load']):
             model.load_state_dict(torch.load(args.lora_config['lora_load'], map_location="cpu", weights_only=True),
                                   strict=False)
