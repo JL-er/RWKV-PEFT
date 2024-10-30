@@ -96,8 +96,8 @@ def load_peft_model(args: TrainingArgs):
     # Load peft checkpoint
     # multi-GPU training
     if args.peft == 'bone':
-        if os.path.isfile(args.lora_config['bone_load']):
-            model.load_state_dict(torch.load(args.lora_config['bone_load'], map_location="cpu", weights_only=True),
+        if os.path.isfile(args.bone_config['bone_load']):
+            model.load_state_dict(torch.load(args.bone_config['bone_load'], map_location="cpu", weights_only=True),
                                   strict=False)
     elif args.peft == 'lora':
         if os.path.isfile(args.lora_config['lora_load']):
