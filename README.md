@@ -36,7 +36,7 @@ streamlit run web/app.py
 
 Consider the memory requirements for training the following models with an 4090 24GB GPU with 64GB of CPU RAM.(--strategy deepspeed_stage_1 --ctx_len 1024 --micro_bsz 1 --lora_r 64)
 
-|   Model         | Full Finetuning | lora/pissa  | Qlora/Qpissa | State tuning |
+|   Model         | Full Finetuning | Bone/lora/pissa  | Qlora/Qpissa | State tuning |
 | --------- | ---- | ---- | ---- | ---- |
 | RWKV6-1.6B | OOM GPU | 7.4GB GPU | 5.6GB GPU | 6.4GB GPU |
 | RWKV6-3B | OOM GPU | 12.1GB GPU | 8.2GB GPU | 9.4GB GPU |
