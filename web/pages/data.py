@@ -134,7 +134,8 @@ class Data:
                 self.config["micro_batch_size"] = st.number_input("Micro Batch Size", value=1, min_value=1, step=1)
             with _col3:
                 self.config["num_devices"] = st.number_input("Number of Devices", value=1, min_value=1, step=1)
-            self.config["epoch_steps"] = st.text(f"Epoch Steps: {self.config["data_count"] // (self.config['micro_batch_size'] * self.config['num_devices'])}")
+            step = self.config["data_count"] // (self.config['micro_batch_size'] * self.config['num_devices'])
+            self.config["epoch_steps"] = st.text(f"Epoch Steps: {step}")
 
     def setup_config(self):
         with st.container(border=True):
