@@ -1,13 +1,13 @@
-load_model='/home/rwkv/JL/model/RWKV-x060-World-3B-v2.1-20240417-ctx4096.pth'
-proj_dir='/home/rwkv/JL/out_model/metabone'
-data_file='/home/rwkv/JL/data/metamath_text_document'
+load_model='/home/ryan/code/model/RWKV-x060-World-1B6-v2.1-20240328-ctx4096.pth'
+proj_dir='/home/ryan/code/out_model/metabone'
+data_file='/home/ryan/code/data/roleplay'
 
-n_layer=32
-n_embd=2560
+n_layer=24
+n_embd=2048
 
-micro_bsz=8
+micro_bsz=4
 epoch_save=1
-epoch_steps=1000
+epoch_steps=100
 ctx_len=512
 
 bone_config='{"bone_load":"","bone_r":64}'
