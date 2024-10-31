@@ -52,7 +52,7 @@ class GlobalIndexManager:
         
     def get_next_idx(self, idx_t):
         if self.shuffle:
-            idx = idx_t * self.device_num + self.rank
+            idx = idx_t
         else:
             idx = self.current_idx * self.device_num + self.rank 
             self.current_idx += 1
@@ -185,7 +185,6 @@ class MyDataset(Dataset):
 
     def __getitem__(self, idx):
         idx = self.index_manager.get_next_idx(idx_t=idx) if self.index_manager else idx
-
         args = self.args
         rank = self.rank
         epoch = self.real_epoch

@@ -95,7 +95,7 @@ class Data:
         self.lang_code = self.show_language_selection()
         # Load the data section from the cache
         self.cache = read_cache(os.path.join(self.project_root + '/web', self.cache_name)).get('data', {})
-        self.config['vocab'] = os.path.join(self.project_root + '/json2binidx_tool', '20B_tokenizer.json')
+        self.config['vocab'] = os.path.join(self.project_root + '/json2binidx_tool', 'rwkv_vocab_v20230424.txt')
     
     def show_language_selection(self):
         # Language selection in the sidebar
@@ -201,7 +201,7 @@ class Data:
 
     def generate_command(self):
         script = "json2binidx_tool/tools/preprocess_data.py"
-        common_args = f"--input {self.config['input']} \\\n--output-prefix {self.config['output']} \\\n--vocab {self.config['vocab']} \\\n--dataset-impl mmap \\\n--tokenizer-type HFTokenizer"
+        common_args = f"--input {self.config['input']} \\\n--output-prefix {self.config['output']} \\\n--vocab {self.config['vocab']} \\\n--dataset-impl mmap \\\n--tokenizer-type RWKVTokenizer"
         if self.config["append_eod"]:
             common_args += " --append-eod"
         return f"""python {script} {common_args}"""
