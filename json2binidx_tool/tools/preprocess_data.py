@@ -36,7 +36,6 @@ from tokenizer import build_tokenizer
 import indexed_dataset
 from threading import Semaphore
 
-
 class Encoder(object):
     def __init__(self, args):
         self.args = args
@@ -239,7 +238,8 @@ def main():
     for key in args.jsonl_keys:
         builders[key].finalize(output_idx_files[key])
 
-    print(data_nums)
+    print("data_nums:", data_nums)
+    
 
 if __name__ == "__main__":
     main()

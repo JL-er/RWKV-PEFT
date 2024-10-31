@@ -16,6 +16,7 @@ import yaml
 from PIL import Image
 from common.utils import get_project_root
 from components.sidebar import Sidebar
+
 # Language dictionary
 language_dict = {
     "en": {
@@ -86,27 +87,59 @@ def get_data_files(directory):
             data_files.add(os.path.join(root, file_prefix))
     return sorted(list(data_files))
 
+def reset_cache(cache_file):
+    """重置缓存文件为默认状态"""
+    default_cache = {
+        'public': {
+            'language': 'en'
+        },
+        'training': {}
+    }
+    try:
+        with open(cache_file, 'w') as file:
+            yaml.safe_dump(default_cache, file, default_flow_style=False, sort_keys=False)
+        return default_cache
+    except Exception as e:
+        print(f"Failed to reset cache file: {e}")
+        return default_cache
+
 def read_cache(cache_file):
+    """读取缓存文件，如果出错则重置"""
     try:
         with open(cache_file, 'r') as file:
-            return yaml.safe_load(file) or {}
-    except FileNotFoundError:
-        return {}
+            data = yaml.safe_load(file)
+            if not isinstance(data, dict):
+                return reset_cache(cache_file)
+            return data
+    except (FileNotFoundError, yaml.YAMLError):
+        return reset_cache(cache_file)
+    except Exception as e:
+        print(f"Error reading cache: {e}")
+        return reset_cache(cache_file)
 
 def write_cache(data, cache_file, is_public=False):
-    # Read existing cache
-    cache = read_cache(cache_file)
-    if is_public:
-        cache['public'] = data
-    else:
-        # Ensure the 'training' section exists
-        if 'training' not in cache:
-            cache['training'] = {}
-        # Update only the specified keys in the 'training' section
-        cache['training'].update(data)
-    # Write back to the cache file
-    with open(cache_file, 'w') as file:
-        yaml.safe_dump(cache, file)
+    """写入缓存文件"""
+    try:
+        # 读取现有缓存，如果读取失败会得到新的默认缓存
+        cache = read_cache(cache_file)
+        
+        if is_public:
+            cache['public'] = cache.get('public', {})
+            cache['public'].update(data)
+        else:
+            cache['training'] = cache.get('training', {})
+            cache['training'].update(data)
+        
+        with open(cache_file, 'w') as file:
+            yaml.safe_dump(cache, file, default_flow_style=False, sort_keys=False)
+    except Exception as e:
+        print(f"Error writing cache: {e}")
+        # 如果出错，尝试重新创建缓存文件
+        try:
+            with open(cache_file, 'w') as file:
+                yaml.safe_dump({'training': {}, 'public': {}}, file, default_flow_style=False)
+        except Exception as e:
+            print(f"Failed to create new cache file: {e}")
 
 class Training:
     def __init__(self):
@@ -116,9 +149,6 @@ class Training:
         self.project_root = get_project_root()
         Sidebar().show(is_running=bool(st.session_state.get('process')))
         self.lang_code = self.show_language_selection()
-        self.gpu_memory_usage = 0
-        self.gpu_memory_total = 0
-        self.stop_monitoring = False
         self.cache_name = 'cache.yml'
         self.model_config = {"0.1B":{"n_layer": 12, "n_embd": 768}, "0.4B":{"n_layer": 24, "n_embd": 1024}, "1.6B":{"n_layer": 24, "n_embd": 2048}, "3B":{"n_layer": 32, "n_embd": 2560}, "7B":{"n_layer": 32, "n_embd": 4096}, "14B":{"n_layer": 61, "n_embd": 4096}}
         # Load the training section from the cache
@@ -161,11 +191,13 @@ class Training:
                         st.stop()
                 self.run_script(self.generate_script())
                 st.rerun()
+                # write_cache({'run_tag': True}, os.path.join(self.project_root + '/web', self.cache_name), is_public=True)
             
             stop_button = st.button(language_dict[self.lang_code]["stop_script"], disabled=st.session_state.process is None)
             if stop_button:
                 self.stop_script()
                 st.rerun()
+                # write_cache({'run_tag': False}, os.path.join(self.project_root + '/web', self.cache_name), is_public=True)
 
         # 监控GPU、loss、训练进度
         self.activity_monitor()
@@ -175,21 +207,6 @@ class Training:
 
     def setup_page(self):
         st.title(language_dict[self.lang_code]["title"])
-        # 插入css
-        st.markdown("""
-        <style>
-        div[data-testid="stSidebarHeader"]{
-            align-items:center !important;
-        }
-        img[data-testid="stLogo"] {
-            height: 3.5rem;
-            width: 3.5rem;
-            background-color: #fff;
-            border-radius: 50%;
-        }
-        </style>
-        """, unsafe_allow_html=True)
-
         st.logo(Image.open(os.path.join(self.project_root + '/web', 'assets/peft-logo.png')))
 
     def setup_config(self):
@@ -360,7 +377,7 @@ class Training:
             col1, col2 = st.columns(2)
             with col1:
                 self.config["micro_bsz"] = st.number_input("Micro Batch Size", value=4, min_value=1)
-                self.config["epoch_steps"] = st.number_input("Epoch Steps", value=50, min_value=1)
+                self.config["epoch_steps"] = st.number_input("Epoch Steps", value=1000, min_value=1)
                 self.config["epoch_begin"] = st.number_input("Epoch Begin", value=0, min_value=0)
                 self.config["lr_init"] = st.number_input("Initial Learning Rate", value=2e-5, format="%.1e")
                 self.config["strategy"] = st.selectbox("Strategy", ["deepspeed_stage_1", "deepspeed_stage_2", "deepspeed_stage_2_offload", "deepspeed_stage_3", "deepspeed_stage_3_offload"])
@@ -516,19 +533,17 @@ class Training:
             print("No script running")
 
     def monitor_gpu_memory(self):
-        while not self.stop_monitoring and st.session_state.process is not None:
+        while not read_cache(os.path.join(self.project_root + '/web', self.cache_name)).get('training', {}).get('stop_monitoring', False):
             try:
                 gpus = GPUtil.getGPUs()
                 if gpus:
                     self.gpu_memory_usage = gpus[0].memoryUsed
                     self.gpu_memory_total = gpus[0].memoryTotal
-                    print(f"#### GPU Memory: {self.gpu_memory_usage:.2f} MB / {self.gpu_memory_total:.2f} MB")
+                    write_cache({'gpu_memory_usage': gpus[0].memoryUsed, 'gpu_memory_total': gpus[0].memoryTotal}, os.path.join(self.project_root + '/web', self.cache_name))
             except (ValueError, Exception) as e:
                 self.gpu_memory_usage = 0
                 self.gpu_memory_total = 0
-                print(f"GPU monitoring error: {str(e)}")
             time.sleep(1)
-        print("GPU monitoring stopped")
 
     def activity_monitor(self):
         st.subheader(language_dict[self.lang_code]["activity_monitor"])
@@ -537,11 +552,11 @@ class Training:
         self.setup_training_progress()
         
     def start_gpu_monitoring(self):
-        self.stop_monitoring = False
-        threading.Thread(target=self.monitor_gpu_memory, daemon=True).start()
+        write_cache({'stop_monitoring': False}, os.path.join(self.project_root + '/web', self.cache_name))
+        threading.Thread(target=self.monitor_gpu_memory).start()
 
     def stop_gpu_monitoring(self):
-        self.stop_monitoring = True
+        write_cache({'stop_monitoring': True}, os.path.join(self.project_root + '/web', self.cache_name))
         # 等待监控线程实际停止
         time.sleep(2)
         # 重置显示
@@ -549,7 +564,6 @@ class Training:
             self.memory_text.text("GPU monitoring stopped")
         if hasattr(self, 'memory_bar') and self.memory_bar is not None:
             self.memory_bar.progress(0)
-
 
     def read_data(self, proj_dir):
         loss_file = os.path.join(proj_dir, "loss_data.json")
@@ -579,64 +593,79 @@ class Training:
         self.rate_text = st.empty()
 
     def update_displays(self):
-        placeholder = st.empty()
         loss_data = []
         current_epoch = 0
         last_progress = 0
         last_t_cost = 0
         last_kt_s = 0
         last_loss = 0
-        while st.session_state.process:
-            # 添加条件检查
-            if self.gpu_memory_total > 0:
-                memory_percentage = self.gpu_memory_usage / self.gpu_memory_total
-                self.memory_text.text(f"GPU Memory: {self.gpu_memory_usage:.2f} MB / {self.gpu_memory_total:.2f} MB")
-                self.memory_bar.progress(memory_percentage)
-            else:
-                self.memory_text.text("GPU monitoring not available")
-                self.memory_bar.progress(0)
-
-            placeholder.text(language_dict[self.lang_code]["script_running"])
-            
-            new_loss_data, t_cost, kt_s, loss = self.read_data(self.config['proj_dir'])
-            
-            current_epoch = min(int(len(new_loss_data) / self.config['epoch_steps']), self.config['epoch_count'] - 1)
-            total_progress = min(len(new_loss_data) / (self.config['epoch_steps'] * self.config['epoch_count']), 1.0)
-            
-            if total_progress > last_progress:
-                last_progress = total_progress
-                last_t_cost = t_cost
-                last_kt_s = kt_s
-                last_loss = loss
-            
-            self.rate_bar.progress(last_progress)
-            self.rate_text.text(f"Epoch {current_epoch + 1}/{self.config['epoch_count']}: {last_progress:.2%} complete "
-                           f"| it/s: {last_t_cost:.2f} | Kt/s: {last_kt_s:.2f} | Loss: {last_loss:.4f}")
-            
-            if len(new_loss_data) > len(loss_data):
-                loss_data = new_loss_data
-                steps = range(1, len(loss_data) + 1)
-                df = pd.DataFrame({'step': steps, 'loss': loss_data})
-                
-                fig = px.line(df, x='step', y='loss', title='Training Loss')
-                fig.update_layout(xaxis_title='Epoch Step', yaxis_title='Loss')
-                if self.config['accumulate_grad_batches'] > 0:
-                    fig.update_xaxes(range=[1, (self.config['epoch_steps'] * self.config['epoch_count']) // self.config['accumulate_grad_batches']])
-                else:
-                    fig.update_xaxes(range=[1, self.config['epoch_steps'] * self.config['epoch_count']])
-                self.loss_chart.plotly_chart(fig, use_container_width=True)
-
-            time.sleep(1)
-            placeholder.empty()
         
+        # 添加最大重试次数
+        max_retries = 3
+        retry_count = 0
+        
+        while st.session_state.process and retry_count < max_retries:
+            try:
+                # 检查进程是否还在运行
+                if st.session_state.process.poll() is not None:
+                    break
+                
+                cache_data = read_cache(os.path.join(self.project_root + '/web', self.cache_name))
+                gpu_memory_total = cache_data.get('training', {}).get("gpu_memory_total", 0)
+                
+                if gpu_memory_total > 0:
+                    memory_percentage = cache_data.get('training', {}).get("gpu_memory_usage", 0) / gpu_memory_total
+                    self.memory_text.text(f"GPU Memory: {cache_data.get('training', {}).get('gpu_memory_usage', 0):.2f} MB / {gpu_memory_total:.2f} MB")
+                    self.memory_bar.progress(memory_percentage)
+                else:
+                    self.memory_text.text("GPU monitoring not available")
+                    self.memory_bar.progress(0)
+                
+                new_loss_data, t_cost, kt_s, loss = self.read_data(self.config['proj_dir'])
+                
+                if new_loss_data:  # 只在有新数据时更新
+                    current_epoch = min(int(len(new_loss_data) / self.config['epoch_steps']), self.config['epoch_count'] - 1)
+                    total_progress = min(len(new_loss_data) / (self.config['epoch_steps'] * self.config['epoch_count']), 1.0)
+                    
+                    if total_progress > last_progress:
+                        last_progress = total_progress
+                        last_t_cost = t_cost
+                        last_kt_s = kt_s
+                        last_loss = loss
+                    
+                    self.rate_bar.progress(last_progress)
+                    self.rate_text.text(f"Epoch {current_epoch + 1}/{self.config['epoch_count']}: {last_progress:.2%} complete "
+                                   f"| it/s: {last_t_cost:.2f} | Kt/s: {last_kt_s:.2f} | Loss: {last_loss:.4f}")
+                    
+                    if len(new_loss_data) > len(loss_data):
+                        loss_data = new_loss_data
+                        steps = range(1, len(loss_data) + 1)
+                        df = pd.DataFrame({'step': steps, 'loss': loss_data})
+                        
+                        fig = px.line(df, x='step', y='loss', title='Training Loss')
+                        fig.update_layout(xaxis_title='Epoch Step', yaxis_title='Loss')
+                        if self.config['accumulate_grad_batches'] > 0:
+                            fig.update_xaxes(range=[1, (self.config['epoch_steps'] * self.config['epoch_count']) // self.config['accumulate_grad_batches']])
+                        else:
+                            fig.update_xaxes(range=[1, self.config['epoch_steps'] * self.config['epoch_count']])
+                        self.loss_chart.plotly_chart(fig, use_container_width=True)
+                
+                time.sleep(1)  # 添加短暂延时
+                retry_count = 0  # 重置重试计数
+                
+            except Exception as e:
+                print(f"Error in update_displays: {e}")
+                retry_count += 1
+                time.sleep(1)
+        
+        # 循环结束后的清理工作
         self.rate_bar.progress(1.0)
         self.rate_text.text(f"Training Complete: 100.00% | it/s: {last_t_cost:.2f} | Kt/s: {last_kt_s:.2f} | Loss: {last_loss:.4f}")
-        
         self.stop_gpu_monitoring()
         st.balloons()
         st.success(language_dict[self.lang_code]["training_success"])
         st.session_state.process = None
-
+        
 if __name__ == "__main__":
     training = Training()
     training.render()

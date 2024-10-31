@@ -40,7 +40,7 @@ class train_callback(pl.Callback):
     def write_data(self, loss_data, t_cost, kt_s):
         # 将loss数据写入文件，便于streamlit绘图
         with open(self.loss_file, 'a') as f:
-            json.dump({"loss": loss_data, "t_cost": t_cost, "kt_s": kt_s}, f)
+            json.dump({"loss": float(loss_data), "t_cost": t_cost, "kt_s": kt_s}, f)
             f.write('\n')
 
     def on_train_batch_start(self, trainer, pl_module, batch, batch_idx):
