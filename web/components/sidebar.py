@@ -30,7 +30,7 @@ class Sidebar:
         with st.sidebar:
             # Navigation links
             st.page_link('app.py', label='Home', disabled=is_running)
-            st.page_link('pages/Training.py', label='Training', disabled=is_running)
-            st.page_link('pages/Merge.py', label='Merge', disabled=is_running)
-            st.page_link('pages/Data.py', label='Data', disabled=is_running)
+            st.page_link('pages/training.py', label='Training', disabled=is_running)
+            st.page_link('pages/merge.py', label='Merge', disabled=is_running)
+            st.page_link('pages/data.py', label='Data', disabled=is_running)
             
