@@ -122,21 +122,6 @@ class Merge:
 
     def setup_page(self):
         st.title(language_dict[self.lang_code]["title"])
-        # 插入css
-        st.markdown("""
-        <style>
-        div[data-testid="stSidebarHeader"]{
-            align-items:center !important;
-        }
-        img[data-testid="stLogo"] {
-            height: 3.5rem;
-            width: 3.5rem;
-            background-color: #fff;
-            border-radius: 50%;
-        }
-        </style>
-        """, unsafe_allow_html=True)
-
         st.logo(Image.open(os.path.join(self.project_root + '/web', 'assets/peft-logo.png')))
 
     def setup_config(self):
