@@ -16,8 +16,6 @@ if __name__ == "__main__":
     import json
     from src.args_type import TrainingArgs
     from src.dataset import get_data_by_l_version, get_vocab_size
-    from src.args_type import TrainingArgs
-    from src.dataset import get_data_by_l_version, get_vocab_size
     rank_zero_info("########## work in progress ##########")
 
     parser = ArgumentParser()
@@ -368,12 +366,12 @@ if __name__ == "__main__":
     from src.peft_loading import load_peft_model
 
     args, model = load_peft_model(args)
-
-
-    if pl.__version__[0]=='2':
-        trainer = Trainer(accelerator=args.accelerator,strategy=args.strategy,devices=args.devices,num_nodes=args.num_nodes,precision=args.precision,
-        logger=args.logger,callbacks=[train_callback(args)],max_epochs=args.max_epochs,check_val_every_n_epoch=args.check_val_every_n_epoch,num_sanity_val_steps=args.num_sanity_val_steps,
-        log_every_n_steps=args.log_every_n_steps,enable_checkpointing=args.enable_checkpointing,accumulate_grad_batches=args.accumulate_grad_batches,gradient_clip_val=args.gradient_clip_val)
+    acc, stragegy = get_accerator_and_strategy(args)
+    
+    if pl.__version__[0] == '2':
+        trainer = Trainer(accelerator=acc, strategy=stragegy, devices=args.devices, num_nodes=args.num_nodes, precision=args.precision,
+                          logger=args.logger, callbacks=[train_callback(args)], max_epochs=args.max_epochs, check_val_every_n_epoch=args.check_val_every_n_epoch, num_sanity_val_steps=args.num_sanity_val_steps,
+                          log_every_n_steps=args.log_every_n_steps,enable_checkpointing=args.enable_checkpointing,accumulate_grad_batches=args.accumulate_grad_batches,gradient_clip_val=args.gradient_clip_val)
     else:
         raise ValueError("Please use pytorch-lightning 2.4.0 or newer")
 
