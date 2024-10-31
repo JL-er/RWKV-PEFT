@@ -6,6 +6,8 @@ import yaml
 from PIL import Image
 from common.utils import get_project_root
 from components.sidebar import Sidebar
+import re
+
 # Language dictionary
 language_dict = {
     "en": {
@@ -31,7 +33,8 @@ language_dict = {
         "error": "An error occurred during the data processing: {}",
         "command_output_error": "Command output: {}",
         "command_stderr_error": "Command stderr: {}",
-        "unexpected_error": "An unexpected error occurred: {}"
+        "unexpected_error": "An unexpected error occurred: {}",
+        "step_cal": "Step Calculation"
     },
     "zh": {
         "title": "数据处理界面",
@@ -56,7 +59,8 @@ language_dict = {
         "error": "数据处理过程中发生错误：{}",
         "command_output_error": "命令输出：{}",
         "command_stderr_error": "命令标准错误：{}",
-        "unexpected_error": "发生意外错误：{}"
+        "unexpected_error": "发生意外错误：{}",
+        "step_cal": "Step 计算"
     }
 }
 
@@ -113,26 +117,24 @@ class Data:
     def render(self):
         self.setup_page()
         self.setup_config()
+        self.pad_config()
         self.show_data_command()
 
     def setup_page(self):
         st.title(language_dict[self.lang_code]["title"])
-        # 插入css
-        st.markdown("""
-        <style>
-        div[data-testid="stSidebarHeader"]{
-            align-items:center !important;
-        }
-        img[data-testid="stLogo"] {
-            height: 3.5rem;
-            width: 3.5rem;
-            background-color: #fff;
-            border-radius: 50%;
-        }
-        </style>
-        """, unsafe_allow_html=True)
-
         st.logo(Image.open(os.path.join(self.project_root + '/web', 'assets/peft-logo.png')))
+        
+    def pad_config(self):
+        with st.container(border=True):
+            st.subheader(language_dict[self.lang_code]["step_cal"])
+            _col1, _col2, _col3 = st.columns(3)
+            with _col1:
+                self.config["data_count"] = st.number_input("Data Count", value=0, min_value=0, step=1)
+            with _col2:
+                self.config["micro_batch_size"] = st.number_input("Micro Batch Size", value=1, min_value=1, step=1)
+            with _col3:
+                self.config["num_devices"] = st.number_input("Number of Devices", value=1, min_value=1, step=1)
+            self.config["epoch_steps"] = st.text(f"Epoch Steps: {self.config["data_count"] // (self.config['micro_batch_size'] * self.config['num_devices'])}")
 
     def setup_config(self):
         with st.container(border=True):
@@ -185,6 +187,7 @@ class Data:
             st.text(f"Full output path: {self.config['output']}")
             
             self.config["append_eod"] = st.toggle("Append EOD", value=self.cache.get('append_eod', True))
+            
 
     def show_data_command(self):
         with st.container():
@@ -206,7 +209,6 @@ class Data:
         try:
             os.environ['MKL_THREADING_LAYER'] = 'GNU'
             
-            # 使用st.spinner显示正在运行的状态
             with st.spinner(language_dict[self.lang_code]["data"]):
                 result = subprocess.run(
                     command,
@@ -217,12 +219,18 @@ class Data:
                     cwd=self.project_root
                 )
             
-            # 合并成功后显示成功消息
-            st.balloons()
+            # 提取数据条数
+            data_nums_pattern = r"data_nums: (\d+)"
+            data_nums_match = re.search(data_nums_pattern, result.stdout)
+            if data_nums_match:
+                data_count = int(data_nums_match.group(1))
+                self.config["data_count"] = data_count
+                st.text("data_nums：" + str(data_count))
             st.success(language_dict[self.lang_code]["data_success"])
             
-            # 可选：显示命令输出
+            # 可选：显示命令输出，从命令中提取数据条数
             with st.expander(language_dict[self.lang_code]["command_output"]):
+                # 显示完整输出
                 st.code(result.stdout)
         except subprocess.CalledProcessError as e:
             st.error(language_dict[self.lang_code]["error"].format(e))
