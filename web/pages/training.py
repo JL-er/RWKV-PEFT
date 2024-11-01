@@ -471,8 +471,8 @@ class Training:
 --devices {self.config['devices']} --precision {self.config['precision']} --strategy {self.config['strategy']} {'--grad_cp 0' if not self.config['grad_cp'] else '--grad_cp 1'} \\
 {'--my_testing "x060"' if self.config['my_testing'] == "v6" else ''} \\
 --dataload {self.config['data_load']} --loss_mask {self.config['loss_mask']} \\
-{f"--peft {self.config['peft']}" if self.config['peft'] != 'state' else ''} {f"--bone_config '{self.config['bone_config']}'" if self.config['peft'] == 'bone' else ''}{f" --lora_config '{self.config['lora_config']}'" if self.config['peft'] == 'lora' else ''} {f" --pissa_config '{self.config['pissa_config']}'" if self.config['peft'] == 'pissa' else ''} \\
-{f"--data_shuffle 1" if self.config['data_shuffle'] == True else '--data_shuffle 0'}{f" --accumulate_grad_batches {self.config['accumulate_grad_batches']}" if self.config['accumulate_grad_batches'] > 0 else ''}{f"{' --train_type state' if self.config['peft'] == 'state' else ' --train_type infctx' if self.config['train_type'] else ''}"}{f" --chunk_ctx {self.config['chunk_ctx']}" if self.config['train_type'] else ""}{fla_arg}{f" --quant {self.config['quant']}" if self.config['quant'] else ''}{f" --wandb {self.config['wandb_project']}" if self.config['wandb'] else ''}"""
+{f"--data_shuffle 1" if self.config['data_shuffle'] == True else '--data_shuffle 0'}{f" --accumulate_grad_batches {self.config['accumulate_grad_batches']}" if self.config['accumulate_grad_batches'] > 0 else ''}{f"{' --train_type state' if self.config['peft'] == 'state' else ' --train_type infctx' if self.config['train_type'] else ''}"}{f" --chunk_ctx {self.config['chunk_ctx']}" if self.config['train_type'] else ""}{fla_arg}{f" --quant {self.config['quant']}" if self.config['quant'] else ''}{f" --wandb {self.config['wandb_project']}" if self.config['wandb'] else ''}
+{f"--peft {self.config['peft']}" if self.config['peft'] != 'state' else ''} {f"--bone_config '{self.config['bone_config']}'" if self.config['peft'] == 'bone' else ''}{f" --lora_config '{self.config['lora_config']}'" if self.config['peft'] == 'lora' else ''} {f" --pissa_config '{self.config['pissa_config']}'" if self.config['peft'] == 'pissa' else ''}"""
 
         return f"""python train.py {common_args}"""
     
@@ -626,9 +626,8 @@ class Training:
                 
                 if new_loss_data:
                     # Calculate current epoch considering multiple devices
-                    total_steps = len(new_loss_data) // self.config['devices']
-                    current_epoch = min(int(total_steps / self.config['epoch_steps']), self.config['epoch_count'] - 1)
-                    total_progress = min(len(new_loss_data) / (self.config['epoch_steps'] * self.config['epoch_count']), 1.0)
+                    current_epoch = min(int(len(new_loss_data) / self.config['epoch_steps']), self.config['epoch_count'] - 1)
+                    total_progress = min(len(new_loss_data) / (self.config['epoch_steps'] * self.config['epoch_count'] // self.config['devices']), 1.0)
                     
                     if total_progress > last_progress:
                         last_progress = total_progress
@@ -642,15 +641,15 @@ class Training:
                     
                     if len(new_loss_data) > len(loss_data):
                         loss_data = new_loss_data
-                        steps = range(1, (len(loss_data) + 1) // self.config["devices"])
+                        steps = range(1, len(loss_data) + 1)
                         df = pd.DataFrame({'step': steps, 'loss': loss_data})
                         
                         fig = px.line(df, x='step', y='loss', title='Training Loss')
                         fig.update_layout(xaxis_title='Epoch Step', yaxis_title='Loss')
                         if self.config['accumulate_grad_batches'] > 0:
-                            fig.update_xaxes(range=[1, (self.config['epoch_steps'] * self.config['epoch_count']) // self.config['accumulate_grad_batches']])
+                            fig.update_xaxes(range=[1, (self.config['epoch_steps'] * self.config['epoch_count']) // self.config['accumulate_grad_batches'] // self.config['devices']])
                         else:
-                            fig.update_xaxes(range=[1, self.config['epoch_steps'] * self.config['epoch_count']])
+                            fig.update_xaxes(range=[1, self.config['epoch_steps'] * self.config['epoch_count'] // self.config['devices']])
                         self.loss_chart.plotly_chart(fig, use_container_width=True)
                 
                 time.sleep(1)  # 添加短暂延时
