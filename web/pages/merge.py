@@ -125,11 +125,12 @@ class Merge:
     def show_language_selection(self):
         # Language selection in the sidebar
         language = st.sidebar.selectbox(
-        "", 
+        "language", 
         ["English", "中文"], 
         index=0 if read_cache(os.path.join(get_project_root() + '/web', 'cache.yml')).get("public", {}).get('language', 'en') == 'en' else 1,
         key='language',
-        on_change=self.update_language_cache
+        on_change=self.update_language_cache,
+        label_visibility="hidden"
         )
         self.lang_code = "en" if language == "English" else "zh"
         return self.lang_code

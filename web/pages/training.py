@@ -77,14 +77,42 @@ def get_model_files(directory):
                 model_files.append(os.path.join(root, file))
     return model_files
 
-def get_data_files(directory):
+def get_data_files(directory, data_type):
+    """
+    获取指定目录下第一层的指定类型文件
+    
+    Args:
+        directory: 目标目录路径
+        data_type: 文件类型 (如 'binidx', 'jsonl')
+        
+    Returns:
+        list: 符合条件的文件路径列表
+    """
     data_files = set()
-    for root, dirs, files in os.walk(directory):
+    
+    # 只读取目标目录下的文件（不包含子目录）
+    try:
+        files = os.listdir(directory)
         for file in files:
-            file_prefix = os.path.splitext(file)[0]
-            if '.' in file_prefix:
-                file_prefix = file_prefix.split('.')[0]
-            data_files.add(os.path.join(root, file_prefix))
+            # 只处理文件，忽略目录
+            if os.path.isfile(os.path.join(directory, file)):
+                # 检查文件扩展名是否匹配
+                if data_type == 'binidx':
+                    type1 = 'bin'
+                    type2 = 'idx'
+                else:
+                    type1 = data_type
+                    type2 = ''
+                if file.endswith(f'.{type1}') or file.endswith(f'.{type2}'):
+                    # 获取不带扩展名的文件名
+                    file_prefix = os.path.splitext(file)[0]
+                    # 如果文件名中还有其他点号，只取第一部分
+                    if '.' in file_prefix:
+                        file_prefix = file_prefix.split('.')[0]
+                    data_files.add(os.path.join(directory, file_prefix))
+    except Exception as e:
+        print(f"Error reading directory: {e}")
+        
     return sorted(list(data_files))
 
 def reset_cache(cache_file):
@@ -153,7 +181,6 @@ class Training:
         self.model_config = {"0.1B":{"n_layer": 12, "n_embd": 768}, "0.4B":{"n_layer": 24, "n_embd": 1024}, "1.6B":{"n_layer": 24, "n_embd": 2048}, "3B":{"n_layer": 32, "n_embd": 2560}, "7B":{"n_layer": 32, "n_embd": 4096}, "14B":{"n_layer": 61, "n_embd": 4096}}
         # Load the training section from the cache
         self.cache = read_cache(os.path.join(self.project_root + '/web', self.cache_name)).get('training', {})
-        
         # Initialize session states
         if 'proj_dir' not in st.session_state:
             st.session_state.proj_dir = self.cache.get('proj_dir', "/home/rwkv/your_output_directory")
@@ -161,6 +188,8 @@ class Training:
             st.session_state.data_file_dir = self.cache.get('data_file_dir', "/home/rwkv/your_data_directory")
         if 'model_directory' not in st.session_state:
             st.session_state.model_directory = self.cache.get('model_directory', "/home/rwkv/your_model_directory")
+        if 'data_type' not in st.session_state:
+            st.session_state.data_type = self.cache.get('data_type', 'binidx')
         
         # Initialize file lists in session state
         if 'data_files' not in st.session_state:
@@ -175,11 +204,12 @@ class Training:
     def show_language_selection(self):
         # Language selection in the sidebar
         language = st.sidebar.selectbox(
-        "", 
+        "language", 
         ["English", "中文"], 
         index=0 if read_cache(os.path.join(get_project_root() + '/web', 'cache.yml')).get("public", {}).get('language', 'en') == 'en' else 1,
         key='language',
-        on_change=self.update_language_cache
+        on_change=self.update_language_cache,
+        label_visibility="hidden"
         )
         self.lang_code = "en" if language == "English" else "zh"
         return self.lang_code
@@ -209,19 +239,18 @@ class Training:
                         st.stop()
                 self.run_script(self.generate_script())
                 st.rerun()
-                # write_cache({'run_tag': True}, os.path.join(self.project_root + '/web', self.cache_name), is_public=True)
             
             stop_button = st.button(language_dict[self.lang_code]["stop_script"], disabled=st.session_state.process is None)
             if stop_button:
                 self.stop_script()
                 st.rerun()
-                # write_cache({'run_tag': False}, os.path.join(self.project_root + '/web', self.cache_name), is_public=True)
 
         # 监控GPU、loss、训练进度
         self.activity_monitor()
 
         if st.session_state.process is not None:
             self.update_displays()
+
 
     def setup_page(self):
         st.title(language_dict[self.lang_code]["title"])
@@ -311,7 +340,7 @@ class Training:
                 col1, col2 = st.columns(2)
                 with col1:
                     self.config["data_load"] = st.selectbox("Data Load", ["pad", "get", "only"])
-                    self.config["data_type"] = st.selectbox("Data Type", ["binidx", "jsonl"])
+                    self.config["data_type"] = st.selectbox("Data Type", key="data_type", options=["binidx", "jsonl"], on_change=self.check_data_dir)
                     self.config["data_shuffle"] = st.toggle("Data Shuffle", value=1)
                 with col2:
                     self.config["loss_mask"] = st.selectbox("Loss Mask", ["none", "pad", "qa"], index=0)
@@ -483,9 +512,7 @@ class Training:
 
         try:
             os.chmod(temp_file_path, 0o755)
-            process = subprocess.Popen(['bash', temp_file_path], 
-                                   cwd=self.project_root,
-                                   preexec_fn=os.setsid)
+            process = subprocess.Popen(['bash', temp_file_path], cwd=self.project_root, preexec_fn=os.setsid)
             st.session_state.process = process
             self.start_gpu_monitoring()
         except Exception as e:
@@ -676,7 +703,7 @@ class Training:
     def check_data_dir(self):
         data_file_dir = st.session_state.data_file_dir
         if os.path.exists(data_file_dir):
-            st.session_state.data_files = get_data_files(data_file_dir)
+            st.session_state.data_files = get_data_files(data_file_dir, st.session_state.data_type)
             self.cache['data_file_dir'] = data_file_dir
             write_cache(self.cache, os.path.join(self.project_root + '/web', self.cache_name))
         else:
