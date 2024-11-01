@@ -153,7 +153,25 @@ class Training:
         self.model_config = {"0.1B":{"n_layer": 12, "n_embd": 768}, "0.4B":{"n_layer": 24, "n_embd": 1024}, "1.6B":{"n_layer": 24, "n_embd": 2048}, "3B":{"n_layer": 32, "n_embd": 2560}, "7B":{"n_layer": 32, "n_embd": 4096}, "14B":{"n_layer": 61, "n_embd": 4096}}
         # Load the training section from the cache
         self.cache = read_cache(os.path.join(self.project_root + '/web', self.cache_name)).get('training', {})
-    
+        
+        # Initialize session states
+        if 'proj_dir' not in st.session_state:
+            st.session_state.proj_dir = self.cache.get('proj_dir', "/home/rwkv/your_output_directory")
+        if 'data_file_dir' not in st.session_state:
+            st.session_state.data_file_dir = self.cache.get('data_file_dir', "/home/rwkv/your_data_directory")
+        if 'model_directory' not in st.session_state:
+            st.session_state.model_directory = self.cache.get('model_directory', "/home/rwkv/your_model_directory")
+        
+        # Initialize file lists in session state
+        if 'data_files' not in st.session_state:
+            st.session_state.data_files = []
+        if 'model_files' not in st.session_state:
+            st.session_state.model_files = []
+            
+        # Check directories on load
+        self.check_data_dir()
+        self.check_model_dir()
+
     def show_language_selection(self):
         # Language selection in the sidebar
         language = st.sidebar.selectbox(
@@ -227,15 +245,16 @@ class Training:
                         bone_r = st.number_input("Bone R", value=64, min_value=1)
                     self.config["bone_config"] = json.dumps({"bone_load": bone_load, "bone_r": bone_r})
                 self.config["quant"] = st.selectbox("Quant", ["none", "int8", "nf4"], index=0)
-                proj_dir = st.text_input(
-                    "Output Path", 
-                    self.cache.get('proj_dir', "/home/rwkv/out_model/")
+                
+                # Output Path with data binding
+                st.text_input(
+                    "Output Path",
+                    value=self.cache.get('proj_dir', "/home/rwkv/your_output_directory"),
+                    key='proj_dir',
+                    on_change=self.update_config_on_change('proj_dir')
                 )
-                if st.button(language_dict[self.lang_code]["save_output_path"]):
-                    self.cache['proj_dir'] = proj_dir
-                    write_cache(self.cache, os.path.join(self.project_root + '/web', self.cache_name))
-                    st.success(language_dict[self.lang_code]["output_saved"])
-                self.config["proj_dir"] = proj_dir
+                self.config["proj_dir"] = st.session_state.proj_dir
+
                 if self.config["peft"] == "lora":
                     lora_load = st.text_input("LoRA Load", "")
                     lora_r = st.number_input("LoRA R", value=32, min_value=1)
@@ -270,25 +289,14 @@ class Training:
             with st.container(border=True):
                 st.subheader(language_dict[self.lang_code]["data_config"])
                 st.markdown(f"[{language_dict[self.lang_code]['config_reference']}](https://rwkv.cn/RWKV-Fine-Tuning/FT-Dataset)")
-                data_file_dir = st.text_input(
-                    "Data File Path", 
-                    self.cache.get('data_file_dir', "/home/rwkv/data/")
-                )
-                if st.button("Check Data File"):
-                    if os.path.exists(data_file_dir):
-                        st.session_state.data_files = get_data_files(data_file_dir)
-                        if st.session_state.data_files:
-                            st.success(language_dict[self.lang_code]["data_found"].format(len(st.session_state.data_files)))
-                            self.cache['data_file_dir'] = data_file_dir
-                            write_cache(self.cache, os.path.join(self.project_root + '/web', self.cache_name))
-                        else:
-                            st.warning(language_dict[self.lang_code]["no_files_found"])
-                    else:
-                        st.error(language_dict[self.lang_code]["data_dir_not_exist"])
-                        st.session_state.data_files = []
                 
-                if 'data_files' not in st.session_state:
-                    st.session_state.data_files = []
+                # Data File Path with data binding
+                st.text_input(
+                    "Data File Path",
+                    value=self.cache.get('data_file_dir', "/home/rwkv/your_data_directory"),
+                    key='data_file_dir',
+                    on_change=self.check_data_dir
+                )
                 
                 if st.session_state.data_files:
                     self.config["data_file"] = st.selectbox(
@@ -299,7 +307,7 @@ class Training:
                 else:
                     st.warning(language_dict[self.lang_code]["no_files_found"])
                     self.config["data_file"] = st.text_input("Data File", "")
-                    
+
                 col1, col2 = st.columns(2)
                 with col1:
                     self.config["data_load"] = st.selectbox("Data Load", ["pad", "get", "only"])
@@ -314,21 +322,14 @@ class Training:
             with st.container(border=True):
                 st.subheader(language_dict[self.lang_code]["model_config"])
                 st.markdown(f"[{language_dict[self.lang_code]['config_reference']}](https://rwkv.cn/RWKV-Wiki/Model-Download)")
-                model_directory = st.text_input(
-                    "Base Model Directory", 
-                    self.cache.get('model_directory', "/home/rwkv/model")
+                
+                # Base Model Directory with data binding
+                st.text_input(
+                    "Base Model Directory",
+                    value=self.cache.get('model_directory', "/home/rwkv/your_model_directory"),
+                    key='model_directory',
+                    on_change=self.check_model_dir
                 )
-                if st.button("Check Base Model Directory"):
-                    if os.path.exists(model_directory):
-                        st.success(language_dict[self.lang_code]["model_dir_exists"])
-                        st.session_state.model_files = get_model_files(model_directory)
-                        self.cache['model_directory'] = model_directory
-                        write_cache(self.cache, os.path.join(self.project_root + '/web', self.cache_name))
-                    else:
-                        st.error(language_dict[self.lang_code]["model_dir_not_exist"])
-                        st.session_state.model_files = []
-                if 'model_files' not in st.session_state:
-                    st.session_state.model_files = []
                 
                 if st.session_state.model_files:
                     self.config["load_model"] = st.selectbox(
@@ -340,7 +341,7 @@ class Training:
                 else:
                     st.warning(language_dict[self.lang_code]["no_pth_files"])
                     self.config["load_model"] = st.text_input("Load Model Path", "")
-                
+
                 # 添加模型大小选择框
                 model_size = st.selectbox(
                     "Model Size",
@@ -470,8 +471,8 @@ class Training:
 --devices {self.config['devices']} --precision {self.config['precision']} --strategy {self.config['strategy']} {'--grad_cp 0' if not self.config['grad_cp'] else '--grad_cp 1'} \\
 {'--my_testing "x060"' if self.config['my_testing'] == "v6" else ''} \\
 --dataload {self.config['data_load']} --loss_mask {self.config['loss_mask']} \\
-{f"--peft {self.config['peft']}" if self.config['peft'] != 'state' else ''} {f"--bone_config '{self.config['bone_config']}'" if self.config['peft'] == 'bone' else ''}{f" --lora_config '{self.config['lora_config']}'" if self.config['peft'] == 'lora' else ''} {f" --pissa_config '{self.config['pissa_config']}'" if self.config['peft'] == 'pissa' else ''} \\
-{f"--data_shuffle 1" if self.config['data_shuffle'] == True else '--data_shuffle 0'}{f" --accumulate_grad_batches {self.config['accumulate_grad_batches']}" if self.config['accumulate_grad_batches'] > 0 else ''}{f"{' --train_type state' if self.config['peft'] == 'state' else ' --train_type infctx' if self.config['train_type'] else ''}"}{f" --chunk_ctx {self.config['chunk_ctx']}" if self.config['train_type'] else ""}{fla_arg}{f" --quant {self.config['quant']}" if self.config['quant'] else ''}{f" --wandb {self.config['wandb_project']}" if self.config['wandb'] else ''}"""
+{f"--data_shuffle 1" if self.config['data_shuffle'] == True else '--data_shuffle 0'}{f" --accumulate_grad_batches {self.config['accumulate_grad_batches']}" if self.config['accumulate_grad_batches'] > 0 else ''}{f"{' --train_type state' if self.config['peft'] == 'state' else ' --train_type infctx' if self.config['train_type'] else ''}"}{f" --chunk_ctx {self.config['chunk_ctx']}" if self.config['train_type'] else ""}{fla_arg}{f" --quant {self.config['quant']}" if self.config['quant'] else ''}{f" --wandb {self.config['wandb_project']}" if self.config['wandb'] else ''}
+{f"--peft {self.config['peft']}" if self.config['peft'] != 'state' else ''} {f"--bone_config '{self.config['bone_config']}'" if self.config['peft'] == 'bone' else ''}{f" --lora_config '{self.config['lora_config']}'" if self.config['peft'] == 'lora' else ''} {f" --pissa_config '{self.config['pissa_config']}'" if self.config['peft'] == 'pissa' else ''}"""
 
         return f"""python train.py {common_args}"""
     
@@ -623,9 +624,10 @@ class Training:
                 
                 new_loss_data, t_cost, kt_s, loss = self.read_data(self.config['proj_dir'])
                 
-                if new_loss_data:  # 只在有新数据时更新
+                if new_loss_data:
+                    # Calculate current epoch considering multiple devices
                     current_epoch = min(int(len(new_loss_data) / self.config['epoch_steps']), self.config['epoch_count'] - 1)
-                    total_progress = min(len(new_loss_data) / (self.config['epoch_steps'] * self.config['epoch_count']), 1.0)
+                    total_progress = min(len(new_loss_data) / (self.config['epoch_steps'] * self.config['epoch_count'] // self.config['devices']), 1.0)
                     
                     if total_progress > last_progress:
                         last_progress = total_progress
@@ -645,9 +647,9 @@ class Training:
                         fig = px.line(df, x='step', y='loss', title='Training Loss')
                         fig.update_layout(xaxis_title='Epoch Step', yaxis_title='Loss')
                         if self.config['accumulate_grad_batches'] > 0:
-                            fig.update_xaxes(range=[1, (self.config['epoch_steps'] * self.config['epoch_count']) // self.config['accumulate_grad_batches']])
+                            fig.update_xaxes(range=[1, (self.config['epoch_steps'] * self.config['epoch_count']) // self.config['accumulate_grad_batches'] // self.config['devices']])
                         else:
-                            fig.update_xaxes(range=[1, self.config['epoch_steps'] * self.config['epoch_count']])
+                            fig.update_xaxes(range=[1, self.config['epoch_steps'] * self.config['epoch_count'] // self.config['devices']])
                         self.loss_chart.plotly_chart(fig, use_container_width=True)
                 
                 time.sleep(1)  # 添加短暂延时
@@ -666,6 +668,29 @@ class Training:
         st.success(language_dict[self.lang_code]["training_success"])
         st.session_state.process = None
         
+    def update_config_on_change(self, key):
+        current_value = st.session_state[key]
+        self.cache[key] = current_value
+        write_cache(self.cache, os.path.join(self.project_root + '/web', self.cache_name))
+
+    def check_data_dir(self):
+        data_file_dir = st.session_state.data_file_dir
+        if os.path.exists(data_file_dir):
+            st.session_state.data_files = get_data_files(data_file_dir)
+            self.cache['data_file_dir'] = data_file_dir
+            write_cache(self.cache, os.path.join(self.project_root + '/web', self.cache_name))
+        else:
+            st.session_state.data_files = []
+
+    def check_model_dir(self):
+        model_directory = st.session_state.model_directory
+        if os.path.exists(model_directory):
+            st.session_state.model_files = get_model_files(model_directory)
+            self.cache['model_directory'] = model_directory
+            write_cache(self.cache, os.path.join(self.project_root + '/web', self.cache_name))
+        else:
+            st.session_state.model_files = []
+
 if __name__ == "__main__":
     training = Training()
     training.render()
