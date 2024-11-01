@@ -96,7 +96,16 @@ class Data:
         # Load the data section from the cache
         self.cache = read_cache(os.path.join(self.project_root + '/web', self.cache_name)).get('data', {})
         self.config['vocab'] = os.path.join(self.project_root + '/json2binidx_tool', 'rwkv_vocab_v20230424.txt')
-    
+        # Initialize session state if not already present
+        if 'data_dir' not in st.session_state:
+            st.session_state.data_dir = self.cache.get('data_dir', "/home/rwkv/your_data_directory")
+        if 'data_dir_files' not in st.session_state:
+            st.session_state.data_dir_files = []
+        if 'output_name' not in st.session_state:
+            st.session_state.output_name = self.cache.get('output_name', "your_output_name")
+        # Check data_dir files on load
+        self.check_data_dir()
+
     def show_language_selection(self):
         # Language selection in the sidebar
         language = st.sidebar.selectbox(
@@ -135,25 +144,23 @@ class Data:
             step = self.config["data_count"] // self.config['micro_batch_size']
             self.config["epoch_steps"] = st.text(f"Epoch Steps: {step}")
 
+    def update_config_on_change(self, key):
+        # Get current value from session state and write it to cache
+        current_value = st.session_state[key]
+        self.cache[key] = current_value
+        write_cache(self.cache, os.path.join(self.project_root + '/web', self.cache_name))
+
     def setup_config(self):
         with st.container(border=True):
             st.subheader(language_dict[self.lang_code]["basic_config"])
-            data_dir = st.text_input(
+            st.text_input(
                 "Data Directory", 
-                self.cache.get('data_dir', "/home/rwkv/data")
+                self.cache.get('data_dir', "/home/rwkv/your_data_directory"),
+                key='data_dir',
+                on_change=self.check_data_dir
             )
-            if 'data_dir_files' not in st.session_state:
-                st.session_state.data_dir_files = []
-            if st.button(language_dict[self.lang_code]["check_data_dir"]):
-                if os.path.exists(data_dir):
-                    st.success(language_dict[self.lang_code]["data_dir_exists"])
-                    st.session_state.data_dir_files = get_data_files(data_dir)
-                    # Save to cache
-                    self.cache['data_dir'] = data_dir
-                    write_cache(self.cache, os.path.join(self.project_root + '/web', self.cache_name))
-                else:
-                    st.error(language_dict[self.lang_code]["data_dir_not_exists"])
-                    st.session_state.data_dir_files = []
+            
+            # File selection or warning if no files
             if st.session_state.data_dir_files:
                 self.config["input"] = st.selectbox(
                     "Data Path",
@@ -166,27 +173,38 @@ class Data:
                 self.config["input"] = st.text_input("Data Path", "")
             
             # Output name 设置
-            output_name = st.text_input(
-                "Output Name", 
-                self.cache.get('output_name', "sample")
+            st.text_input(
+                label="Output Name", 
+                value=self.cache.get('output_name', "your_output_name"),
+                key='output_name',
+                on_change=self.update_config_on_change('output_name')
             )
-            
-            if st.button(language_dict[self.lang_code]["save_output_path"]):
-                self.cache['output_name'] = output_name
-                write_cache(self.cache, os.path.join(self.project_root + '/web', self.cache_name))
-                st.success(language_dict[self.lang_code]["output_saved"])
-            
+
             # 根据 data_dir 验证状态构建完整的输出路径
             if self.cache.get('data_dir') and os.path.exists(self.cache.get('data_dir')):
-                self.config["output"] = os.path.join(self.cache.get('data_dir'), output_name)
+                self.config["output"] = os.path.join(self.cache.get('data_dir'), st.session_state.output_name)
             else:
-                self.config["output"] = output_name
+                self.config["output"] = st.session_state.output_name
             
             # 显示完整输出路径（可选）
             st.text(f"Full output path: {self.config['output']}")
             
             self.config["append_eod"] = st.toggle("Append EOD", value=self.cache.get('append_eod', True))
-            
+    
+    def check_data_dir(self):
+        data_dir = st.session_state.data_dir  # Get current value from session state
+        if os.path.exists(data_dir):
+            # st.success(language_dict[self.lang_code]["data_dir_exists"])
+            st.session_state.data_dir_files = self.get_data_files(data_dir)
+            # Save to cache
+            self.cache['data_dir'] = data_dir
+            write_cache(self.cache, os.path.join(self.project_root + '/web', self.cache_name))
+        else:
+            # st.error(language_dict[self.lang_code]["data_dir_not_exists"])
+            st.session_state.data_dir_files = []
+
+    def get_data_files(self, directory):
+        return [os.path.join(directory, f) for f in os.listdir(directory) if f.endswith('.jsonl')]
 
     def show_data_command(self):
         with st.container():
