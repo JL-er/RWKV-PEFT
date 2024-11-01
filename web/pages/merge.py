@@ -97,6 +97,30 @@ class Merge:
         self.lang_code = self.show_language_selection()
         # Load the merge section from the cache
         self.cache = read_cache(os.path.join(self.project_root + '/web', self.cache_name)).get('merge', {})
+        # Check if 'output_path' exists in cache, if not, set it to default value
+        if 'output_path' not in st.session_state:
+            st.session_state.output_path = self.cache.get('output_path', "/home/rwkv/model/meta-1.6b.pth")
+        
+        # Initialize session states for file lists
+        if 'base_model_files' not in st.session_state:
+            st.session_state.base_model_files = []
+        if 'checkpoint_files' not in st.session_state:
+            st.session_state.checkpoint_files = []
+        if 'pissa_init_files' not in st.session_state:
+            st.session_state.pissa_init_files = []
+            
+        # Initialize directory states
+        if 'base_model_directory' not in st.session_state:
+            st.session_state.base_model_directory = self.cache.get('base_model_directory', "/home/rwkv/model")
+        if 'checkpoint_directory' not in st.session_state:
+            st.session_state.checkpoint_directory = self.cache.get('checkpoint_directory', "/home/rwkv/out_model/metabone")
+        if 'pissa_init_directory' not in st.session_state:
+            st.session_state.pissa_init_directory = self.cache.get('pissa_init_directory', "/home/rwkv/out_model/metapissa")
+            
+        # Check directories on load
+        self.check_base_model_dir()
+        self.check_checkpoint_dir()
+        self.check_pissa_init_dir()
     
     def show_language_selection(self):
         # Language selection in the sidebar
@@ -123,6 +147,12 @@ class Merge:
     def setup_page(self):
         st.title(language_dict[self.lang_code]["title"])
         st.logo(Image.open(os.path.join(self.project_root + '/web', 'assets/peft-logo.png')))
+    
+    def update_config_on_change(self, key):
+        # Get current value from session state and write it to cache
+        current_value = st.session_state[key]
+        self.cache[key] = current_value
+        write_cache(self.cache, os.path.join(self.project_root + '/web', self.cache_name))
 
     def setup_config(self):
         col1, col2 = st.columns([1,2])
@@ -131,36 +161,23 @@ class Merge:
                 st.subheader(language_dict[self.lang_code]["basic_config"])
                 self.config["merge_type"] = st.selectbox("Select Merge Type", ("bone", "pissa", "lora", "state"))
                 self.config["quant"] = st.selectbox("Quant", ["none", "int8", "nf4"], index=0)
-                output_path = st.text_input(
-                    "Output Path", 
-                    self.cache.get('output_path', f"/home/rwkv/model/meta{self.config['merge_type']}-1.6b.pth")
+                st.text_input(
+                    label="Output Path", 
+                    key='output_path',
+                    on_change=self.update_config_on_change('output_path'),
+                    value=self.cache.get('output_path', "/home/rwkv/model/meta-1.6b.pth")
                 )
-                if st.button(language_dict[self.lang_code]["save_output_path"]):
-                    # Save to cache
-                    self.cache['output_path'] = output_path
-                    write_cache(self.cache, os.path.join(self.project_root + '/web', self.cache_name))
-                    st.success(language_dict[self.lang_code]["output_saved"])
-                self.config["output"] = output_path
         with col2:
             with st.container(border=True):
                 st.subheader(language_dict[self.lang_code]["model_config"])
                 # Base Model Path
-                base_model_directory = st.text_input(
+                st.text_input(
                     "Base Model Directory", 
-                    self.cache.get('base_model_directory', "/home/rwkv/model")
+                    self.cache.get('base_model_directory', "/home/rwkv/model"),
+                    key='base_model_directory',
+                    on_change=self.check_base_model_dir
                 )
-                if 'base_model_files' not in st.session_state:
-                    st.session_state.base_model_files = []
-                if st.button(language_dict[self.lang_code]["check_base_model_dir"]):
-                    if os.path.exists(base_model_directory):
-                        st.success(language_dict[self.lang_code]["base_model_exists"])
-                        st.session_state.base_model_files = get_model_files(base_model_directory)
-                        # Save to cache
-                        self.cache['base_model_directory'] = base_model_directory
-                        write_cache(self.cache, os.path.join(self.project_root + '/web', self.cache_name))
-                    else:
-                        st.error(language_dict[self.lang_code]["base_model_not_exists"])
-                        st.session_state.base_model_files = []
+                
                 if st.session_state.base_model_files:
                     self.config["base_model"] = st.selectbox(
                         "Base Model Path",
@@ -174,22 +191,13 @@ class Merge:
 
                 # Checkpoint Path (LoRA or State)
                 checkpoint_label = "State Checkpoint" if self.config["merge_type"] == "state" else "LoRA Checkpoint"
-                checkpoint_directory = st.text_input(
+                st.text_input(
                     f"{checkpoint_label} Directory", 
-                    self.cache.get('checkpoint_directory', "/home/rwkv/out_model/metabone")
+                    self.cache.get('checkpoint_directory', "/home/rwkv/out_model/metabone"),
+                    key='checkpoint_directory',
+                    on_change=self.check_checkpoint_dir
                 )
-                if 'checkpoint_files' not in st.session_state:
-                    st.session_state.checkpoint_files = []
-                if st.button(language_dict[self.lang_code]["check_checkpoint_dir"].format(checkpoint_label)):
-                    if os.path.exists(checkpoint_directory):
-                        st.success(language_dict[self.lang_code]["checkpoint_exists"].format(checkpoint_label))
-                        st.session_state.checkpoint_files = get_model_files(checkpoint_directory)
-                        # Save to cache
-                        self.cache['checkpoint_directory'] = checkpoint_directory
-                        write_cache(self.cache, os.path.join(self.project_root + '/web', self.cache_name))
-                    else:
-                        st.error(language_dict[self.lang_code]["checkpoint_not_exists"].format(checkpoint_label))
-                        st.session_state.checkpoint_files = []
+                
                 if st.session_state.checkpoint_files:
                     checkpoint_key = "state_checkpoint" if self.config["merge_type"] == "state" else "lora_checkpoint"
                     self.config[checkpoint_key] = st.selectbox(
@@ -205,22 +213,13 @@ class Merge:
 
                 # PISSA specific configuration
                 if self.config["merge_type"] == "pissa":
-                    pissa_init_directory = st.text_input(
+                    st.text_input(
                         "PISSA Init Directory", 
-                        self.cache.get('pissa_init_directory', "/home/rwkv/out_model/metapissa")
+                        self.cache.get('pissa_init_directory', "/home/rwkv/out_model/metapissa"),
+                        key='pissa_init_directory',
+                        on_change=self.check_pissa_init_dir
                     )
-                    if 'pissa_init_files' not in st.session_state:
-                        st.session_state.pissa_init_files = []
-                    if st.button(language_dict[self.lang_code]["check_pissa_init_dir"]):
-                        if os.path.exists(pissa_init_directory):
-                            st.success(language_dict[self.lang_code]["pissa_init_exists"])
-                            st.session_state.pissa_init_files = get_model_files(pissa_init_directory)
-                            # Save to cache
-                            self.cache['pissa_init_directory'] = pissa_init_directory
-                            write_cache(self.cache, os.path.join(self.project_root + '/web', self.cache_name))
-                        else:
-                            st.error(language_dict[self.lang_code]["pissa_init_not_exists"])
-                            st.session_state.pissa_init_files = []
+                    
                     if st.session_state.pissa_init_files:
                         self.config["lora_init"] = st.selectbox(
                             "PISSA Init Path",
@@ -276,7 +275,7 @@ class Merge:
         quant_arg = f"--quant {self.config['quant']}" if merge_type != "state" else ""
 
         common_args = f"""--base_model {self.config['base_model']} \\
---output {self.config['output']}"""
+--output {self.cache.get('output_path', "/home/rwkv/model/meta-1.6b.pth")}"""
 
         # 如果有quant参数，添加到common_args中
         if quant_arg:
@@ -314,6 +313,36 @@ class Merge:
             st.error(language_dict[self.lang_code]["command_stderr_error"].format(e.stderr))
         except Exception as e:
             st.error(language_dict[self.lang_code]["unexpected_error"].format(str(e)))
+
+    def check_base_model_dir(self):
+        base_model_directory = st.session_state.base_model_directory
+        if os.path.exists(base_model_directory):
+            st.session_state.base_model_files = get_model_files(base_model_directory)
+            # Save to cache
+            self.cache['base_model_directory'] = base_model_directory
+            write_cache(self.cache, os.path.join(self.project_root + '/web', self.cache_name))
+        else:
+            st.session_state.base_model_files = []
+
+    def check_checkpoint_dir(self):
+        checkpoint_directory = st.session_state.checkpoint_directory
+        if os.path.exists(checkpoint_directory):
+            st.session_state.checkpoint_files = get_model_files(checkpoint_directory)
+            # Save to cache
+            self.cache['checkpoint_directory'] = checkpoint_directory
+            write_cache(self.cache, os.path.join(self.project_root + '/web', self.cache_name))
+        else:
+            st.session_state.checkpoint_files = []
+
+    def check_pissa_init_dir(self):
+        pissa_init_directory = st.session_state.pissa_init_directory
+        if os.path.exists(pissa_init_directory):
+            st.session_state.pissa_init_files = get_model_files(pissa_init_directory)
+            # Save to cache
+            self.cache['pissa_init_directory'] = pissa_init_directory
+            write_cache(self.cache, os.path.join(self.project_root + '/web', self.cache_name))
+        else:
+            st.session_state.pissa_init_files = []
 
 def get_model_files(directory):
     return [os.path.join(directory, f) for f in os.listdir(directory) if f.endswith('.pth')]
