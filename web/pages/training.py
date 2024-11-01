@@ -626,9 +626,8 @@ class Training:
                 
                 if new_loss_data:
                     # Calculate current epoch considering multiple devices
-                    total_steps = len(new_loss_data) // self.config['devices']
-                    current_epoch = min(int(total_steps / self.config['epoch_steps']), self.config['epoch_count'] - 1)
-                    total_progress = min(len(new_loss_data) / (self.config['epoch_steps'] * self.config['epoch_count']), 1.0)
+                    current_epoch = min(int(len(new_loss_data) / self.config['epoch_steps']), self.config['epoch_count'] - 1)
+                    total_progress = min(len(new_loss_data) / (self.config['epoch_steps'] * self.config['epoch_count'] // self.config['devices']), 1.0)
                     
                     if total_progress > last_progress:
                         last_progress = total_progress
@@ -642,15 +641,15 @@ class Training:
                     
                     if len(new_loss_data) > len(loss_data):
                         loss_data = new_loss_data
-                        steps = range(1, (len(loss_data) + 1))
+                        steps = range(1, len(loss_data) + 1)
                         df = pd.DataFrame({'step': steps, 'loss': loss_data})
                         
                         fig = px.line(df, x='step', y='loss', title='Training Loss')
                         fig.update_layout(xaxis_title='Epoch Step', yaxis_title='Loss')
                         if self.config['accumulate_grad_batches'] > 0:
-                            fig.update_xaxes(range=[1, (self.config['epoch_steps'] * self.config['epoch_count']) // self.config['accumulate_grad_batches']])
+                            fig.update_xaxes(range=[1, (self.config['epoch_steps'] * self.config['epoch_count']) // self.config['accumulate_grad_batches'] // self.config['devices']])
                         else:
-                            fig.update_xaxes(range=[1, self.config['epoch_steps'] * self.config['epoch_count']])
+                            fig.update_xaxes(range=[1, self.config['epoch_steps'] * self.config['epoch_count'] // self.config['devices']])
                         self.loss_chart.plotly_chart(fig, use_container_width=True)
                 
                 time.sleep(1)  # 添加短暂延时
