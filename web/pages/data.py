@@ -98,11 +98,11 @@ class Data:
         self.config['vocab'] = os.path.join(self.project_root + '/json2binidx_tool', 'rwkv_vocab_v20230424.txt')
         # Initialize session state if not already present
         if 'data_dir' not in st.session_state:
-            st.session_state.data_dir = self.cache.get('data_dir', "/home/rwkv/data11")
+            st.session_state.data_dir = self.cache.get('data_dir', "/home/rwkv/your_data_directory")
         if 'data_dir_files' not in st.session_state:
             st.session_state.data_dir_files = []
         if 'output_name' not in st.session_state:
-            st.session_state.output_name = self.cache.get('output_name', "sample")
+            st.session_state.output_name = self.cache.get('output_name', "your_output_name")
         # Check data_dir files on load
         self.check_data_dir()
         
@@ -157,7 +157,7 @@ class Data:
             st.subheader(language_dict[self.lang_code]["basic_config"])
             st.text_input(
                 "Data Directory", 
-                self.cache.get('data_dir', "/home/rwkv/data"),
+                self.cache.get('data_dir', "/home/rwkv/your_data_directory"),
                 key='data_dir',
                 on_change=self.check_data_dir
             )
@@ -177,7 +177,7 @@ class Data:
             # Output name 设置
             st.text_input(
                 label="Output Name", 
-                value=self.cache.get('output_name', "sample"),
+                value=self.cache.get('output_name', "your_output_name"),
                 key='output_name',
                 on_change=self.update_config_on_change('output_name')
             )

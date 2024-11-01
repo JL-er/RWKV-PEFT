@@ -156,11 +156,11 @@ class Training:
         
         # Initialize session states
         if 'proj_dir' not in st.session_state:
-            st.session_state.proj_dir = self.cache.get('proj_dir', "/home/rwkv/out_model/")
+            st.session_state.proj_dir = self.cache.get('proj_dir', "/home/rwkv/your_output_directory")
         if 'data_file_dir' not in st.session_state:
-            st.session_state.data_file_dir = self.cache.get('data_file_dir', "/home/rwkv/data/")
+            st.session_state.data_file_dir = self.cache.get('data_file_dir', "/home/rwkv/your_data_directory")
         if 'model_directory' not in st.session_state:
-            st.session_state.model_directory = self.cache.get('model_directory', "/home/rwkv/model")
+            st.session_state.model_directory = self.cache.get('model_directory', "/home/rwkv/your_model_directory")
         
         # Initialize file lists in session state
         if 'data_files' not in st.session_state:
@@ -249,7 +249,7 @@ class Training:
                 # Output Path with data binding
                 st.text_input(
                     "Output Path",
-                    value=self.cache.get('proj_dir', "/home/rwkv/out_model/"),
+                    value=self.cache.get('proj_dir', "/home/rwkv/your_output_directory"),
                     key='proj_dir',
                     on_change=self.update_config_on_change('proj_dir')
                 )
@@ -293,7 +293,7 @@ class Training:
                 # Data File Path with data binding
                 st.text_input(
                     "Data File Path",
-                    value=self.cache.get('data_file_dir', "/home/rwkv/data/"),
+                    value=self.cache.get('data_file_dir', "/home/rwkv/your_data_directory"),
                     key='data_file_dir',
                     on_change=self.check_data_dir
                 )
@@ -326,7 +326,7 @@ class Training:
                 # Base Model Directory with data binding
                 st.text_input(
                     "Base Model Directory",
-                    value=self.cache.get('model_directory', "/home/rwkv/model"),
+                    value=self.cache.get('model_directory', "/home/rwkv/your_model_directory"),
                     key='model_directory',
                     on_change=self.check_model_dir
                 )
@@ -624,8 +624,10 @@ class Training:
                 
                 new_loss_data, t_cost, kt_s, loss = self.read_data(self.config['proj_dir'])
                 
-                if new_loss_data:  # 只在有新数据时更新
-                    current_epoch = min(int(len(new_loss_data) / self.config['epoch_steps']), self.config['epoch_count'] - 1)
+                if new_loss_data:
+                    # Calculate current epoch considering multiple devices
+                    total_steps = len(new_loss_data) // self.config['devices']
+                    current_epoch = min(int(total_steps / self.config['epoch_steps']), self.config['epoch_count'] - 1)
                     total_progress = min(len(new_loss_data) / (self.config['epoch_steps'] * self.config['epoch_count']), 1.0)
                     
                     if total_progress > last_progress:
@@ -640,7 +642,7 @@ class Training:
                     
                     if len(new_loss_data) > len(loss_data):
                         loss_data = new_loss_data
-                        steps = range(1, len(loss_data) + 1)
+                        steps = range(1, (len(loss_data) + 1) // self.config["devices"])
                         df = pd.DataFrame({'step': steps, 'loss': loss_data})
                         
                         fig = px.line(df, x='step', y='loss', title='Training Loss')

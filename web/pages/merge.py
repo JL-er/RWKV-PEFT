@@ -99,7 +99,7 @@ class Merge:
         self.cache = read_cache(os.path.join(self.project_root + '/web', self.cache_name)).get('merge', {})
         # Check if 'output_path' exists in cache, if not, set it to default value
         if 'output_path' not in st.session_state:
-            st.session_state.output_path = self.cache.get('output_path', "/home/rwkv/model/meta-1.6b.pth")
+            st.session_state.output_path = self.cache.get('output_path', "/home/rwkv/model/your_output_model_path.pth")
         
         # Initialize session states for file lists
         if 'base_model_files' not in st.session_state:
@@ -111,11 +111,11 @@ class Merge:
             
         # Initialize directory states
         if 'base_model_directory' not in st.session_state:
-            st.session_state.base_model_directory = self.cache.get('base_model_directory', "/home/rwkv/model")
+            st.session_state.base_model_directory = self.cache.get('base_model_directory', "/home/rwkv/your_model_directory")
         if 'checkpoint_directory' not in st.session_state:
-            st.session_state.checkpoint_directory = self.cache.get('checkpoint_directory', "/home/rwkv/out_model/metabone")
+            st.session_state.checkpoint_directory = self.cache.get('checkpoint_directory', "/home/rwkv/your_checkpoint_directory")
         if 'pissa_init_directory' not in st.session_state:
-            st.session_state.pissa_init_directory = self.cache.get('pissa_init_directory', "/home/rwkv/out_model/metapissa")
+            st.session_state.pissa_init_directory = self.cache.get('pissa_init_directory', "/home/rwkv/your_pissa_init_directory")
             
         # Check directories on load
         self.check_base_model_dir()
@@ -165,7 +165,7 @@ class Merge:
                     label="Output Path", 
                     key='output_path',
                     on_change=self.update_config_on_change('output_path'),
-                    value=self.cache.get('output_path', "/home/rwkv/model/meta-1.6b.pth")
+                    value=self.cache.get('output_path', "/home/rwkv/your_output_model_path.pth")
                 )
         with col2:
             with st.container(border=True):
@@ -173,7 +173,7 @@ class Merge:
                 # Base Model Path
                 st.text_input(
                     "Base Model Directory", 
-                    self.cache.get('base_model_directory', "/home/rwkv/model"),
+                    self.cache.get('base_model_directory', "/home/rwkv/your_model_directory"),
                     key='base_model_directory',
                     on_change=self.check_base_model_dir
                 )
@@ -193,7 +193,7 @@ class Merge:
                 checkpoint_label = "State Checkpoint" if self.config["merge_type"] == "state" else "LoRA Checkpoint"
                 st.text_input(
                     f"{checkpoint_label} Directory", 
-                    self.cache.get('checkpoint_directory', "/home/rwkv/out_model/metabone"),
+                    self.cache.get('checkpoint_directory', "/home/rwkv/your_checkpoint_directory"),
                     key='checkpoint_directory',
                     on_change=self.check_checkpoint_dir
                 )
@@ -215,7 +215,7 @@ class Merge:
                 if self.config["merge_type"] == "pissa":
                     st.text_input(
                         "PISSA Init Directory", 
-                        self.cache.get('pissa_init_directory', "/home/rwkv/out_model/metapissa"),
+                        self.cache.get('pissa_init_directory', "/home/rwkv/your_pissa_init_directory"),
                         key='pissa_init_directory',
                         on_change=self.check_pissa_init_dir
                     )
