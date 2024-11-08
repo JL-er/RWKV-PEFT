@@ -230,8 +230,6 @@ class BoneLinear(nn.Module):
 
 
 
-
-    
 @functools.wraps(LoraLinear)
 def make_linear_att(*args, **kwargs):
     if "att" in LORA_CONFIG["parts"] and LORA_CONFIG["r"] > 0:

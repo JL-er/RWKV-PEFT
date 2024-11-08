@@ -284,7 +284,7 @@ class RWKV(pl.LightningModule):
                 # )
                 # new_shift_states = new_shift_states.cpu()
                 # new_wkv_states = new_wkv_states.cpu()
-                states = BlockStateList(new_shift_states, new_wkv_states)
+                states = BlockStateList(new_shift_states.clone().detach(), new_wkv_states.clone().detach())
             
             return total_loss
     else:
