@@ -131,9 +131,10 @@ class train_callback(pl.Callback):
         token_per_step = args.ctx_len * args.real_bsz
         real_step = trainer.global_step + args.epoch_begin * args.epoch_steps
 
-        if pl.__version__[0]=='2' and args.devices>1:
+        if pl.__version__[0]=='2' :
             loss = outputs['loss']
-            torch.distributed.all_reduce(loss, op=torch.distributed.ReduceOp.SUM)
+            if args.devices>1:
+                torch.distributed.all_reduce(loss, op=torch.distributed.ReduceOp.SUM)
 
         if trainer.is_global_zero:  # logging
             t_now = time.time_ns()
