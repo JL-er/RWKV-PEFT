@@ -10,3 +10,4 @@ GPUtil
 plotly
 psutil
 lightning
+gradio
