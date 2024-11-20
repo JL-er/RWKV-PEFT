@@ -35,7 +35,7 @@ def rwkv_dequantize(quant_type, weight, qstate):
         deweight= weight.data
     return deweight.to(torch.bfloat16)
 
-@torch.jit.script
+#@torch.jit.script
 def fp8_matmul_(a,b): # shape3 @ shape2 only
     with torch.no_grad():
         if b.dtype == torch.float8_e4m3fn:
