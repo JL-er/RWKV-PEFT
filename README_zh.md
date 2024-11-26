@@ -23,7 +23,7 @@ pip install -r requirements.txt
 > 如果你想使用云服务器运行streamlit (如 [Vast](https://vast.ai/) or [AutoDL](https://www.autodl.com/)), 你需要查看云服务器平台教程进行配置
 
 ```bash
-streamlit run web/app.py
+gradio web/app.py
 ```
 
 ## 目录

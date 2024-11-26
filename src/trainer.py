@@ -143,7 +143,8 @@ class train_callback(pl.Callback):
             try:
                 t_cost = (t_now - trainer.my_time_ns) / 1e9
                 kt_s = token_per_step / t_cost / 1000
-                self.log("REAL it/s", 1.0 / t_cost, prog_bar=True, on_step=True)
+                t_cost = 1.0 / t_cost
+                self.log("REAL it/s", t_cost, prog_bar=True, on_step=True)
                 self.log("Kt/s", kt_s, prog_bar=True, on_step=True)
             except:
                 pass

@@ -2,11 +2,12 @@
 # The RWKV Language Model - https://github.com/BlinkDL/RWKV-LM
 ########################################################################################################
 import os
-
+import sys
+from web.utils import set_error_message
 import logging
 logging.basicConfig(level=logging.INFO)
 
-if __name__ == "__main__":
+def rwkv_train():
     from argparse import ArgumentParser
     from lightning import Trainer
     from lightning.pytorch import seed_everything
@@ -328,3 +329,10 @@ if __name__ == "__main__":
     train_data = get_data_by_l_version(trainer=trainer, args=args)
 
     trainer.fit(model, train_data)
+
+if __name__ == "__main__":
+    try:
+        rwkv_train()
+    except Exception as e:
+        set_error_message(str(e))
+        sys.exit(1)
