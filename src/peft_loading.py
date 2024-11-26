@@ -4,12 +4,11 @@ from src.model import RWKV
 from src.args_type import TrainingArgs
 from lightning_utilities.core.rank_zero import rank_zero_info
 from src.trainer import generate_init_weight
-
+from src.rwkvLinear import LORA_CONFIG
 
 def load_peft_model(args: TrainingArgs):
     freeze = False
     if args.peft == 'lora':
-        from src.rwkvLinear import LORA_CONFIG
         assert args.lora_config['lora_r'] > 0, "LoRA should have its `r` > 0"
         LORA_CONFIG["r"] = args.lora_config['lora_r']
         LORA_CONFIG["alpha"] = args.lora_config['lora_alpha']
