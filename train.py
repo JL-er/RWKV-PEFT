@@ -157,7 +157,7 @@ def rwkv_train():
     warnings.filterwarnings("ignore", ".*The progress bar already tracks a metric with the*")
     # os.environ["WDS_SHOW_SEED"] = "1"
 
-    args.vocab_size = get_vocab_size(args)
+    #args.vocab_size = get_vocab_size(args)
     args.my_timestamp = datetime.datetime.today().strftime("%Y-%m-%d-%H-%M-%S")
     args.enable_checkpointing = False
     args.replace_sampler_ddp = False

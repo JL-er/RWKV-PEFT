@@ -72,9 +72,6 @@ def sft_dataset(script_args):
     # logger.info("BOS Token", tokenizer.bos_token, tokenizer.bos_token_id)
     # logger.info("EOS Token", tokenizer.eos_token, tokenizer.eos_token_id)
 
-    print(tokenizer.pad_token, tokenizer.pad_token_id)
-
-    print(script_args.data_file, script_args.sft_split)
     raw_train_datasets = load_dataset(script_args.data_file, split=script_args.sft_split)
 
     # if script_args.local_rank > 0: 
@@ -90,19 +87,22 @@ def sft_dataset(script_args):
         desc="Running tokenizer on train dataset",
         fn_kwargs={"tokenizer": tokenizer, "query": script_args.sft_field[0], "response": script_args.sft_field[1]}
     )
-
-    return train_dataset
-
-
-class Data():
-    model_name_or_path: str = "RWKV/rwkv-5-world-3b"
-    data_file :str = "/home/rwkv/JL/data/MetaMathQA"
-    sft_split: str = "train[:5000]"#field(default="train[:100000]", metadata={"help": "(`['train', 'test', 'eval']`):"})
-    sft_field: List[str] = ["query", "response"]#field(default=["query", "response"], metadata={"help": "Fields of dataset input and output."})
-    ctx_len: int = 100
+    #labels_tensor = torch.tensor(train_dataset['labels'])
+    #input_ids_tensor = torch.tensor(train_dataset['input_ids'])
+    labels_tensor = [torch.tensor(label) for label in train_dataset['labels']]
+    input_ids_tensor = [torch.tensor(input_id) for input_id in train_dataset['input_ids']]
+    return (input_ids_tensor, labels_tensor)
 
 
-if __name__ == "__main__":
-    args = Data()
-    sft_dataset(args)
+# class Data():
+#     model_name_or_path: str = "RWKV/rwkv-5-world-3b"
+#     data_file :str = "/home/rwkv/JL/data/MetaMathQA"
+#     sft_split: str = "train[:5000]"#field(default="train[:100000]", metadata={"help": "(`['train', 'test', 'eval']`):"})
+#     sft_field: List[str] = ["query", "response"]#field(default=["query", "response"], metadata={"help": "Fields of dataset input and output."})
+#     ctx_len: int = 100
+
+
+# if __name__ == "__main__":
+#     args = Data()
+#     sft_dataset(args)
 
