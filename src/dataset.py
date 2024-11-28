@@ -1,6 +1,7 @@
 ########################################################################################################
 # The RWKV Language Model - https://github.com/BlinkDL/RWKV-LM
 ########################################################################################################
+import torch.nn.functional as F
 
 import json
 import math
@@ -17,6 +18,8 @@ from .binidx import MMapIndexedDataset
 from .utils import MaybeIsPrime
 from .args_type import TrainingArgs
 from rwkv.utils import PIPELINE
+from .rwkv_datasets.SFTdataset import sft_dataset
+
 pipeline = PIPELINE('rwkv6', "rwkv_vocab_v20230424")
 
 def get_vocab_size(args: TrainingArgs) -> int:
@@ -92,8 +95,10 @@ class MyDataset(Dataset):
         self.world_size = 0
         self.index_manager = None
 
-
-        if args.data_type == "binidx":
+        if args.data_type == "sft":
+            self.vocab_size = args.vocab_size
+            self.data = sft_dataset(args)
+        elif args.data_type == "binidx":
             self.vocab_size = args.vocab_size
             rank_zero_info(f"Current vocab size = {self.vocab_size} (make sure it's correct)")
 
@@ -194,6 +199,29 @@ class MyDataset(Dataset):
             dix = self.data[i]
             x = torch.tensor(dix[:-1], dtype=torch.long)
             y = torch.tensor(dix[1:], dtype=torch.long)
+        elif args.data_type == "sft":
+            ctx_len = args.ctx_len
+            req_len = ctx_len + 1
+            data = self.data
+
+            label = torch.tensor(data['labels'][idx])
+            dix = torch.tensor(data['input_ids'][idx], dtype=torch.long)
+            data_len = len(dix)
+            padding = (0, req_len-data_len)
+            dix_pad = F.pad(dix, padding, "constant", 0)
+            label_pad = F.pad(label, padding, "constant", -100)
+            mask = (label_pad != -100).int()
+
+
+
+            x = dix_pad[:-1]
+            y = dix_pad[1:]
+            # print(x.size())
+            # print(y.size())
+            # print(label_pad)
+            # print(mask)
+            # assert False
+            return x, y, mask[1:]
         else:
             ctx_len = args.ctx_len
             req_len = ctx_len + 1

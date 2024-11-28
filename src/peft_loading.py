@@ -22,6 +22,7 @@ def load_peft_model(args: TrainingArgs):
         LORA_CONFIG["quant"] = True
     if args.peft == 'bone':
         from src.rwkvLinear import BONE_CONFIG
+        BONE_CONFIG["mode"] = args.bone_config['bone_mode']
         BONE_CONFIG["r"] = args.bone_config['bone_r']
 
     model = RWKV(args)

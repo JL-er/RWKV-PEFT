@@ -340,7 +340,7 @@ class RWKV(pl.LightningModule):
 
         def training_step(self, batch, batch_idx):
             args = self.args
-            if args.loss_mask!='none':
+            if args.loss_mask!='none' or args.data_type=='sft':
                 idx, targets, mask = batch
                 mask = mask.view(-1)
                 sum_mask = torch.sum(mask).item()
@@ -353,11 +353,6 @@ class RWKV(pl.LightningModule):
                 logits = self(idx)
                 loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1))
 
-                # if '0' in os.environ["RWKV_MY_TESTING"]:
-                #     print('logits', logits)
-                #     torch.set_printoptions(threshold=10000)
-                #     print('idx', idx)
-                #     exit(0)
             else:
                 idx, targets, mask = batch
                 mask = mask.view(-1)

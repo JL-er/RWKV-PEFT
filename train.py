@@ -6,6 +6,7 @@ import sys
 from web.utils import set_error_message
 import logging
 logging.basicConfig(level=logging.INFO)
+from typing import Optional, Dict, Sequence, List, Literal
 
 def rwkv_train():
     from argparse import ArgumentParser
@@ -26,7 +27,7 @@ def rwkv_train():
     parser.add_argument("--random_seed", default="-1", type=int)
 
     parser.add_argument("--data_file", default="", type=str)
-    parser.add_argument("--data_type", default="utf-8", type=str)
+    parser.add_argument("--data_type", default="utf-8", type=str) #binidx / sft
     parser.add_argument("--vocab_size", default=0, type=int)  # vocab_size = 0 means auto (for char-level LM and .txt data)
 
     parser.add_argument("--ctx_len", default=1024, type=int)
@@ -92,7 +93,7 @@ def rwkv_train():
     parser.add_argument("--pissa_config", default='{"pissa_load":"", "pissa_init":"", "pissa_r":8, "svd_niter":4}', type=json.loads)
 
     #Bone
-    parser.add_argument("--bone_config", default='{"bone_load":"", "bone_r":64}', type=json.loads)
+    parser.add_argument("--bone_config", default='{"bone_mode":"mode", "bone_load":"", "bone_r":64}', type=json.loads)
 
 
     #quant
@@ -122,6 +123,9 @@ def rwkv_train():
     #acc_grad_batchs
     parser.add_argument("--avg_loss", default=0, type=int)
 
+
+    parser.add_argument("--sft_field", default=None, type=str, nargs='+', help='List of fields for SFT')
+    parser.add_argument("--sft_split", default="train", type=str)
 
     if pl.__version__[0]=='2':
         parser.add_argument("--accelerator", default="gpu", type=str)
@@ -163,7 +167,7 @@ def rwkv_train():
     args.check_val_every_n_epoch = int(1e20)
     args.log_every_n_steps = int(1e20)
     args.max_epochs = -1  # continue forever
-    if args.dataload!='get':
+    if args.dataload!='get' or args.data_type=='sft':
         args.max_epochs = args.epoch_count
     args.betas = (args.beta1, args.beta2)
     args.real_bsz = int(args.num_nodes) * int(args.devices) * args.micro_bsz
@@ -266,7 +270,7 @@ def rwkv_train():
     )
     rank_zero_info(str(vars(args)) + "\n")
 
-    assert args.data_type in ["utf-8", "utf-16le", "numpy", "binidx", "dummy", "uint16"]
+    assert args.data_type in ["utf-8", "utf-16le", "numpy", "binidx", "dummy", "uint16", "sft"]
 
     if args.lr_final == 0 or args.lr_init == 0:
         rank_zero_info("\n\nNote: lr_final = 0 or lr_init = 0. Using linear LR schedule instead.\n\n")
@@ -330,9 +334,11 @@ def rwkv_train():
 
     trainer.fit(model, train_data)
 
-if __name__ == "__main__":
-    try:
-        rwkv_train()
-    except Exception as e:
-        set_error_message(str(e))
-        sys.exit(1)
+
+rwkv_train()
+# if __name__ == "__main__":
+#     try:
+#         rwkv_train()
+#     except Exception as e:
+#         set_error_message(str(e))
+#         sys.exit(1)

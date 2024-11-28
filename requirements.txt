@@ -5,9 +5,7 @@ triton
 rwkv-fla
 rwkv
 transformers
-streamlit
 GPUtil
 plotly
-psutil
 lightning
 gradio

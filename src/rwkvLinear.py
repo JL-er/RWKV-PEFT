@@ -75,6 +75,14 @@ class FP8Matmul(torch.autograd.Function):
 fp8_matmul = FP8Matmul.apply
 
 
+def ori_result(x, qweight, quant_type, qstate):
+
+    if qweight.dtype == torch.float8_e4m3fn:
+        return  fp8_matmul(x, qweight.t()) 
+    else:
+        return F.linear(x, rwkv_dequantize(quant_type, qweight.data, qstate).to(x.device))
+
+
         
 LORA_CONFIG = {
     "r": 0,
@@ -86,6 +94,7 @@ LORA_CONFIG = {
 
 BONE_CONFIG = {
     "r": 0,
+    "mode": "bone", #"bat"
     "parts": {"att", "ffn"},
 }
 class LoraLinear(nn.Module):
@@ -195,7 +204,7 @@ class QuantLinear(nn.Module):
 #         w = rearrange(w, 'b a r1 r2 ->(a r1) (b r2) ')
 #         return F.linear(x,self.weight+w)
 
-class BoneLinear(nn.Module):
+class BatLinear(nn.Module):
     def __init__(self, in_features: int, out_features: int, bias: bool):
         super().__init__()
         self.weight = nn.Parameter(torch.empty((out_features, in_features)))
@@ -221,12 +230,36 @@ class BoneLinear(nn.Module):
             w = rearrange(w, 'a b r1 r2 ->(a r1) (b r2) ') 
             return F.linear(x,self.weight+w)
     
-#     def forward(self, x):
-#         def fn_bone(W, b, x, r):
-#             w = rearrange(W, '(a r1) (b r2) -> a b r1 r2', r1 = r, r2 = r)@b+b
-#             w = rearrange(w, 'a b r1 r2 ->(a r1) (b r2) ')
-#             return F.linear(x , W+w)
-#         return torch_checkpoint(fn_bone, self.weight,  self.bone, x, self.r, use_reentrant=False)
+class BoneLinear(nn.Module):
+    def __init__(self, in_features: int, out_features: int, bias: bool):
+        super().__init__()
+        self.weight = nn.Parameter(torch.empty((out_features, in_features)))
+        assert bias == False, "Biased QuantLinear not supported"
+        self.r = BONE_CONFIG["r"]
+        self.bone = nn.Parameter(torch.zeros(self.r, out_features))
+        self.in_features = in_features
+        self.out_features = out_features
+        self.is_quant = False
+
+    def quant(self, quant_type):
+        self.is_quant = True
+        self.quant_type = quant_type
+        self.qweight, self.qstate= rwkv_quantize(self.quant_type, (self.weight.data).to('cuda'))
+        self.weight = None # Because Latest Pytorch-lightning forced to BF16 type. thats why delete
+
+    def forward(self, x):
+        if self.is_quant:
+            result = ori_result(x, self.qweight, self.quant_type, self.qstate)
+        else:
+            result = F.linear(x, self.weight)
+        #result = ori_result(x, self.weight, self.is_quant, self.qweight, self.quant_type, self.qstate)
+
+        if self.in_features%self.r!=0:
+            padding_size = (self.r - self.in_features % self.r) % self.r
+            x = F.pad(x, (0, padding_size))
+
+        y = result + torch.sum(x.reshape(*x.shape[:-1], x.size(-1)//self.r, self.r), dim=-2)@self.bone
+        return y
 
 
 
@@ -234,8 +267,10 @@ class BoneLinear(nn.Module):
 def make_linear_att(*args, **kwargs):
     if "att" in LORA_CONFIG["parts"] and LORA_CONFIG["r"] > 0:
         return LoraLinear(*args, **kwargs)
-    elif "att" in BONE_CONFIG["parts"] and BONE_CONFIG["r"] > 0:
+    elif "att" in BONE_CONFIG["parts"] and BONE_CONFIG["r"] > 0 and BONE_CONFIG["mode"]=="bone":
         return BoneLinear(*args, **kwargs)
+    elif "att" in BONE_CONFIG["parts"] and BONE_CONFIG["r"] > 0 and BONE_CONFIG["mode"]=="bat":
+        return BatLinear(*args, **kwargs)
     elif LORA_CONFIG["quant"]:
         return QuantLinear(*args, **kwargs)
     else:
@@ -246,8 +281,10 @@ def make_linear_att(*args, **kwargs):
 def make_linear_ffn(*args, **kwargs):
     if "ffn" in LORA_CONFIG["parts"] and LORA_CONFIG["r"] > 0:
         return LoraLinear(*args, **kwargs)
-    elif "ffn" in BONE_CONFIG["parts"] and BONE_CONFIG["r"] > 0:
+    elif "ffn" in BONE_CONFIG["parts"] and BONE_CONFIG["r"] > 0 and BONE_CONFIG["mode"]=="bone" :
         return BoneLinear(*args, **kwargs)
+    elif "ffn" in BONE_CONFIG["parts"] and BONE_CONFIG["r"] > 0 and BONE_CONFIG["mode"]=="bat" :
+        return BatLinear(*args, **kwargs)
     elif LORA_CONFIG["quant"]:
         return QuantLinear(*args, **kwargs)
     else:

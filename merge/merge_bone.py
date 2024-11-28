@@ -63,7 +63,7 @@ with torch.no_grad():
             if gbmm in keys: ### row
                 w[k] = w[k].to(device=device)
                 w[gbmm] = w[gbmm].to(device=device)
-                b,r,_ = w[gbmm].shape
+                dim = w[gbmm].dim()
                 if quant=='4bit':
                     qw,qs = bnb.functional.quantize_4bit(w[k])
                     w[k] = (bnb.functional.dequantize_4bit(qw,quant_state=qs)).to(dtype=torch.bfloat16)
@@ -76,9 +76,29 @@ with torch.no_grad():
                 elif quant=='int8':
                     qw,qs = bnb.functional.quantize(w[k])
                     w[k] = (bnb.functional.dequantize(qw,state=qs)).to(dtype=torch.bfloat16)
-                bone = rearrange(w[k], '(a r1) (b r2) -> a b r1 r2', r1 = r, r2 = r)@w[gbmm]+w[gbmm]
-                w[k] += rearrange(bone, 'a b r1 r2 ->(a r1) (b r2) ')
-
+                if dim==3:
+                    b,r,_ = w[gbmm].shape
+                    bone = rearrange(w[k], '(a r1) (b r2) -> a b r1 r2', r1 = r, r2 = r)@w[gbmm]+w[gbmm]
+                    w[k] += rearrange(bone, 'a b r1 r2 ->(a r1) (b r2) ')
+                if dim==2:
+                    r,b = w[gbmm].shape
+                    
+                    in_features = w[k].size(-1)
+                    if in_features % r != 0:
+                        last_size = in_features % r
+                        n_block = in_features // r
+                        n_block_size = n_block * r
+                        w[k][:, :n_block_size] = (
+                            (w[k][:, :n_block_size].reshape(-1, n_block, r).permute(1, 2, 0) + w[gbmm])
+                            .permute(2, 0, 1)
+                            .reshape(*w[k][:, :n_block_size].shape)
+                        )
+                        w[k][:, n_block_size:] = (
+                            w[k][:, n_block_size:] + (w[gbmm].transpose(0, 1))[:, :last_size]
+                        )
+                    else:
+                        t = w[k].reshape(-1, w[k].size(-1) // r, r).permute(1, 2, 0) + w[gbmm]
+                        w[k] = t.permute(2, 0, 1).reshape(*w[k].shape)
                 output_w[k] = w[k].to(device='cpu', copy=True)
                 del w[k]
                 del w[gbmm]
