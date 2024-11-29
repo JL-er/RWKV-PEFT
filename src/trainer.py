@@ -133,7 +133,7 @@ class train_callback(pl.Callback):
 
         if pl.__version__[0]=='2' :
             loss = outputs['loss']
-            if args.devices>1:
+            if int(args.devices)>1:
                 torch.distributed.all_reduce(loss, op=torch.distributed.ReduceOp.SUM)
 
         if trainer.is_global_zero:  # logging
@@ -150,7 +150,7 @@ class train_callback(pl.Callback):
                 pass
             trainer.my_time_ns = t_now
             if pl.__version__[0]=='2':
-                trainer.my_loss = loss*trainer.accumulate_grad_batches
+                trainer.my_loss = loss*trainer.accumulate_grad_batches/int(args.devices)
             else:
                 trainer.my_loss = trainer.my_loss_all.float().mean().item()
             trainer.my_loss_sum += trainer.my_loss

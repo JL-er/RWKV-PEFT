@@ -20,4 +20,4 @@ python train.py --load_model $load_model \
 --pre_ffn 0 --head_qk 0 --lr_init 1 --lr_final 1e-2 --warmup_steps 10 --beta1 0.9 --beta2 0.99 --adam_eps 1e-8 \
 --accelerator gpu --devices 1 --precision bf16 --strategy deepspeed_stage_1 --grad_cp 1 \
 --my_testing "x060" \
---train_type "state"  --dataload pad --fla \
+--train_type "state"  --dataload pad --fla
