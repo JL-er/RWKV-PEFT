@@ -213,8 +213,8 @@ class MyDataset(Dataset):
             label_pad = F.pad(label, padding, "constant", -100)
             mask = (label_pad != -100).int()
 
-            x = torch.tensor(dix_pad[:-1], dtype=torch.long)
-            y = torch.tensor(dix_pad[1:], dtype=torch.long)
+            x = dix_pad[:-1].to(dtype=torch.long)
+            y = dix_pad[1:].to(dtype=torch.long)
 
             return x, y, mask[1:]
         else:
