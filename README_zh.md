@@ -6,6 +6,36 @@
 
 RWKV-PEFT 是一个旨在为 RWKV5/6 模型实现高效参数微调的官方实现，支持在多种硬件上实现多种先进的微调方法。
 
+# 最近更新
+## SFT训练
+相关参数,详细使用参考scripts/run_sft.sh  
+--data_file 'meta-math/MetaMathQA' 可直接选择huggingface路径，也可选择自己的json路径  
+--data_type sft 选择数据类型  
+--sft_field query answer 根据json中问答格式进行检索  
+--sft_split "train" 设置加载数据数量"train"全部加载，"train[:1000]"只加载1000条数据  
+```
+--data_type sft --sft_field query answer --sft_split "train"
+```
+### SFT具体设置
+#### RWKV-PEFT/src/rwkv_datasets/SFTdataset.py
+```
+tokenizer_path = 'RWKV/rwkv-5-world-3b' #选择分词器（选择官方分词器）
+IGNORE_INDEX = -100 #填充（请勿修改）
+EOT_TOKEN = "<|EOT|>" #设置你需要的停止符
+
+# 根据需求修改对应的prompt
+PROMPT = (
+        "Below is an instruction that describes a task. "
+        "Write a response that appropriately completes the request.\n\n"
+        "### Instruction:\n{instruction}\n\n### Response:"
+    )
+```
+> [!TIP]
+> 中国网络下载huggingface数据会超时，所以你需要添加 HF_ENDPOINT="https://hf-mirror.com" sh scripts/run_sft.sh
+
+## [Bone: Block-Affine Adaptation of Large Language Models](https://arxiv.org/pdf/2409.15371)
+论文更新，现在Bone是一个简单高效基础PEFT方法，比LoRA更快更省显存，比PiSSA收敛更快表现更好。同时将旧版本的Bone更改为了Bat方法  
+```bone_config='{"bone_load":"","bone_r":64}'```更新为``` bone_config='{"bone_mode":"bone","bone_load":"","bone_r":64}' ``` or``` bone_config='{"bone_mode":"bat","bone_load":"","bone_r":64}' ```
 
 # Installation
 
@@ -138,15 +168,13 @@ streamlit run web/app.py
 ## 引用
 
 如果您觉得本项目对您有帮助，请引用我们的工作：
-
-```bibtex
-@misc{kang2024boneblockaffinetransformation,
-      title={Bone: Block Affine Transformation as Parameter Efficient Fine-tuning Methods for Large Language Models},
+```bib
+@misc{kang2024boneblockaffineadaptationlarge,
+      title={Bone: Block-Affine Adaptation of Large Language Models}, 
       author={Jiale Kang},
       year={2024},
       eprint={2409.15371},
       archivePrefix={arXiv},
       primaryClass={cs.CL},
-      url={https://arxiv.org/abs/2409.15371}
+      url={https://arxiv.org/abs/2409.15371}, 
 }
-```

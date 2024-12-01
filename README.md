@@ -7,6 +7,39 @@
 
 RWKV-PEFT is the official implementation for efficient parameter fine-tuning of RWKV5/6 models, supporting various advanced fine-tuning methods across multiple hardware platforms.
 
+# Recent updates
+## SFT Train
+Relevant parameters, detailed usage reference: scripts/run_sft.sh  
+- data_file 'meta-math/MetaMathQA' #You can directly choose the Hugging Face path, or you can choose your own JSON path.  
+- data_type sft #Select data type  
+- sft_field query answer #Perform retrieval based on the question-and-answer format in the JSON.  
+- sft_split "train" #Set the number of data to load: "train" loads all the data, while "train[:1000]" loads only the first 1000 samples.  
+```
+--data_type sft --sft_field query answer --sft_split "train"
+```
+## Specific settings for SFT
+### RWKV-PEFT/src/rwkv_datasets/SFTdataset.py
+```
+tokenizer_path = 'RWKV/rwkv-5-world-3b' #Choose a tokenizer (select the official tokenizer)
+IGNORE_INDEX = -100 #Padding (do not modify)
+EOT_TOKEN = "<|EOT|>" #Set the stop token(s) you need
+
+# Modify the corresponding prompt according to your requirements
+PROMPT = (
+        "Below is an instruction that describes a task. "
+        "Write a response that appropriately completes the request.\n\n"
+        "### Instruction:\n{instruction}\n\n### Response:"
+    )
+```
+> [!TIP]
+> Downloading Hugging Face data may time out in China, so you need to add: HF_ENDPOINT="https://hf-mirror.com" sh scripts/run_sft.sh
+
+## [Bone: Block-Affine Adaptation of Large Language Models](https://arxiv.org/pdf/2409.15371)
+The paper has been updated. Bone is now a simple and efficient basic PEFT method that is faster and uses less VRAM than LoRA, converges faster, and performs better than PiSSA. The previous version of Bone has been changed to the Bat method.    
+scripts:  
+```bone_config='{"bone_load":"","bone_r":64}'```update``` bone_config='{"bone_mode":"bone","bone_load":"","bone_r":64}' ``` or``` bone_config='{"bone_mode":"bat","bone_load":"","bone_r":64}' ```
+
+
 # Installation
 
 > [!IMPORTANT]
@@ -140,15 +173,13 @@ However, you can use `--fla` to enable the Triton kernel:
 ## Citation
 
 If you find this project helpful, please cite our work:
-
-```bibtex
-@misc{kang2024boneblockaffinetransformation,
-      title={Bone: Block Affine Transformation as Parameter Efficient Fine-tuning Methods for Large Language Models},
+```bib
+@misc{kang2024boneblockaffineadaptationlarge,
+      title={Bone: Block-Affine Adaptation of Large Language Models}, 
       author={Jiale Kang},
       year={2024},
       eprint={2409.15371},
       archivePrefix={arXiv},
       primaryClass={cs.CL},
-      url={https://arxiv.org/abs/2409.15371}
+      url={https://arxiv.org/abs/2409.15371}, 
 }
-```

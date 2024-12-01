@@ -1,5 +1,5 @@
 
-from rwkvfla.ops.rwkv6 import chunk_rwkv6
+from fla.ops.rwkv6 import chunk_rwkv6
 
 from einops import rearrange
 import os, math, gc, importlib
