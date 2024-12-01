@@ -32,9 +32,10 @@ PROMPT = (
     )
 ```
 > [!TIP]
-> Downloading Hugging Face data may time out in China, so you need to add: HF_ENDPOINT="https://hf-mirror.com" sh scripts/run_sft.sh
+> Downloading Hugging Face data may time out in China, so you need to add:   
+>```HF_ENDPOINT="https://hf-mirror.com" sh scripts/run_sft.sh```
 
-## [Bone: Block-Affine Adaptation of Large Language Models](https://arxiv.org/pdf/2409.15371)
+## Bone: Block-Affine Adaptation of Large Language Models [Paper](https://arxiv.org/pdf/2409.15371)
 The paper has been updated. Bone is now a simple and efficient basic PEFT method that is faster and uses less VRAM than LoRA, converges faster, and performs better than PiSSA. The previous version of Bone has been changed to the Bat method.    
 scripts:  
 ```bone_config='{"bone_load":"","bone_r":64}'```update``` bone_config='{"bone_mode":"bone","bone_load":"","bone_r":64}' ``` or``` bone_config='{"bone_mode":"bat","bone_load":"","bone_r":64}' ```

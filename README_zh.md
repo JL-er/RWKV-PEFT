@@ -31,9 +31,10 @@ PROMPT = (
     )
 ```
 > [!TIP]
-> 中国网络下载huggingface数据会超时，所以你需要添加 HF_ENDPOINT="https://hf-mirror.com" sh scripts/run_sft.sh
+> 中国网络下载huggingface数据会超时，所以你需要添加:HF_ENDPOINT="https://hf-mirror.com"  
+>```HF_ENDPOINT="https://hf-mirror.com" sh scripts/run_sft.sh```
 
-## [Bone: Block-Affine Adaptation of Large Language Models](https://arxiv.org/pdf/2409.15371)
+## Bone: Block-Affine Adaptation of Large Language Models [Paper](https://arxiv.org/pdf/2409.15371)
 论文更新，现在Bone是一个简单高效基础PEFT方法，比LoRA更快更省显存，比PiSSA收敛更快表现更好。同时将旧版本的Bone更改为了Bat方法  
 ```bone_config='{"bone_load":"","bone_r":64}'```更新为``` bone_config='{"bone_mode":"bone","bone_load":"","bone_r":64}' ``` or``` bone_config='{"bone_mode":"bat","bone_load":"","bone_r":64}' ```
 
