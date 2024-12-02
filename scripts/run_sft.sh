@@ -22,4 +22,4 @@ python train.py --load_model $load_model \
 --accelerator gpu --devices 1 --precision bf16 --strategy deepspeed_stage_1 --grad_cp 1 \
 --my_testing "x060" \
 --peft bone --bone_config $bone_config --data_shuffle 0 --train_parts [] \
---data_type sft --sft_field query answer --sft_split "train"
+--data_type sft --sft_field query response --sft_split "train"

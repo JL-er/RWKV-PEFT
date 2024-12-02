@@ -11,10 +11,10 @@ RWKV-PEFT 是一个旨在为 RWKV5/6 模型实现高效参数微调的官方实�
 相关参数,详细使用参考scripts/run_sft.sh  
 --data_file 'meta-math/MetaMathQA' 可直接选择huggingface路径，也可选择自己的json路径  
 --data_type sft 选择数据类型  
---sft_field query answer 根据json中问答格式进行检索  
+--sft_field query response 根据json中问答格式进行检索  
 --sft_split "train" 设置加载数据数量"train"全部加载，"train[:1000]"只加载1000条数据  
 ```
---data_type sft --sft_field query answer --sft_split "train"
+--data_type sft --sft_field query response --sft_split "train"
 ```
 ### SFT具体设置
 #### RWKV-PEFT/src/rwkv_datasets/SFTdataset.py

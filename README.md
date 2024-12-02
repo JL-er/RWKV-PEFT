@@ -12,10 +12,10 @@ RWKV-PEFT is the official implementation for efficient parameter fine-tuning of 
 Relevant parameters, detailed usage reference: scripts/run_sft.sh  
 - data_file 'meta-math/MetaMathQA' #You can directly choose the Hugging Face path, or you can choose your own JSON path.  
 - data_type sft #Select data type  
-- sft_field query answer #Perform retrieval based on the question-and-answer format in the JSON.  
+- sft_field query response #Perform retrieval based on the question-and-answer format in the JSON.  
 - sft_split "train" #Set the number of data to load: "train" loads all the data, while "train[:1000]" loads only the first 1000 samples.  
 ```
---data_type sft --sft_field query answer --sft_split "train"
+--data_type sft --sft_field query response --sft_split "train"
 ```
 ## Specific settings for SFT
 ### RWKV-PEFT/src/rwkv_datasets/SFTdataset.py
