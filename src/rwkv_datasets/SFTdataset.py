@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 
 tokenizer_path = 'RWKV/rwkv-5-world-3b'
 IGNORE_INDEX = -100
-EOT_TOKEN = "<|EOT|>"
+EOT_TOKEN = "\x17"
 
 PROMPT = (
         "Below is an instruction that describes a task. "
