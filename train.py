@@ -80,7 +80,8 @@ def rwkv_train():
     parser.add_argument("--my_exit_tokens", default=0, type=int)
 
     parser.add_argument("--peft", default="none", type=str)# lora pissa bone
-    parser.add_argument("--train_parts", default=["time", "ln"], type=list)##emb , head
+    #parser.add_argument("--train_parts", default=["time", "ln"], type=list)##emb , head
+    parser.add_argument("--train_parts", default=["time", "ln"], nargs='*', help="List of parts to train emb head time ln")
 
     #LORA
     parser.add_argument("--lora_config", default='{"lora_load":"", "lora_r":8, "lora_alpha":32, "lora_dropout":0.01}', type=json.loads)
