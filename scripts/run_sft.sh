@@ -22,5 +22,5 @@ python train.py --load_model $load_model \
 --lr_init 1e-4 --lr_final 1e-4 --warmup_steps 0 --beta1 0.9 --beta2 0.99 --adam_eps 1e-8 \
 --accelerator gpu --devices 1 --precision bf16 --strategy deepspeed_stage_1 --grad_cp 1 \
 --my_testing "x060" \
---peft bone --bone_config $bone_config --data_shuffle 0 \
---data_type sft --sft_field query response --sft_split "train[:1000]"
+--peft bone --bone_config $bone_config \
+--data_type sft --sft_field query response --sft_split "train"
