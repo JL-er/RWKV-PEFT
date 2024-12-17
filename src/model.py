@@ -308,14 +308,25 @@ class RWKV(pl.LightningModule):
                     else:
                         x = block(x, x_emb)
             else:
-                for block in self.blocks:
-                    if args.grad_cp == 1:
-                        if args.state_tune or args.train_type == 'state' or args.peft !='none':
-                            x = torch_checkpoint(block, x, x_emb ,use_reentrant=False)
+                if 'x070' in os.environ["RWKV_MY_TESTING"]:
+                    v_first = torch.empty_like(x)
+                    for block in self.blocks:
+                        if args.grad_cp == 1:
+                            if args.state_tune or args.train_type == 'state' or args.peft !='none':
+                                x, v_first = torch_checkpoint(block, x, v_first ,use_reentrant=False)
+                            else:
+                                x, v_first = deepspeed.checkpointing.checkpoint(block, x, v_first)
                         else:
-                            x = deepspeed.checkpointing.checkpoint(block, x)
-                    else:
-                        x = block(x)
+                            x, v_first = block(x, v_first)
+                else:
+                    for block in self.blocks:
+                        if args.grad_cp == 1:
+                            if args.state_tune or args.train_type == 'state' or args.peft !='none':
+                                x = torch_checkpoint(block, x, x_emb ,use_reentrant=False)
+                            else:
+                                x = deepspeed.checkpointing.checkpoint(block, x)
+                        else:
+                            x = block(x)
 
             x = self.ln_out(x)
 

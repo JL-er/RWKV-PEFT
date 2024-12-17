@@ -7,6 +7,8 @@
 RWKV-PEFT 是一个旨在为 RWKV5/6 模型实现高效参数微调的官方实现，支持在多种硬件上实现多种先进的微调方法。
 
 # 最近更新
+## 支持 v7
+``` --my_testing "x070" ```
 ## SFT训练
 相关参数,详细使用参考scripts/run_sft.sh  
 --data_file 'meta-math/MetaMathQA' 可直接选择huggingface路径，也可选择自己的json路径  

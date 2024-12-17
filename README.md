@@ -8,6 +8,8 @@
 RWKV-PEFT is the official implementation for efficient parameter fine-tuning of RWKV5/6 models, supporting various advanced fine-tuning methods across multiple hardware platforms.
 
 # Recent updates
+## Support v7
+``` --my_testing "x070" ```
 ## SFT
 Relevant parameters, detailed usage reference: scripts/run_sft.sh  
 - data_file 'meta-math/MetaMathQA' #You can directly choose the Hugging Face path, or you can choose your own JSON path.  
