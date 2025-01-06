@@ -1,6 +1,4 @@
 
-from fla.ops.rwkv6 import chunk_rwkv6
-
 from einops import rearrange
 import os, math, gc, importlib
 import torch
@@ -23,6 +21,7 @@ def RUN_CUDA_RWKV5():
 
 
 if os.environ["WKV"] == 'fla':
+    from fla.ops.rwkv6 import chunk_rwkv6
     if 'x060' in os.environ["RWKV_MY_TESTING"]:
         if os.environ["RWKV_TRAIN_TYPE"] == 'infctx' and 'x060' in os.environ["RWKV_MY_TESTING"]:
             def RUN_CUDA_RWKV6_STATE(B, T, C, H, r, k, v, w, u, s):
