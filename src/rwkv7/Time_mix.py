@@ -69,9 +69,10 @@ class RWKV_Tmix_x070(nn.Module):
 
             D_MV_LORA = 32
             # D_MV_LORA = max(32, int(round(  (1.3*(C**0.5))  /32)*32)) # suggestion
-            self.v1 = nn.Parameter(torch.zeros(C, D_MV_LORA))
-            self.v2 = nn.Parameter(ortho_init(torch.zeros(D_MV_LORA, C), 0.1))
-            self.v0 = nn.Parameter(torch.zeros(1,1,C)+1.0)
+            if self.layer_id!=0:
+                self.v1 = nn.Parameter(torch.zeros(C, D_MV_LORA))
+                self.v2 = nn.Parameter(ortho_init(torch.zeros(D_MV_LORA, C), 0.1))
+                self.v0 = nn.Parameter(torch.zeros(1,1,C)+1.0)
 
             D_GATE_LORA = 128
             # D_GATE_LORA = max(32, int(round(  (0.6*(C**0.8))  /32)*32)) # suggestion
