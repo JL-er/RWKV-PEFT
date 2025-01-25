@@ -337,9 +337,3 @@ def rwkv_train():
 
 
 rwkv_train()
-# if __name__ == "__main__":
-#     try:
-#         rwkv_train()
-#     except Exception as e:
-#         set_error_message(str(e))
-#         sys.exit(1)
