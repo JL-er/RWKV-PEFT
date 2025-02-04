@@ -306,8 +306,8 @@ def rwkv_train():
 
     ########################################################################################################
 
-    from src.trainer import train_callback
-    from src.peft_loading import load_peft_model
+    from rwkvft.lightning_train.trainer import train_callback
+    from rwkvft.peft.peft_loading import load_peft_model
 
     args, model = load_peft_model(args)
 
