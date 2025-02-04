@@ -10,3 +10,4 @@ plotly
 lightning
 gradio
 datasets
+streamlit
