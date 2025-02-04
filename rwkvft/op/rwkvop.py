@@ -47,6 +47,7 @@ if os.environ["WKV"] == 'fla':
                 return o
     if 'x060' in os.environ["RWKV_MY_TESTING"]:
         from fla.ops.rwkv6 import chunk_rwkv6
+
         if os.environ["RWKV_TRAIN_TYPE"] == 'infctx':
             def RUN_CUDA_RWKV6_STATE(B, T, C, H, r, k, v, w, u, s):
                 r = rearrange(r, 'b l (h d) -> b h l d', h = H)

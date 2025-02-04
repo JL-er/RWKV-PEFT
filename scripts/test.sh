@@ -8,6 +8,7 @@ n_embd=768
 micro_bsz=1
 epoch_save=1
 epoch_steps=10
+
 ctx_len=1024
 
 bone_config='{"bone_mode":"bone","bone_load":"","bone_r":64}'

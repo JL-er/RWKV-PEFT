@@ -128,7 +128,9 @@ def rwkv_train():
     parser.add_argument("--sft_field", default=None, type=str, nargs='+', help='List of fields for SFT')
     parser.add_argument("--sft_split", default="train", type=str)
 
+
     parser.add_argument("--op", default="cuda", type=str)
+
 
     if pl.__version__[0]=='2':
         parser.add_argument("--accelerator", default="gpu", type=str)
@@ -185,6 +187,7 @@ def rwkv_train():
         os.environ["RWKV_TRAIN_TYPE"]='infctx'
 
     os.environ["WKV"]= args.op
+
     if args.dim_att <= 0:
         args.dim_att = args.n_embd
     if args.dim_ffn <= 0:
