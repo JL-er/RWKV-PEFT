@@ -128,6 +128,8 @@ def rwkv_train():
     parser.add_argument("--sft_field", default=None, type=str, nargs='+', help='List of fields for SFT')
     parser.add_argument("--sft_split", default="train", type=str)
 
+    parser.add_argument("--op", default="cuda", type=str)
+
     if pl.__version__[0]=='2':
         parser.add_argument("--accelerator", default="gpu", type=str)
         parser.add_argument("--strategy", default="auto", type=str)
@@ -182,7 +184,7 @@ def rwkv_train():
     elif args.train_type=='infctx':
         os.environ["RWKV_TRAIN_TYPE"]='infctx'
 
-    os.environ["WKV"]='fla' if args.fla else ''
+    os.environ["WKV"]= args.op
     if args.dim_att <= 0:
         args.dim_att = args.n_embd
     if args.dim_ffn <= 0:
@@ -306,8 +308,8 @@ def rwkv_train():
 
     ########################################################################################################
 
-    from src.trainer import train_callback
-    from src.peft_loading import load_peft_model
+    from rwkvft.lightning_train.trainer import train_callback
+    from rwkvft.peft.peft_loading import load_peft_model
 
     args, model = load_peft_model(args)
 
