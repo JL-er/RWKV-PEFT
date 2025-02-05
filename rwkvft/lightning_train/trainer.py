@@ -206,7 +206,7 @@ class train_callback(pl.Callback):
                     # to_save_dict = pl_module.state_dict()
                     to_save_dict = {k.replace("model.", ""): v for k, v in pl_module.state_dict().items()}
 
-                if args.state_tune or args.train_type=='state':
+                if args.train_type=='state':
                     peft_dict = {}
                     for name, state in to_save_dict.items():
                         if 'state' in name:

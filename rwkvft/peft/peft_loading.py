@@ -27,10 +27,8 @@ def load_peft_model(args: TrainingArgs):
 
     model = RWKV(args)
     print(model)
-    if args.train_type == 'state':
-        args.state_tune = True
 
-    if args.train_type == 'state' or args.state_tune:
+    if os.environ["RWKV_TRAIN_TYPE"] == 'state':
         model.requires_grad_(False)
         freeze = True
         for name, module in model.named_modules():

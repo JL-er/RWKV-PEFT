@@ -27,7 +27,7 @@ def RUN_CUDA_RWKV5():
 if os.environ["WKV"] == 'fla':
     if 'x070' in os.environ["RWKV_MY_TESTING"]:
         from fla.ops.rwkv7 import chunk_rwkv7
-        if os.environ["RWKV_TRAIN_TYPE"] == 'infctx' or os.environ["RWKV_TRAIN_TYPE"] == 'states':
+        if os.environ["RWKV_TRAIN_TYPE"] == 'infctx' or os.environ["RWKV_TRAIN_TYPE"] == 'state':
             def RUN_RWKV7_STATE(r, k, v, w, a, b, s, HEAD_SIZE=64): # for State-tuning, infctx
                 B,T,HC = w.shape
                 C = HEAD_SIZE
@@ -58,7 +58,7 @@ if os.environ["WKV"] == 'fla':
                 o, state = chunk_rwkv6(r, k, v, w, u=u, scale=1., initial_state=s, output_final_state=True)
                 x = rearrange(o, 'b h l d -> b l (h d)')
                 return x, state
-        elif os.environ["RWKV_TRAIN_TYPE"] == 'states':
+        elif os.environ["RWKV_TRAIN_TYPE"] == 'state':
             def RUN_CUDA_RWKV6_STATE(B, T, C, H, r, k, v, w, u, s):
                 r = rearrange(r, 'b l (h d) -> b h l d', h = H)
                 k = rearrange(k, 'b l (h d) -> b h l d', h = H)

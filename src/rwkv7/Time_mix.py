@@ -74,8 +74,8 @@ class RWKV_Tmix_x070(nn.Module):
                 self.v2 = nn.Parameter(ortho_init(torch.zeros(D_MV_LORA, C), 0.1))
                 self.v0 = nn.Parameter(torch.zeros(1,1,C)+1.0)
 
-            D_GATE_LORA = 128
-            # D_GATE_LORA = max(32, int(round(  (0.6*(C**0.8))  /32)*32)) # suggestion
+            # D_GATE_LORA = 128
+            D_GATE_LORA = max(32, int(round(  (0.6*(C**0.8))  /32)*32)) # suggestion
             # Note: for some data, you can reduce D_GATE_LORA or even remove this gate
             self.g1 = nn.Parameter(torch.zeros(C, D_GATE_LORA))
             self.g2 = nn.Parameter(ortho_init(torch.zeros(D_GATE_LORA, C), 0.1))

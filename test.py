@@ -103,10 +103,6 @@ def rwkv_train():
     #dataset
     parser.add_argument("--dataload", default="get", type=str)
 
-    #state tuning
-    parser.add_argument("--state_tune", action="store_true")
-
-
     parser.add_argument("--chunk_ctx", default=512, type=int)
     #fla
     parser.add_argument("--fla", action="store_true")
@@ -182,7 +178,7 @@ def rwkv_train():
     ######state tuning
     os.environ["RWKV_TRAIN_TYPE"]=''
     if args.train_type=='state':
-        os.environ["RWKV_TRAIN_TYPE"]='states'
+        os.environ["RWKV_TRAIN_TYPE"]='state'
     elif args.train_type=='infctx':
         os.environ["RWKV_TRAIN_TYPE"]='infctx'
 

@@ -35,7 +35,7 @@ class RWKV7(nn.Module):
 
         for block in self.blocks:
             if args.grad_cp == 1:
-                if args.state_tune or args.train_type == 'state' or args.peft !='none':
+                if args.train_type == 'state' or args.peft !='none':
                     x, v_first = torch_checkpoint(block, x, v_first ,use_reentrant=False)
                 else:
                     x, v_first = deepspeed.checkpointing.checkpoint(block, x, v_first)
