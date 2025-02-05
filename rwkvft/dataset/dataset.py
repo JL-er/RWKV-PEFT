@@ -16,9 +16,9 @@ from torch.utils.data import DataLoader
 from lightning_utilities.core.rank_zero import rank_zero_info
 from .binidx import MMapIndexedDataset
 from .utils import MaybeIsPrime
-from .args_type import TrainingArgs
+from rwkvft.args_type import TrainingArgs
 from rwkv.utils import PIPELINE
-from .rwkv_datasets.SFTdataset import sft_dataset
+from rwkvft.dataset.SFTdataset import sft_dataset
 import time
 pipeline = PIPELINE('rwkv6', "rwkv_vocab_v20230424")
 

@@ -11,6 +11,8 @@ def RUN_CUDA_RWKV7g():
 def RUN_RWKV7_STATE():
     raise NotImplementedError('RUN_CUDA_RUN_KV not implemented')
 
+def RUN_RWKV7_INFCTX():
+    raise NotImplementedError('RUN_CUDA_RUN_KV not implemented')
 
 def RUN_CUDA_RWKV6():
     raise NotImplementedError('RUN_CUDA_RUN_KV not implemented')
@@ -23,17 +25,25 @@ def RUN_CUDA_RWKV6_STATE():
 def RUN_CUDA_RWKV5():
     raise NotImplementedError('RUN_CUDA_RUN_KV not implemented')
 
-
 if os.environ["WKV"] == 'fla':
     if 'x070' in os.environ["RWKV_MY_TESTING"]:
         from fla.ops.rwkv7 import chunk_rwkv7
-        if os.environ["RWKV_TRAIN_TYPE"] == 'infctx' or os.environ["RWKV_TRAIN_TYPE"] == 'state':
+        if os.environ["RWKV_TRAIN_TYPE"] == 'infctx':
+            def RUN_RWKV7_INFCTX(r, k, v, w, a, b, s, HEAD_SIZE=64): # for State-tuning, infctx
+                B,T,HC = w.shape
+                C = HEAD_SIZE
+                H = HC//C
+                w=-torch.exp(w)
+                r,w,k,v,a,b = [i.view(B,T,H,C) for i in [r,w,k,v,a,b]]
+                o, state = chunk_rwkv7(r, w, k, v, a, b, scale=1.0, initial_state=s, output_final_state=True, head_first=False)
+                return o, state
+        if os.environ["RWKV_TRAIN_TYPE"] == 'state':
             def RUN_RWKV7_STATE(r, k, v, w, a, b, s, HEAD_SIZE=64): # for State-tuning, infctx
                 B,T,HC = w.shape
                 C = HEAD_SIZE
                 H = HC//C
                 w=-torch.exp(w)
-                s = s.transpose(1, 2).expand(B,*s.shape)
+                s = s.expand(B,*s.shape)
                 r,w,k,v,a,b = [i.view(B,T,H,C) for i in [r,w,k,v,a,b]]
                 o, state = chunk_rwkv7(r, w, k, v, a, b, scale=1.0, initial_state=s, output_final_state=True, head_first=False)
                 return o, state

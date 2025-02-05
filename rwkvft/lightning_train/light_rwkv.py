@@ -17,7 +17,7 @@ from lightning.pytorch.strategies import DeepSpeedStrategy
 if importlib.util.find_spec('deepspeed'):
     import deepspeed
     from deepspeed.ops.adam import DeepSpeedCPUAdam, FusedAdam
-
+from rwkvft.infctx_module import BlockStateList
 from rwkvft.rwkv7.model import RWKV7
 try:
     print('RWKV_MY_TESTING', os.environ["RWKV_MY_TESTING"])
@@ -155,44 +155,98 @@ class RWKV(pl.LightningModule):
             return cfg.get("offload_optimizer") or cfg.get("offload_param")
         return False
 
+    if os.environ.get("RWKV_TRAIN_TYPE") == 'infctx':
+        def forward(self, idx,  last_shift_states: torch.Tensor,
+                last_wkv_states: torch.Tensor):
+            return self.model(idx, last_shift_states, last_wkv_states)
+    else:
+        def forward(self, idx):
+            return self.model(idx)
 
-    def forward(self, idx):
-
-        y = self.model(idx)
-        return y
-
-    def training_step(self, batch, batch_idx):
-        args = self.args
-        if args.loss_mask!='none' or args.data_type=='sft':
-            idx, targets, mask = batch
-            mask = mask.view(-1)
-            sum_mask = torch.sum(mask).item()
-            logits = self(idx)
-            loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), reduction='none')
-            loss = torch.sum(loss * mask) / sum_mask
-        elif args.my_qa_mask != 1:
+    if os.environ.get("RWKV_TRAIN_TYPE") == 'infctx':
+        def training_step(self, batch, batch_idx):
+            args = self.args
+            T_train = args.chunk_ctx 
             idx, targets = batch
+            B, T = idx.shape
+            C = args.n_embd
+            H =  args.dim_att // args.head_size_a
+            assert C==H*args.head_size_a
+            states = BlockStateList.create(args.n_layer, B, C, H, idx.device,
+                self.model.emb.weight.dtype)
 
-            logits = self(idx)
-            loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1))
+            def checkpointed_step(idx, targets, prev_loss, last_shift_states,
+                                last_wkv_states, prev_token_amount):
+                logits, new_shift_states, new_wkv_states = self(idx, last_shift_states, last_wkv_states)
+                current_token_amount = (targets!=-100).sum() #这样是不是更合适？
+                current_token_amount = idx.shape[1]
+                if current_token_amount == 0:
+                    loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.reshape(-1),reduction='sum')
+                else:
+                    loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.reshape(-1))
+                    loss = L2Wrap.apply(loss, logits, current_token_amount)
+                new_token_amount = prev_token_amount+current_token_amount
+                if new_token_amount>0:
+                    new_loss = prev_loss * (prev_token_amount / new_token_amount) + loss * (
+                        current_token_amount / new_token_amount)
+                else:
+                    new_loss = prev_loss
 
-        else:
-            idx, targets, mask = batch
-            mask = mask.view(-1)
-            sum_mask = torch.sum(mask).item()
-            # if sum_mask == 0:
-            #     return torch.tensor([0.0], requires_grad=True)
+                return new_loss, new_shift_states, new_wkv_states, new_token_amount
+            
+            total_loss = torch.tensor(0.,dtype=self.model.emb.weight.dtype).requires_grad_()
+            token_amount = 0
+            i = 0
+            for i in range(math.ceil(T / T_train)):
 
-            logits = self(idx)
-            if sum_mask == mask.shape[0]:
-                loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1))
-                # print('rank', self.global_rank, 'loss', loss.item())
-            else:
+                total_loss,new_shift_states, new_wkv_states,token_amount = torch_checkpoint(
+                    checkpointed_step,
+                    idx[:, i * T_train:(i + 1) * T_train],
+                    targets[:, i * T_train:(i + 1) * T_train],
+                    total_loss,
+                    states.shift_states,
+                    states.wkv_states,
+                    token_amount,
+                    use_reentrant=False
+                )
+
+                states = BlockStateList(new_shift_states.clone().detach(), new_wkv_states.clone().detach())
+            
+            return total_loss
+    else:
+        def training_step(self, batch, batch_idx):
+            args = self.args
+            if args.loss_mask!='none' or args.data_type=='sft':
+                idx, targets, mask = batch
+                mask = mask.view(-1)
+                sum_mask = torch.sum(mask).item()
+                logits = self(idx)
                 loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), reduction='none')
-                # loss_raw = loss
                 loss = torch.sum(loss * mask) / sum_mask
+            elif args.my_qa_mask != 1:
+                idx, targets = batch
 
-        return L2Wrap.apply(loss, logits)
+                logits = self(idx)
+                loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1))
+
+            else:
+                idx, targets, mask = batch
+                mask = mask.view(-1)
+                sum_mask = torch.sum(mask).item()
+                # if sum_mask == 0:
+                #     return torch.tensor([0.0], requires_grad=True)
+
+                logits = self(idx)
+                if sum_mask == mask.shape[0]:
+                    loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1))
+                    # print('rank', self.global_rank, 'loss', loss.item())
+                else:
+                    loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), reduction='none')
+                    # loss_raw = loss
+                    loss = torch.sum(loss * mask) / sum_mask
+
+            return L2Wrap.apply(loss, logits)
+    
 
     def training_step_end(self, batch_parts):
         if pl.__version__[0]!='2':

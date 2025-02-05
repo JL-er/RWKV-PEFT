@@ -44,17 +44,13 @@ def load_peft_model(args: TrainingArgs):
                 if any(n.startswith("emb.") for n, _ in module.named_parameters()):
                     for pname, param in module.named_parameters():
                         if 'emb.weight' == pname:
-                            print(
-                                f'  EMB additionally training module {pname}')
                             param.requires_grad = True
                 if any(n.startswith("head.") for n, _ in module.named_parameters()):
                     for pname, param in module.named_parameters():
                         if 'head.weight' == pname:
-                            print(
-                                f'  head additionally training module {pname}')
+                            
                             param.requires_grad = True
                 if 'ln' in name:
-                    print(f'  LoRA additionally training module {name}')
                     for param in module.parameters():
                         param.requires_grad = True
                 break
@@ -63,22 +59,21 @@ def load_peft_model(args: TrainingArgs):
             for pname, param in module.named_parameters():
                 for part in args.train_parts:
                     if part in pname:
-                        print(f'  Parts additionally training module {name}')
+                        
                         param.requires_grad = True
             break
 
         if args.peft == 'lora' or args.peft == 'pissa':
+            print(f'  {args.peft} additionally training module {name}')
             for name, module in model.named_modules():
                 if any(n.startswith("lora_") for n, _ in module.named_parameters()):
-                    print(f'  LoRA additionally training module {name}')
                     for pname, param in module.named_parameters():
                         param.requires_grad = 'lora_' in pname
         if args.peft == 'bone':
+            print(f'  Bone additionally training parameter {pname}')
             for name, module in model.named_modules():
                 for pname, param in module.named_parameters():
                     if 'bone' in pname:
-                        print(
-                            f'  Bone additionally training parameter {pname}')
                         param.requires_grad = True
                 break
 
