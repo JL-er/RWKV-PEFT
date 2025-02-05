@@ -33,6 +33,7 @@ if os.environ["WKV"] == 'fla':
                 C = HEAD_SIZE
                 H = HC//C
                 w=-torch.exp(w)
+                s = s.transpose(1, 2).expand(B,*s.shape)
                 r,w,k,v,a,b = [i.view(B,T,H,C) for i in [r,w,k,v,a,b]]
                 o, state = chunk_rwkv7(r, w, k, v, a, b, scale=1.0, initial_state=s, output_final_state=True, head_first=False)
                 return o, state
