@@ -43,7 +43,7 @@ if os.environ["WKV"] == 'fla':
                 C = HEAD_SIZE
                 H = HC//C
                 w=-torch.exp(w)
-                s = s.expand(B,*s.shape)
+                s = s.transpose(1, 2).expand(B,*s.shape)
                 r,w,k,v,a,b = [i.view(B,T,H,C) for i in [r,w,k,v,a,b]]
                 o, state = chunk_rwkv7(r, w, k, v, a, b, scale=1.0, initial_state=s, output_final_state=True, head_first=False)
                 return o, state
@@ -286,8 +286,13 @@ elif os.environ["WKV"] == 'triton':
         r,w,k,v,a,b = [i.view(B,T,H,C) for i in [r,w,k,v,a,b]]
         s0 = th.zeros(B,H,C,C, dtype=th.bfloat16,device=w.device)
         return TritonRWKV7.apply(w,r,k,v,a,b,s0,dot_prec)[0].view(B,T,HC)
-    def RUN_RWKV7_STATE(r, k, v, w, a, b, s):
-        assert "Triton Wind kernel currently not supported state. please set --fla 1 :)"
+    def RUN_RWKV7_STATE(r, k, v, w, a, b, s, HEAD_SIZE=64, dot_prec = 'fp32'):
+                B,T,HC = w.shape
+                C = HEAD_SIZE
+                H = HC//C
+                r,w,k,v,a,b = [i.view(B,T,H,C) for i in [r,w,k,v,a,b]]
+                s0 = s
+                return TritonRWKV7.apply(w,r,k,v,a,b,s0,dot_prec)[0].view(B,T,HC), None
 else:
     from torch.utils.cpp_extension import load
 
