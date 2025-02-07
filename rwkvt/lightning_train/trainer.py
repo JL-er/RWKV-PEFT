@@ -3,7 +3,7 @@ import torch
 from torch.utils.data import DataLoader
 from lightning_utilities.core.rank_zero import rank_zero_info, rank_zero_only
 import lightning as pl
-from rwkvft.peft.rwkvLinear import LORA_CONFIG, BONE_CONFIG
+from rwkvt.peft.rwkvLinear import LORA_CONFIG, BONE_CONFIG
 import re
 import numpy as np
 import streamlit as st

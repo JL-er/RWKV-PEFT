@@ -2,14 +2,12 @@
 # The RWKV Language Model - https://github.com/BlinkDL/RWKV-LM
 ########################################################################################################
 from torch.utils.checkpoint import checkpoint as torch_checkpoint
-from torch.profiler import profile, record_function, ProfilerActivity
-
-import os, math, gc, importlib
+import os
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
 import deepspeed
-from rwkvft.infctx_module import BlockStateList
+from rwkvt.infctx_module import BlockStateList
 from .block import Block
 
 class RWKV7(nn.Module):
@@ -66,7 +64,6 @@ class RWKV7(nn.Module):
         assert C==H*args.head_size_a
         
         x = self.emb(idx)
-        x_emb = x
         new_states = BlockStateList.empty(args.n_layer, B, args.n_embd, H,
                                         x.device, x.dtype)
 
@@ -75,11 +72,10 @@ class RWKV7(nn.Module):
         for i, (block, block_state) in enumerate(zip(self.blocks,
             BlockStateList(last_shift_states, last_wkv_states))):
             if args.grad_cp == 1 and i > 0:# and i < len(self.blocks)-1 :
-                x, v_first, new_block_state = torch_checkpoint(block, x, v_first, block_state, x_emb, use_reentrant=False)
+                x, v_first, new_block_state = torch_checkpoint(block, x, v_first, block_state, use_reentrant=False)
 
             else:
-                #x, new_block_state = torch_checkpoint(block, x, block_state,x_emb, use_reentrant=False)
-                x, v_first, new_block_state = deepspeed.checkpointing.checkpoint(block, x,v_first,block_state, x_emb)
+                x, v_first, new_block_state = block(x,v_first,block_state)
     
             new_states[i] = new_block_state 
 

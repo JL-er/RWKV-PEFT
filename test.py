@@ -5,7 +5,7 @@ import os
 import sys
 from web.utils import set_error_message
 import logging
-logging.basicConfig(level=logging.INFO)
+# logging.basicConfig(level=logging.INFO)
 from typing import Optional, Dict, Sequence, List, Literal
 
 if __name__ == "__main__":
@@ -308,8 +308,8 @@ if __name__ == "__main__":
 
     ########################################################################################################
 
-    from rwkvft.lightning_train.trainer import train_callback
-    from rwkvft.peft.peft_loading import load_peft_model
+    from rwkvt.lightning_train.trainer import train_callback
+    from rwkvt.peft.peft_loading import load_peft_model
 
     args, model = load_peft_model(args)
 

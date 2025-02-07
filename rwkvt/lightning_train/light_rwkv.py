@@ -17,13 +17,22 @@ from lightning.pytorch.strategies import DeepSpeedStrategy
 if importlib.util.find_spec('deepspeed'):
     import deepspeed
     from deepspeed.ops.adam import DeepSpeedCPUAdam, FusedAdam
-from rwkvft.infctx_module import BlockStateList
-from rwkvft.rwkv7.model import RWKV7
+from rwkvt.infctx_module import BlockStateList
+
+
 try:
     print('RWKV_MY_TESTING', os.environ["RWKV_MY_TESTING"])
 except:
     os.environ["RWKV_MY_TESTING"] = ''
 
+if "7" in os.environ["RWKV_MY_TESTING"]:
+    from rwkvt.rwkv7.model import RWKV7 as RWKVModel
+elif "6" in os.environ["RWKV_MY_TESTING"]:
+    from rwkvt.rwkv6.model import RWKV6 as RWKVModel
+elif "5" in os.environ["RWKV_MY_TESTING"]:
+    from rwkvt.rwkv5.model import RWKV5 as RWKVModel
+else:
+    raise ValueError(f"Unsupported model version: . Valid options: 5,6,7")
 
 if os.environ["RWKV_TRAIN_TYPE"] == 'infctx':
     class L2Wrap(torch.autograd.Function):
@@ -70,7 +79,7 @@ class RWKV(pl.LightningModule):
     def __init__(self, args):
         super().__init__()
         self.args = args
-        self.model = RWKV7(args)
+        self.model = RWKVModel(args)
 
     def configure_optimizers(self):
         args = self.args
@@ -110,10 +119,7 @@ class RWKV(pl.LightningModule):
         lr_1x = sorted(list(lr_1x))
         lr_2x = sorted(list(lr_2x))
         lr_3x = sorted(list(lr_3x))
-        # print('decay', lr_decay)
-        # print('1x', lr_1x)
-        # print('2x', lr_2x)
-        # print('3x', lr_3x)
+
         param_dict = {n: p for n, p in self.model.named_parameters()}
         
         if args.layerwise_lr > 0:
