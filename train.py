@@ -5,18 +5,18 @@ import os
 import sys
 from web.utils import set_error_message
 import logging
-logging.basicConfig(level=logging.INFO)
+# logging.basicConfig(level=logging.INFO)
 from typing import Optional, Dict, Sequence, List, Literal
 
-def rwkv_train():
+if __name__ == "__main__":
     from argparse import ArgumentParser
     from lightning import Trainer
     from lightning.pytorch import seed_everything
     from lightning_utilities.core.rank_zero import rank_zero_info
     import lightning as pl
     import json
-    from src.args_type import TrainingArgs
-    from src.dataset import get_data_by_l_version, get_vocab_size
+    from rwkvt.args_type import TrainingArgs
+    from rwkvt.dataset.dataset import get_data_by_l_version, get_vocab_size
     rank_zero_info("########## work in progress ##########")
 
     parser = ArgumentParser()
@@ -103,10 +103,6 @@ def rwkv_train():
     #dataset
     parser.add_argument("--dataload", default="get", type=str)
 
-    #state tuning
-    parser.add_argument("--state_tune", action="store_true")
-
-
     parser.add_argument("--chunk_ctx", default=512, type=int)
     #fla
     parser.add_argument("--fla", action="store_true")
@@ -127,6 +123,10 @@ def rwkv_train():
 
     parser.add_argument("--sft_field", default=None, type=str, nargs='+', help='List of fields for SFT')
     parser.add_argument("--sft_split", default="train", type=str)
+
+
+    parser.add_argument("--op", default="cuda", type=str)
+
 
     if pl.__version__[0]=='2':
         parser.add_argument("--accelerator", default="gpu", type=str)
@@ -178,11 +178,13 @@ def rwkv_train():
     ######state tuning
     os.environ["RWKV_TRAIN_TYPE"]=''
     if args.train_type=='state':
-        os.environ["RWKV_TRAIN_TYPE"]='states'
+        os.environ["RWKV_TRAIN_TYPE"]='state'
     elif args.train_type=='infctx':
         os.environ["RWKV_TRAIN_TYPE"]='infctx'
 
-    os.environ["WKV"]='fla' if args.fla else ''
+
+    os.environ["WKV"]= args.op
+
     if args.dim_att <= 0:
         args.dim_att = args.n_embd
     if args.dim_ffn <= 0:
@@ -246,30 +248,30 @@ def rwkv_train():
     except:
         deepspeed_version = None
         pass
-    rank_zero_info(
-        f"""
-############################################################################
-#
-# RWKV-5 {args.precision.upper()} on {args.num_nodes}x{args.devices} {args.accelerator.upper()}, bsz {args.num_nodes}x{args.devices}x{args.micro_bsz}={args.real_bsz}, {args.strategy} {'with grad_cp' if args.grad_cp > 0 else ''}
-#
-# Data = {args.data_file} ({args.data_type}), ProjDir = {args.proj_dir}
-#
-# Epoch = {args.epoch_begin} to {args.epoch_begin + args.epoch_count - 1} (will continue afterwards), save every {args.epoch_save} epoch
-#
-# Each "epoch" = {args.epoch_steps} steps, {samples_per_epoch} samples, {tokens_per_epoch} tokens
-#
-# Model = {args.n_layer} n_layer, {args.n_embd} n_embd, {args.ctx_len} ctx_len
-#
-# Adam = lr {args.lr_init} to {args.lr_final}, warmup {args.warmup_steps} steps, beta {args.betas}, eps {args.adam_eps}
-#
-# Found torch {torch.__version__}, recommend 2.4.0 or newer if you use fla
-# Found deepspeed {deepspeed_version}, recommend 0.7.0 (faster than newer versions)
-# Found pytorch_lightning {pl.__version__}, recommend 2.4.0 or newer
-#
-############################################################################
-"""
-    )
-    rank_zero_info(str(vars(args)) + "\n")
+#     rank_zero_info(
+#         f"""
+# ############################################################################
+# #
+# # RWKV-5 {args.precision.upper()} on {args.num_nodes}x{args.devices} {args.accelerator.upper()}, bsz {args.num_nodes}x{args.devices}x{args.micro_bsz}={args.real_bsz}, {args.strategy} {'with grad_cp' if args.grad_cp > 0 else ''}
+# #
+# # Data = {args.data_file} ({args.data_type}), ProjDir = {args.proj_dir}
+# #
+# # Epoch = {args.epoch_begin} to {args.epoch_begin + args.epoch_count - 1} (will continue afterwards), save every {args.epoch_save} epoch
+# #
+# # Each "epoch" = {args.epoch_steps} steps, {samples_per_epoch} samples, {tokens_per_epoch} tokens
+# #
+# # Model = {args.n_layer} n_layer, {args.n_embd} n_embd, {args.ctx_len} ctx_len
+# #
+# # Adam = lr {args.lr_init} to {args.lr_final}, warmup {args.warmup_steps} steps, beta {args.betas}, eps {args.adam_eps}
+# #
+# # Found torch {torch.__version__}, recommend 2.4.0 or newer if you use fla
+# # Found deepspeed {deepspeed_version}, recommend 0.7.0 (faster than newer versions)
+# # Found pytorch_lightning {pl.__version__}, recommend 2.4.0 or newer
+# #
+# ############################################################################
+# """
+#     )
+    # rank_zero_info(str(vars(args)) + "\n")
 
     assert args.data_type in ["utf-8", "utf-16le", "numpy", "binidx", "dummy", "uint16", "sft"]
 
@@ -306,8 +308,8 @@ def rwkv_train():
 
     ########################################################################################################
 
-    from src.trainer import train_callback
-    from src.peft_loading import load_peft_model
+    from rwkvt.lightning_train.trainer import train_callback
+    from rwkvt.peft.peft_loading import load_peft_model
 
     args, model = load_peft_model(args)
 
@@ -322,18 +324,8 @@ def rwkv_train():
             callbacks=[train_callback(args)],
         )
 
-    if trainer.global_rank == 0:
-        for n in model.state_dict():
-            shape = model.state_dict()[n].shape
-            shape = [i for i in shape if i != 1]
-            if len(shape) > 1:
-                print(f"{str(shape[0]).ljust(5)} {str(shape[1]).ljust(5)} {n}")
-            else:
-                print(f"{str(shape[0]).ljust(5)}       {n}")
  
     train_data = get_data_by_l_version(trainer=trainer, args=args)
 
     trainer.fit(model, train_data)
 
-
-rwkv_train()

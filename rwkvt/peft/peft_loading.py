@@ -1,9 +1,9 @@
 import os
 import torch
 from rwkvt.lightning_train.light_rwkv import RWKV
-from src.args_type import TrainingArgs
+from rwkvt.args_type import TrainingArgs
 from lightning_utilities.core.rank_zero import rank_zero_info
-from src.trainer import generate_init_weight
+from rwkvt.lightning_train.trainer import generate_init_weight
 from rwkvt.peft.rwkvLinear import LORA_CONFIG
 
 def load_peft_model(args: TrainingArgs):
@@ -21,7 +21,7 @@ def load_peft_model(args: TrainingArgs):
     if args.quant != 'none':
         LORA_CONFIG["quant"] = True
     if args.peft == 'bone':
-        from src.rwkvLinear import BONE_CONFIG
+        from rwkvt.peft.rwkvLinear import BONE_CONFIG
         BONE_CONFIG["mode"] = args.bone_config['bone_mode']
         BONE_CONFIG["r"] = args.bone_config['bone_r']
 

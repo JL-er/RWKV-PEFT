@@ -1,8 +1,8 @@
 import os
 import torch
 import torch.nn as nn
-from src.infctx_module import *
-from src.rwkvLinear import make_linear_ffn
+from rwkvt.infctx_module import *
+from rwkvt.peft.rwkvLinear import make_linear_ffn
 
 def RWKV_Cmix_v7(*args, **kwargs):
     
