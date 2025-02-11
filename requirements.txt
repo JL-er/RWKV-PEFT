@@ -8,5 +8,4 @@ transformers
 GPUtil
 plotly
 lightning
-gradio
 datasets

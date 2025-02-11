@@ -20,10 +20,10 @@ def load_peft_model(args: TrainingArgs):
         # LORA_CONFIG["parts"] = set(str(args.pissa_config['pissa_parts']).split(','))
     if args.quant != 'none':
         LORA_CONFIG["quant"] = True
-    if args.peft == 'bone':
-        from rwkvt.peft.rwkvLinear import BONE_CONFIG
-        BONE_CONFIG["mode"] = args.bone_config['bone_mode']
-        BONE_CONFIG["r"] = args.bone_config['bone_r']
+    if args.peft == 'disha':
+        from rwkvt.peft.rwkvLinear import DiSHA_CONFIG
+        DiSHA_CONFIG["mode"] = args.disha_config['mode']
+        DiSHA_CONFIG["r"] = args.disha_config['r']
 
     model = RWKV(args)
     print(model)
@@ -69,11 +69,10 @@ def load_peft_model(args: TrainingArgs):
                 if any(n.startswith("lora_") for n, _ in module.named_parameters()):
                     for pname, param in module.named_parameters():
                         param.requires_grad = 'lora_' in pname
-        if args.peft == 'bone':
-            print(f'  Bone additionally training parameter {pname}')
+        if args.peft == 'disha':
             for name, module in model.named_modules():
                 for pname, param in module.named_parameters():
-                    if 'bone' in pname:
+                    if 'disha' in pname:
                         param.requires_grad = True
                 break
 
@@ -91,9 +90,9 @@ def load_peft_model(args: TrainingArgs):
 
     # Load peft checkpoint
     # multi-GPU training
-    if args.peft == 'bone':
-        if os.path.isfile(args.bone_config['bone_load']):
-            model.load_state_dict(torch.load(args.bone_config['bone_load'], map_location="cpu", weights_only=True),
+    if args.peft == 'disha':
+        if os.path.isfile(args.disha_config['load']):
+            model.load_state_dict(torch.load(args.disha_config['load'], map_location="cpu", weights_only=True),
                                   strict=False)
     elif args.peft == 'lora':
         if os.path.isfile(args.lora_config['lora_load']):

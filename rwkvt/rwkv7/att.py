@@ -3,7 +3,7 @@ import os, math, gc, importlib
 import torch
 
 import torch.nn as nn
-from src.infctx_module import *
+from rwkvt.infctx_module import *
 
 from rwkvt.peft.rwkvLinear import make_linear_att
 from rwkvt.operator.rwkvop import RUN_CUDA_RWKV7g, RUN_RWKV7_STATE, RUN_RWKV7_INFCTX

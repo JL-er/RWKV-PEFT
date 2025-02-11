@@ -4,10 +4,17 @@
 
 \[ [English](README.md) | [中文] \]
 
-RWKV-PEFT 是一个旨在为 RWKV5/6 模型实现高效参数微调的官方实现，支持在多种硬件上实现多种先进的微调方法。
+RWKV-PEFT 是一个旨在为 RWKV 模型实现高效参数微调的官方实现，支持在多种硬件上实现多种先进的微调方法。
 
 # 最近更新
-## 支持 v7
+## 支持 v7和一些代码调整
+ - 1.移除了 `--fla` 并增加了 `--op cuda/fla/triton`. 现在你可以在--op中自由的选择算子。默认推荐cuda，如果你想要使用state tuning 请设置`--op fla` 和 `--train_type state`.
+ - 2.修改名称 Bone to DiSHA:  
+``` disha_config='{"mode":"bone","load":"","r":64}' ```  
+你仍可有选择两种不同的模式 `bone` or `bat`
+- 3.模型代码更干净且容易迁移。 详细查看文件 `rwkvt` .
+- 4.移除了简易的可视化训练，后续会有专门的程序支持可视化训练
+
 ``` --my_testing "x070" ```
 ## SFT训练
 相关参数,详细使用参考scripts/run_sft.sh  
@@ -23,7 +30,7 @@ RWKV-PEFT 是一个旨在为 RWKV5/6 模型实现高效参数微调的官方实�
 ```
 tokenizer_path = 'RWKV/rwkv-5-world-3b' #选择分词器（选择官方分词器）
 IGNORE_INDEX = -100 #填充（请勿修改）
-EOT_TOKEN = "<|EOT|>" #设置你需要的停止符
+EOT_TOKEN = "\x17" #设置你需要的停止符
 
 # 根据需求修改对应的prompt
 PROMPT = (
@@ -37,8 +44,11 @@ PROMPT = (
 >```HF_ENDPOINT="https://hf-mirror.com" sh scripts/run_sft.sh```
 
 ## Bone: Block-Affine Adaptation of Large Language Models [Paper](https://arxiv.org/pdf/2409.15371)
-论文更新，现在Bone是一个简单高效基础PEFT方法，比LoRA更快更省显存，比PiSSA收敛更快表现更好。同时将旧版本的Bone更改为了Bat方法  
-```bone_config='{"bone_load":"","bone_r":64}'```更新为``` bone_config='{"bone_mode":"bone","bone_load":"","bone_r":64}' ``` or``` bone_config='{"bone_mode":"bat","bone_load":"","bone_r":64}' ```
+论文更新，现在DiSHA(bone)是一个简单高效基础PEFT方法，比LoRA更快更省显存，比PiSSA收敛更快表现更好。
+scripts:  
+DiSHA(Bone):``` disha_config='{"mode":"bone","load":"","r":64}' ``` 
+DiSHA(Bat):``` disha_config='{"mode":"bat","load":"","r":64}' ```
+
 
 # Installation
 
@@ -53,11 +63,7 @@ pip install -r requirements.txt
 
 ## Web Run
 > [!TIP]
-> 如果你想使用云服务器运行streamlit (如 [Vast](https://vast.ai/) or [AutoDL](https://www.autodl.com/)), 你需要查看云服务器平台教程进行配置
-
-```bash
-gradio web/app.py
-```
+> Coming Soon!
 
 ## 目录
 - [硬件需求](#硬件需求)
@@ -94,13 +100,6 @@ sh scripts/run_lora.sh
 ```
 注：具体数据准备方法请参考RWKV官方教程
 
-3. 使用 web gui 开始：
-> [!TIP]
-> 如果您使用云服务 (such as [Vast](https://vast.ai/) or [AutoDL](https://www.autodl.com/)), 您需要参考相关服务商的提示，开启网页端口业务。
-
-```bash
-streamlit run web/app.py
-```
 
 ## 主要特性
 
@@ -117,7 +116,7 @@ streamlit run web/app.py
 
 ### 1. PEFT方法选择
 ```bash
---peft bone --bone_config $lora_config
+--peft disha --disha_config $disha_config
 ```
 
 ### 2. 训练部分选择
@@ -172,10 +171,10 @@ streamlit run web/app.py
 
 如果您觉得本项目对您有帮助，请引用我们的工作：
 ```bib
-@misc{kang2024boneblockaffineadaptationlarge,
-      title={Bone: Block-Affine Adaptation of Large Language Models}, 
+@misc{kang2025dishadimensionshardingadaptationlarge,
+      title={DiSHA: Dimension-Sharding Adaptation of Large Language Models with Fast Convergence and Fast Computation}, 
       author={Jiale Kang},
-      year={2024},
+      year={2025},
       eprint={2409.15371},
       archivePrefix={arXiv},
       primaryClass={cs.CL},

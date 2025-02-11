@@ -92,7 +92,7 @@ LORA_CONFIG = {
     "quant": False,
 }
 
-BONE_CONFIG = {
+DiSHA_CONFIG = {
     "r": 0,
     "mode": "bone", #"bat"
     "parts": {"att", "ffn"},
@@ -187,30 +187,14 @@ class QuantLinear(nn.Module):
         else:
             return F.linear(x, self.weight)
         
-        
-
-# class BoneLinear(nn.Module):
-#     def __init__(self, in_features: int, out_features: int, bias: bool):
-#         super().__init__()
-#         self.weight = nn.Parameter(torch.empty((out_features, in_features)))
-#         assert bias == False, "Biased QuantLinear not supported"
-#         self.r = BONE_CONFIG["r"]
-#         self.bone = nn.Parameter(torch.zeros(out_features, self.r))
-#         self.in_features = in_features
-#         self.out_features = out_features
-
-#     def forward(self, x):
-#         w = rearrange(self.weight, '(a r1) (b r2) -> b a r1 r2', r1 = self.r, r2 = self.r)@self.bone.reshape(self.out_features//self.r, self.r, -1)+self.bone.reshape(self.out_features//self.r, self.r, -1)
-#         w = rearrange(w, 'b a r1 r2 ->(a r1) (b r2) ')
-#         return F.linear(x,self.weight+w)
 
 class BatLinear(nn.Module):
     def __init__(self, in_features: int, out_features: int, bias: bool):
         super().__init__()
         self.weight = nn.Parameter(torch.empty((out_features, in_features)))
         assert bias == False, "Biased QuantLinear not supported"
-        self.r = BONE_CONFIG["r"]
-        self.bone = nn.Parameter(torch.zeros(in_features//self.r, self.r, self.r))
+        self.r = DiSHA_CONFIG["r"]
+        self.disha = nn.Parameter(torch.zeros(in_features//self.r, self.r, self.r))
         self.is_quant = False
 
     def quant(self, quant_type):
@@ -222,11 +206,11 @@ class BatLinear(nn.Module):
     def forward(self, x):
         if self.is_quant:
             qw = rwkv_dequantize(self.quant_type, self.qweight.data, self.qstate).to(x.device)
-            w = rearrange(qw, '(a r1) (b r2) -> a b r1 r2', r1 = self.r, r2 = self.r)@self.bone+self.bone
+            w = rearrange(qw, '(a r1) (b r2) -> a b r1 r2', r1 = self.r, r2 = self.r)@self.disha+self.disha
             w = rearrange(w, 'a b r1 r2 ->(a r1) (b r2) ')
             return F.linear(x,qw+w)
         else:
-            w = rearrange(self.weight, '(a r1) (b r2) -> a b r1 r2', r1 = self.r, r2 = self.r)@self.bone+self.bone
+            w = rearrange(self.weight, '(a r1) (b r2) -> a b r1 r2', r1 = self.r, r2 = self.r)@self.disha+self.disha
             w = rearrange(w, 'a b r1 r2 ->(a r1) (b r2) ') 
             return F.linear(x,self.weight+w)
     
@@ -235,8 +219,8 @@ class BoneLinear(nn.Module):
         super().__init__()
         self.weight = nn.Parameter(torch.empty((out_features, in_features)))
         assert bias == False, "Biased QuantLinear not supported"
-        self.r = BONE_CONFIG["r"]
-        self.bone = nn.Parameter(torch.zeros(self.r, out_features))
+        self.r = DiSHA_CONFIG["r"]
+        self.disha = nn.Parameter(torch.zeros(self.r, out_features))
         self.in_features = in_features
         self.out_features = out_features
         self.is_quant = False
@@ -258,7 +242,7 @@ class BoneLinear(nn.Module):
             padding_size = (self.r - self.in_features % self.r) % self.r
             x = F.pad(x, (0, padding_size))
 
-        y = result + torch.sum(x.reshape(*x.shape[:-1], x.size(-1)//self.r, self.r), dim=-2)@self.bone
+        y = result + torch.sum(x.reshape(*x.shape[:-1], x.size(-1)//self.r, self.r), dim=-2)@self.disha
         return y
 
 
@@ -267,9 +251,9 @@ class BoneLinear(nn.Module):
 def make_linear_att(*args, **kwargs):
     if "att" in LORA_CONFIG["parts"] and LORA_CONFIG["r"] > 0:
         return LoraLinear(*args, **kwargs)
-    elif "att" in BONE_CONFIG["parts"] and BONE_CONFIG["r"] > 0 and BONE_CONFIG["mode"]=="bone":
+    elif "att" in DiSHA_CONFIG["parts"] and DiSHA_CONFIG["r"] > 0 and DiSHA_CONFIG["mode"]=="bone":
         return BoneLinear(*args, **kwargs)
-    elif "att" in BONE_CONFIG["parts"] and BONE_CONFIG["r"] > 0 and BONE_CONFIG["mode"]=="bat":
+    elif "att" in DiSHA_CONFIG["parts"] and DiSHA_CONFIG["r"] > 0 and DiSHA_CONFIG["mode"]=="bat":
         return BatLinear(*args, **kwargs)
     elif LORA_CONFIG["quant"]:
         return QuantLinear(*args, **kwargs)
@@ -281,9 +265,9 @@ def make_linear_att(*args, **kwargs):
 def make_linear_ffn(*args, **kwargs):
     if "ffn" in LORA_CONFIG["parts"] and LORA_CONFIG["r"] > 0:
         return LoraLinear(*args, **kwargs)
-    elif "ffn" in BONE_CONFIG["parts"] and BONE_CONFIG["r"] > 0 and BONE_CONFIG["mode"]=="bone" :
+    elif "ffn" in DiSHA_CONFIG["parts"] and DiSHA_CONFIG["r"] > 0 and DiSHA_CONFIG["mode"]=="bone" :
         return BoneLinear(*args, **kwargs)
-    elif "ffn" in BONE_CONFIG["parts"] and BONE_CONFIG["r"] > 0 and BONE_CONFIG["mode"]=="bat" :
+    elif "ffn" in DiSHA_CONFIG["parts"] and DiSHA_CONFIG["r"] > 0 and DiSHA_CONFIG["mode"]=="bat" :
         return BatLinear(*args, **kwargs)
     elif LORA_CONFIG["quant"]:
         return QuantLinear(*args, **kwargs)

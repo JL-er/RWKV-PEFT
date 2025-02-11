@@ -3,10 +3,8 @@ import torch
 from torch.utils.data import DataLoader
 from lightning_utilities.core.rank_zero import rank_zero_info, rank_zero_only
 import lightning as pl
-from rwkvt.peft.rwkvLinear import LORA_CONFIG, BONE_CONFIG
 import re
 import numpy as np
-import streamlit as st
 import json
 
 def my_save(args, trainer, dd, ff):
@@ -226,18 +224,7 @@ class train_callback(pl.Callback):
                             peft_dict[name] = state
                         elif args.peft in name:
                             peft_dict[name] = state
-                    # if args.peft=='lora' or args.peft=='pissa':
-                    #     for name, state in to_save_dict.items():
-                           
-                    #         if ('.lora_' in name):
-                    #             peft_dict[name] = state
-                    # if args.peft=='bone':
-                    #     for name, state in to_save_dict.items():
-                    #         if len(args.load_model) == 0:
-                    #             if 'emb' in name or 'head' in name or 'ln' in name:
-                    #                 peft_dict[name] = state
-                    #         if ('.gbmm' in name):
-                    #             peft_dict[name] = state
+
                     to_save_dict = peft_dict
 
                 try:

@@ -5,10 +5,17 @@
 
 \[ English | [中文](README_zh.md) \]
 
-RWKV-PEFT is the official implementation for efficient parameter fine-tuning of RWKV5/6 models, supporting various advanced fine-tuning methods across multiple hardware platforms.
+RWKV-PEFT is the official implementation for efficient parameter fine-tuning of RWKV models, supporting various advanced fine-tuning methods across multiple hardware platforms.
 
 # Recent updates
-## Support v7
+## Support v7 & Code adjustment
+ - 1.Removed `--fla` and added `--op cuda/fla/triton`. In RWKV7, you can choose from three different operators, with CUDA recommended by default. If you want to fine-tune using state tuning, please enable `--op fla` and set `--train_type state`.
+ - 2.Renamed Bone to DiSHA:  
+``` disha_config='{"mode":"bone","load":"","r":64}' ```  
+You can still choose either `bone` or `bat` in the `mode` field.
+- 3.The model code is now clearer and easier to migrate. Check the `rwkvt` file for details.
+- 4.Removed the basic visualization training. A dedicated program will support visualization training in the future.
+
 ``` --my_testing "x070" ```
 ## SFT
 Relevant parameters, detailed usage reference: scripts/run_sft.sh  
@@ -24,7 +31,7 @@ Relevant parameters, detailed usage reference: scripts/run_sft.sh
 ```
 tokenizer_path = 'RWKV/rwkv-5-world-3b' #Choose a tokenizer (select the official tokenizer)
 IGNORE_INDEX = -100 #Padding (do not modify)
-EOT_TOKEN = "<|EOT|>" #Set the stop token(s) you need
+EOT_TOKEN = "\x17" #Set the stop token(s) you need
 
 # Modify the corresponding prompt according to your requirements
 PROMPT = (
@@ -37,10 +44,11 @@ PROMPT = (
 > Downloading Hugging Face data may time out in China, so you need to add:   
 >```HF_ENDPOINT="https://hf-mirror.com" sh scripts/run_sft.sh```
 
-## Bone: Block-Affine Adaptation of Large Language Models [Paper](https://arxiv.org/pdf/2409.15371)
-The paper has been updated. Bone is now a simple and efficient basic PEFT method that is faster and uses less VRAM than LoRA, converges faster, and performs better than PiSSA. The previous version of Bone has been changed to the Bat method.    
+## DiSHA: Dimension-Sharding Adaptation of Large Language Models with Fast Convergence and Fast Computation [Paper](https://arxiv.org/pdf/2409.15371)
+The paper has been updated. DiSHA(Bone) is now a simple and efficient basic PEFT method that is faster and uses less VRAM than LoRA, converges faster, and performs better than PiSSA. 
 scripts:  
-```bone_config='{"bone_load":"","bone_r":64}'```update``` bone_config='{"bone_mode":"bone","bone_load":"","bone_r":64}' ``` or``` bone_config='{"bone_mode":"bat","bone_load":"","bone_r":64}' ```
+DiSHA(Bone):``` disha_config='{"mode":"bone","load":"","r":64}' ``` 
+DiSHA(Bat):``` disha_config='{"mode":"bat","load":"","r":64}' ```
 
 
 # Installation
@@ -56,11 +64,7 @@ pip install -r requirements.txt
 
 ## Web Run
 > [!TIP]
-> If you are using a cloud server (such as [Vast](https://vast.ai/) or [AutoDL](https://www.autodl.com/)), you can start the Streamlit service by referring to the help documentation on the cloud server's official website.
-
-```bash
-gradio web/app.py
-```
+> Coming Soon!
 
 ## Table of Contents
 - [Hardware Requirements](#hardware-requirements)
@@ -97,13 +101,6 @@ sh scripts/run_lora.sh
 ```
 Note: Please refer to the RWKV official tutorial for detailed data preparation
 
-3. Start with web GUI:
-> [!TIP]
-> If you're using cloud services (such as [Vast](https://vast.ai/) or [AutoDL](https://www.autodl.com/)), you'll need to enable web port access according to your service provider's instructions.
-
-```bash
-streamlit run web/app.py
-```
 
 ## Main Features
 
@@ -120,7 +117,7 @@ streamlit run web/app.py
 
 ### 1. PEFT Method Selection
 ```bash
---peft bone --bone_config $lora_config
+--peft disha --disha_config $disha_config
 ```
 
 ### 2. Training Parts Selection
@@ -162,9 +159,9 @@ Available strategies:
 
 ### 7. FLA Operator
 By default, RWKV-PEFT uses custom CUDA kernels for wkv computation.
-However, you can use `--fla` to enable the Triton kernel:
+However, you can use `--op fla` to enable the Triton kernel:
 ```
---fla
+--op fla
 ```
 
 ## GPU Support
@@ -177,10 +174,10 @@ However, you can use `--fla` to enable the Triton kernel:
 
 If you find this project helpful, please cite our work:
 ```bib
-@misc{kang2024boneblockaffineadaptationlarge,
-      title={Bone: Block-Affine Adaptation of Large Language Models}, 
+@misc{kang2025dishadimensionshardingadaptationlarge,
+      title={DiSHA: Dimension-Sharding Adaptation of Large Language Models with Fast Convergence and Fast Computation}, 
       author={Jiale Kang},
-      year={2024},
+      year={2025},
       eprint={2409.15371},
       archivePrefix={arXiv},
       primaryClass={cs.CL},

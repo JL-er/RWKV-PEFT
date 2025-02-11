@@ -3,7 +3,6 @@
 ########################################################################################################
 import os
 import sys
-from web.utils import set_error_message
 import logging
 # logging.basicConfig(level=logging.INFO)
 from typing import Optional, Dict, Sequence, List, Literal
@@ -79,7 +78,7 @@ if __name__ == "__main__":
     parser.add_argument("--my_exit", default=99999999, type=int)
     parser.add_argument("--my_exit_tokens", default=0, type=int)
 
-    parser.add_argument("--peft", default="none", type=str)# lora pissa bone
+    parser.add_argument("--peft", default="none", type=str)# lora pissa DiSHA
     #parser.add_argument("--train_parts", default=["time", "ln"], type=list)##emb , head
     parser.add_argument("--train_parts", default=["time", "ln"], nargs='*', help="List of parts to train emb head time ln")
 
@@ -94,7 +93,7 @@ if __name__ == "__main__":
     parser.add_argument("--pissa_config", default='{"pissa_load":"", "pissa_init":"", "pissa_r":8, "svd_niter":4}', type=json.loads)
 
     #Bone
-    parser.add_argument("--bone_config", default='{"bone_mode":"mode", "bone_load":"", "bone_r":64}', type=json.loads)
+    parser.add_argument("--disha_config", default='{"mode":"mode", "load":"", "r":64}', type=json.loads)
 
 
     #quant
