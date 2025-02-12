@@ -34,31 +34,6 @@ with torch.no_grad():
         if k.endswith('.weight'):
             prefix = k[:-len('.weight')]
             gbmm = prefix + '.disha'
-            
-            # if gbmm in keys:  ##old
-            #     w[k] = w[k].to(device=device)
-            #     w[gbmm] = w[gbmm].to(device=device)
-            #     b,r = w[gbmm].shape
-
-            #     disha = rearrange(w[k], '(a r1) (b r2) -> b a r1 r2', r1 = r, r2 = r)@w[gbmm].reshape(b//r, r, r)+w[gbmm].reshape(b//r, r, r)
-            #     w[k] += rearrange(disha, 'b a r1 r2 ->(a r1) (b r2) ')
-
-            #     output_w[k] = w[k].to(device='cpu', copy=True)
-            #     del w[k]
-            #     del w[gbmm]
-            #     continue
-
-            # if gbmm in keys: ### col
-            #     w[k] = w[k].to(device=device)
-            #     w[gbmm] = w[gbmm].to(device=device)
-            #     b,r,_ = w[gbmm].shape
-            #     disha = rearrange(w[k], '(a r1) (b r2) -> b a r1 r2', r1 = r, r2 = r)@w[gbmm]+w[gbmm]
-            #     w[k] += rearrange(disha, 'b a r1 r2 ->(a r1) (b r2) ')
-
-            #     output_w[k] = w[k].to(device='cpu', copy=True)
-            #     del w[k]
-            #     del w[gbmm]
-            #     continue
 
             if gbmm in keys: ### row
                 w[k] = w[k].to(device=device)

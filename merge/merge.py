@@ -42,8 +42,8 @@ with torch.no_grad():
             prefix = k[:-len('.weight')]
             lora_A = prefix + '.lora_A'
             lora_B = prefix + '.lora_B'
-            init_lora_A = prefix + '.init_lora_A'
-            init_lora_B = prefix + '.init_lora_B'
+            init_lora_A = 'model.' + prefix + '.init_lora_A'
+            init_lora_B = 'model.' + prefix + '.init_lora_B'
             if lora_A in keys:
                 assert lora_B in keys
                 print(f'merging {lora_A} and {lora_B} into {k}')
