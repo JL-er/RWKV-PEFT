@@ -10,12 +10,12 @@ RWKV-PEFT is the official implementation for efficient parameter fine-tuning of 
 # Recent updates
 ## Support v7 & Code adjustment
  - 1.Removed `--fla` and added `--op cuda/fla/triton`. In RWKV7, you can choose from three different operators, with CUDA recommended by default. If you want to fine-tune using state tuning, please enable `--op fla` and set `--train_type state`.
- - 2.Renamed Bone to DiSHA:  
+ - 2.Renamed Bone to DiSHA(Note: The rank parameter in DiSHA is only half of that in LoRA. Under the same parameter setting, DiSHA(r) = 2 * LoRA(r)).:  
 ``` disha_config='{"mode":"bone","load":"","r":64}' ```  
 You can still choose either `bone` or `bat` in the `mode` field.
 - 3.The model code is now clearer and easier to migrate. Check the `rwkvt` file for details.
 - 4.Removed the basic visualization training. A dedicated program will support visualization training in the future.
-
+- 5.Added lr_schedule, with cos_decay as the default. You can also use cosine annealing by setting --lr_schedule wsd.
 ``` --my_testing "x070" ```
 ## SFT
 Relevant parameters, detailed usage reference: scripts/run_sft.sh  

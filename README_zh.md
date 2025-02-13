@@ -9,11 +9,12 @@ RWKV-PEFT 是一个旨在为 RWKV 模型实现高效参数微调的官方实现�
 # 最近更新
 ## 支持 v7和一些代码调整
  - 1.移除了 `--fla` 并增加了 `--op cuda/fla/triton`. 现在你可以在--op中自由的选择算子。默认推荐cuda，如果你想要使用state tuning 请设置`--op fla` 和 `--train_type state`.
- - 2.修改名称 Bone to DiSHA:  
+ - 2.修改名称 Bone to DiSHA(注意DiSHA中的rank的参数量只有LoRA的一半，同等参数下DiSHA(r)=2*LoRA(r)):  
 ``` disha_config='{"mode":"bone","load":"","r":64}' ```  
 你仍可有选择两种不同的模式 `bone` or `bat`
 - 3.模型代码更干净且容易迁移。 详细查看文件 `rwkvt` .
 - 4.移除了简易的可视化训练，后续会有专门的程序支持可视化训练
+- 5.新增lr_schedule，默认使用cos_decay。你也可以通过`--lr_schedule wsd`使用余弦退火
 
 ``` --my_testing "x070" ```
 ## SFT训练

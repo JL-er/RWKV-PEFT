@@ -126,6 +126,8 @@ if __name__ == "__main__":
 
     parser.add_argument("--op", default="cuda", type=str)
 
+    parser.add_argument("--lr_schedule", default="cos", type=str)        #['cos', 'wsd']
+
 
     if pl.__version__[0]=='2':
         parser.add_argument("--accelerator", default="gpu", type=str)

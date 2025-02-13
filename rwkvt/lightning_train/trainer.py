@@ -3,9 +3,8 @@ import torch
 from torch.utils.data import DataLoader
 from lightning_utilities.core.rank_zero import rank_zero_info, rank_zero_only
 import lightning as pl
-import re
-import numpy as np
 import json
+from rwkvt.trick.lrs import wsd,cos_decay
 
 def my_save(args, trainer, dd, ff):
     if '14b-run1' in ff:
@@ -49,37 +48,11 @@ class train_callback(pl.Callback):
         if args.lr_final == args.lr_init or args.epoch_count == 0:
             lr = args.lr_init
         else:
-            decay_step = real_step - args.my_pile_edecay * args.epoch_steps
-            decay_total = (args.epoch_count - args.my_pile_edecay) * args.epoch_steps
-            progress = (decay_step - w_step + 1) / (decay_total - w_step)
-            progress = min(1, max(0, progress))
-
-            if args.lr_final == 0 or args.lr_init == 0:  # linear decay
-                lr = args.lr_init + (args.lr_final - args.lr_init) * progress
-            else:  # exp decay
-                lr = args.lr_init * math.exp(math.log(args.lr_final / args.lr_init) * pow(progress, 1))
-            # if trainer.is_global_zero:
-            #     print(trainer.global_step, decay_step, decay_total, w_step, progress, lr)
-
-        if args.my_exit_tokens != 0: # cosine decay
-            real_tokens = real_step * args.ctx_len * args.real_bsz
-            warmup_tokens = w_step * args.ctx_len * args.real_bsz
-            progress = (real_tokens - warmup_tokens) / (abs(args.my_exit_tokens) - warmup_tokens)
-            progress = max(0, min(1, progress))
-            lr_final_factor = args.lr_final / args.lr_init                
-            lr_mult = (0.5 + lr_final_factor / 2) + (0.5 - lr_final_factor / 2) * math.cos(math.pi * progress)
-            if args.my_exit_tokens > 0:
-                lr = args.lr_init * lr_mult
+            if 'wsd' == args.lr_schedule:
+                lr = wsc_decay(args.lr_init, args.lr_final, real_step, args.epoch_steps//int(args.devices))
             else:
-                lr = (lr + args.lr_init * lr_mult) / 2
-            if progress >= 1:
-                if (trainer.is_global_zero) or ('deepspeed_stage_3' in args.strategy):
-                    my_save(
-                        args, trainer,
-                        pl_module.state_dict(),
-                        f"{args.proj_dir}/rwkv-final.pth",
-                    )
-                    exit(0)
+                lr = cos_decay(args.lr_init, args.lr_final, real_step, args.epoch_steps//int(args.devices))
+
         if trainer.global_step < w_step:
             lr = lr * (0.01 + 0.99 * trainer.global_step / w_step)
 
