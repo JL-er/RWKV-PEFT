@@ -385,7 +385,7 @@ else:
             def RUN_CUDA_RWKV6_STATE(B, T, C, H, r, k, v, w, u, s):
                 x = WKV_6STATE.apply(B, T, C, H, r, k, v, w, u, s)
                 return x, s
-        elif os.environ["RWKV_TRAIN_TYPE"] == 'states':
+        elif os.environ["RWKV_TRAIN_TYPE"] == 'state':
             wkv6state_cuda = load(name="wkv6state", sources=["cuda/wkv6state_op.cpp", f"cuda/wkv6state_cuda.cu"],
                             verbose=True, extra_cuda_cflags=["-res-usage", "--use_fast_math", "-O3", "-Xptxas -O3", "--extra-device-vectorization", f"-D_N_={HEAD_SIZE}", f"-D_T_={int(os.environ['RWKV_CTXLEN'])}"])
                 
