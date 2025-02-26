@@ -330,8 +330,8 @@ class MyDataset(Dataset):
                 return x, y, mask
 
             if args.loss_mask == 'pad':
-                mask = torch.zeros(req_len)
-                mask[:min_len] = 1
+                mask = torch.zeros(req_len - 1)
+                mask[:min_len-1] = 1
                 return x, y, mask
             if args.loss_mask == 'se':
                 t1 = pipeline.encode(args.mask_id['mask0'])
