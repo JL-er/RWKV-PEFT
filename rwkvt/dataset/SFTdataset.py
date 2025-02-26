@@ -24,6 +24,8 @@ PROMPT = (
         "### Instruction:\n{instruction}\n\n### Response:"
     )
 
+
+
 def _tokenize_fn(strings: Sequence[str], tokenizer: transformers.PreTrainedTokenizer) -> Dict:
     """Tokenize a list of strings."""
     tokenized_list = [tokenizer(text, max_length=tokenizer.model_max_length,truncation=True,)for text in strings]
@@ -87,13 +89,31 @@ def sft_dataset(script_args):
         desc="Running tokenizer on train dataset",
         fn_kwargs={"tokenizer": tokenizer, "query": script_args.sft_field[0], "response": script_args.sft_field[1]}
     )
-    #labels_tensor = torch.tensor(train_dataset['labels'])
-    #input_ids_tensor = torch.tensor(train_dataset['input_ids'])
-    labels_tensor = [torch.tensor(label) for label in train_dataset['labels']]
-    input_ids_tensor = [torch.tensor(input_id) for input_id in train_dataset['input_ids']]
-    return (input_ids_tensor, labels_tensor)
+    data_collator = DataCollatorForSupervisedDataset(tokenizer=tokenizer)
+    data_module = data_collator(train_dataset)
+
+    return (data_module["input_ids"], data_module["labels"], data_module["attention_mask"])
 
 
+@dataclass
+class DataCollatorForSupervisedDataset(object):
+    """Collate examples for supervised fine-tuning."""
+    tokenizer: transformers.PreTrainedTokenizer
+
+    def __call__(self, instances: Sequence[Dict]) -> Dict[str, torch.Tensor]:
+        input_ids, labels = tuple([instance[key] for instance in instances] for key in ("input_ids", "labels"))
+        input_ids = [torch.tensor(x) for x in input_ids]
+        input_ids = torch.nn.utils.rnn.pad_sequence(
+            input_ids, batch_first=True, padding_value=self.tokenizer.pad_token_id
+        )
+        labels = [torch.tensor(x) for x in labels]
+        labels = torch.nn.utils.rnn.pad_sequence(labels, batch_first=True, padding_value=IGNORE_INDEX)
+        
+        return dict(
+            input_ids=input_ids,
+            labels=labels,
+            attention_mask=input_ids.ne(self.tokenizer.pad_token_id),
+        )
 # class Data():
 #     model_name_or_path: str = "RWKV/rwkv-5-world-3b"
 #     data_file :str = "/home/rwkv/JL/data/MetaMathQA"

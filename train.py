@@ -100,7 +100,7 @@ if __name__ == "__main__":
     parser.add_argument("--quant", default="none", type=str)
 
     #dataset
-    parser.add_argument("--dataload", default="get", type=str)
+    parser.add_argument("--dataload", default="pad", type=str)
 
     parser.add_argument("--chunk_ctx", default=512, type=int)
     #fla
@@ -169,9 +169,10 @@ if __name__ == "__main__":
     args.num_sanity_val_steps = 0
     args.check_val_every_n_epoch = int(1e20)
     args.log_every_n_steps = int(1e20)
-    args.max_epochs = -1  # continue forever
-    if args.dataload!='get' or args.data_type=='sft':
-        args.max_epochs = args.epoch_count
+      # continue forever
+    args.max_epochs = args.epoch_count
+    if args.dataload =='get':
+        args.max_epochs = -1
     args.betas = (args.beta1, args.beta2)
     args.real_bsz = int(args.num_nodes) * int(args.devices) * args.micro_bsz
     os.environ["RWKV_MY_TESTING"] = args.my_testing
@@ -277,7 +278,7 @@ if __name__ == "__main__":
 #     )
     # rank_zero_info(str(vars(args)) + "\n")
 
-    assert args.data_type in ["utf-8", "utf-16le", "numpy", "binidx", "dummy", "uint16", "sft"]
+    assert args.data_type in ["utf-8", "utf-16le", "numpy", "binidx", "dummy", "uint16", "sft", 'jsonl']
 
     if args.lr_final == 0 or args.lr_init == 0:
         rank_zero_info("\n\nNote: lr_final = 0 or lr_init = 0. Using linear LR schedule instead.\n\n")

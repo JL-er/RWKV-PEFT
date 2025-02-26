@@ -173,8 +173,8 @@ class RWKV(pl.LightningModule):
                 last_wkv_states: torch.Tensor):
             return self.model(idx, last_shift_states, last_wkv_states)
     else:
-        def forward(self, idx):
-            return self.model(idx)
+        def forward(self, idx, attention_mask=None):
+            return self.model(idx, attention_mask)
 
     if os.environ.get("RWKV_TRAIN_TYPE") == 'infctx':
         def training_step(self, batch, batch_idx):
@@ -194,9 +194,9 @@ class RWKV(pl.LightningModule):
                 current_token_amount = (targets!=-100).sum() #这样是不是更合适？
                 current_token_amount = idx.shape[1]
                 if current_token_amount == 0:
-                    loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.reshape(-1),reduction='sum')
+                    loss = criterion(logits.view(-1, logits.size(-1)), targets.reshape(-1),reduction='sum')
                 else:
-                    loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.reshape(-1))
+                    loss = criterion(logits.view(-1, logits.size(-1)), targets.reshape(-1))
                     loss = L2Wrap.apply(loss, logits, current_token_amount)
                 new_token_amount = prev_token_amount+current_token_amount
                 if new_token_amount>0:
@@ -229,11 +229,26 @@ class RWKV(pl.LightningModule):
     else:
         def training_step(self, batch, batch_idx):
             args = self.args
-            if args.loss_mask!='none' or args.data_type=='sft':
+            if args.data_type=='sft':
                 idx, targets, mask = batch
-                mask = mask.view(-1)
+
+                logits = self(idx, mask)
+
+                mask = mask.reshape(-1)
                 sum_mask = torch.sum(mask).item()
+                
+                loss = criterion(logits.view(-1, logits.size(-1)), targets.view(-1), reduction='none')
+                loss = torch.sum(loss * mask) / sum_mask
+            elif args.loss_mask!='none' or args.data_type=='jsonl':
+                idx, targets, mask = batch
+
                 logits = self(idx)
+
+                # mask = mask[:, :-1].reshape(-1)
+                # mask = mask[:, 1:].reshape(-1)
+                mask = mask.reshape(-1)
+                sum_mask = torch.sum(mask).item()
+                
                 loss = criterion(logits.view(-1, logits.size(-1)), targets.view(-1), reduction='none')
                 loss = torch.sum(loss * mask) / sum_mask
             elif args.my_qa_mask != 1:
@@ -242,21 +257,6 @@ class RWKV(pl.LightningModule):
                 logits = self(idx)
                 loss = criterion(logits.view(-1, logits.size(-1)), targets.view(-1))
 
-            else:
-                idx, targets, mask = batch
-                mask = mask.view(-1)
-                sum_mask = torch.sum(mask).item()
-                # if sum_mask == 0:
-                #     return torch.tensor([0.0], requires_grad=True)
-
-                logits = self(idx)
-                if sum_mask == mask.shape[0]:
-                    loss = criterion(logits.view(-1, logits.size(-1)), targets.view(-1))
-                    # print('rank', self.global_rank, 'loss', loss.item())
-                else:
-                    loss = criterion(logits.view(-1, logits.size(-1)), targets.view(-1), reduction='none')
-                    # loss_raw = loss
-                    loss = torch.sum(loss * mask) / sum_mask
 
             return L2Wrap.apply(loss, logits)
     

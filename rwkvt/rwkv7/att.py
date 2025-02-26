@@ -133,9 +133,12 @@ class RWKV_Tmix_x070(nn.Module):
         return fused_addcmul_rwkv7(x, xx, self.x_r, self.x_w, self.x_k, self.x_v, self.x_a, self.x_g)
 
     @torch.compile
-    def forward(self, x, v_first):
+    def forward(self, x, v_first, attention_mask=None):
         B, T, C = x.size()
         H = self.n_head
+
+        if attention_mask is not None:
+            x = x.mul(attention_mask[:, -x.shape[-2]:, None])
         xx = self.time_shift(x) - x
 
         xr, xw, xk, xv, xa, xg = self.addcmul_kernel(x, xx)
@@ -154,6 +157,9 @@ class RWKV_Tmix_x070(nn.Module):
         kk = k * self.k_k
         kk = F.normalize(kk.view(B,T,H,-1), dim=-1, p=2.0).view(B,T,C)
         k = k * (1 + (a-1) * self.k_a)
+
+        if attention_mask is not None:
+            v = v * attention_mask[:, -v.shape[-2]:, None]
         
         x = RUN_CUDA_RWKV7g(r, w, k, v, -kk, kk*a)
         x = self.ln_x(x.view(B * T, C)).view(B, T, C)

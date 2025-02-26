@@ -32,7 +32,7 @@ class RWKV7(nn.Module):
             return self.forward_infctx(*args, **kwargs)
         return self.forward_normal(*args, **kwargs)
 
-    def forward_normal(self, idx):
+    def forward_normal(self, idx, attention_mask = None):
         args = self.args
         B, T = idx.size()
         assert T <= args.ctx_len, "Cannot forward, model ctx_len is exhausted."
@@ -43,11 +43,11 @@ class RWKV7(nn.Module):
         for block in self.blocks:
             if args.grad_cp == 1:
                 if args.train_type == 'state' or args.peft !='none':
-                    x, v_first = torch_checkpoint(block, x, v_first ,use_reentrant=False)
+                    x, v_first = torch_checkpoint(block, x, v_first , attention_mask, use_reentrant=False)
                 else:
-                    x, v_first = deepspeed.checkpointing.checkpoint(block, x, v_first)
+                    x, v_first = deepspeed.checkpointing.checkpoint(block, x, v_first, attention_mask)
             else:
-                x, v_first = block(x, v_first)
+                x, v_first = block(x, v_first, attention_mask)
 
         x = self.ln_out(x)
         x = self.head(x)
