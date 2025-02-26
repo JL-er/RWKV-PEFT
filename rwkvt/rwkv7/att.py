@@ -183,9 +183,12 @@ class RWKV_Tmix_x070_State(RWKV_Tmix_x070):
             # self.output.weight.data.zero_()
 
     @torch.compile
-    def forward(self, x, v_first):
+    def forward(self, x, v_first, attention_mask=None):
         B, T, C = x.size()
         H = self.n_head
+
+        if attention_mask is not None:
+            x = x.mul(attention_mask[:, -x.shape[-2]:, None])
         xx = self.time_shift(x) - x
 
         xr, xw, xk, xv, xa, xg = self.addcmul_kernel(x, xx)
@@ -217,10 +220,12 @@ class RWKV_Tmix_x070_infctx(RWKV_Tmix_x070):
     def __init__(self, args, layer_id):
         super().__init__(args, layer_id)
 
-    def forward(self, x, v_first, last_state: TimeMixState):
+    def forward(self, x, v_first, last_state: TimeMixState, attention_mask=None):
         B, T, C = x.size()
         H = self.n_head
-        #xx = self.time_shift(x) - x
+
+        if attention_mask is not None:
+            x = x.mul(attention_mask[:, -x.shape[-2]:, None])
         
         shift_state = last_state.shift_state
         wkv_state = last_state.wkv_state.clone().contiguous() 
