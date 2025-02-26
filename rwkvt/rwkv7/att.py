@@ -11,10 +11,10 @@ from torch.nn import functional as F
 
 if os.environ["FUSED_KERNEL"] == '1':
     from rwkvfla.ops.rwkv7 import fused_addcmul_rwkv7
-    from rwkvfla.modules.layernorm import GroupNorm
+    from rwkvfla.modules.layernorm import GroupNorm as FusedGroupNorm
 else:
     fused_addcmul_rwkv7 = None
-    GroupNorm = nn.GroupNorm
+    FusedGroupNorm = None
 
 def RWKV_Tmix_v7(*args, **kwargs):
     
@@ -111,7 +111,10 @@ class RWKV_Tmix_x070(nn.Module):
             self.key = make_linear_att(C, C, bias=False)
             self.value = make_linear_att(C, C, bias=False)
             self.output = make_linear_att(C, C, bias=False)
-            self.ln_x = GroupNorm(H, C, eps=(1e-5)*(args.head_size_divisor**2)) # !!! notice eps value !!!
+            if os.environ["FUSED_KERNEL"] == '1':
+                self.ln_x = FusedGroupNorm(H, C, eps=(1e-5)*(args.head_size_divisor**2), bias=True) # !!! notice eps value !!!
+            else:
+                self.ln_x = nn.GroupNorm(H, C, eps=(1e-5)*(args.head_size_divisor**2))
 
 
             # !!! initialize if you are using RWKV_Tmix_x070 in your code !!!

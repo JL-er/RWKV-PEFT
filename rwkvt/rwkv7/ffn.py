@@ -54,7 +54,10 @@ class RWKV_CMix_x070_fla(RWKV_CMix_x070):
         super().__init__(args, layer_id)
         del self.time_shift
 
-    def forward(self, x):
+    @torch.compile
+    def forward(self, x, attention_mask=None):
+        if attention_mask is not None:
+            x = x.mul(attention_mask[:, -x.shape[-2]:, None])
         x_prev = torch.zeros(x.size(0), x.size(2), device=x.device, dtype=x.dtype)
         output, _ = channel_mixing_rwkv7(x, x_prev, self.x_k, self.key.weight.t(), self.value.weight.t())
         return output
@@ -64,7 +67,9 @@ class RWKV_CMix_x070_infctx(RWKV_CMix_x070):
         super().__init__(args, layer_id)
         del self.time_shift
 
-    def forward(self, x,last_state: ChannelMixState):
+    def forward(self, x, last_state: ChannelMixState, attention_mask=None):
+        if attention_mask is not None:
+            x = x.mul(attention_mask[:, -x.shape[-2]:, None])
         xx = torch.concat((last_state.shift_state.unsqueeze(1), x[:, :-1]), dim=1) - x  
         
         k = x + xx * self.x_k
