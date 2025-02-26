@@ -25,6 +25,13 @@ try:
 except:
     os.environ["RWKV_MY_TESTING"] = ''
 
+if os.environ["FUSED_KERNEL"] == '1':
+    from rwkvfla.modules import FusedCrossEntropyLoss
+    criterion = FusedCrossEntropyLoss(inplace_backward=True)
+else:
+    FusedCrossEntropyLoss = None
+    criterion = nn.CrossEntropyLoss()
+
 if "7" in os.environ["RWKV_MY_TESTING"]:
     from rwkvt.rwkv7.model import RWKV7 as RWKVModel
 elif "6" in os.environ["RWKV_MY_TESTING"]:
@@ -187,9 +194,9 @@ class RWKV(pl.LightningModule):
                 current_token_amount = (targets!=-100).sum() #这样是不是更合适？
                 current_token_amount = idx.shape[1]
                 if current_token_amount == 0:
-                    loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.reshape(-1),reduction='sum')
+                    loss = criterion(logits.view(-1, logits.size(-1)), targets.reshape(-1),reduction='sum')
                 else:
-                    loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.reshape(-1))
+                    loss = criterion(logits.view(-1, logits.size(-1)), targets.reshape(-1))
                     loss = L2Wrap.apply(loss, logits, current_token_amount)
                 new_token_amount = prev_token_amount+current_token_amount
                 if new_token_amount>0:
@@ -230,7 +237,7 @@ class RWKV(pl.LightningModule):
                 mask = mask.reshape(-1)
                 sum_mask = torch.sum(mask).item()
                 
-                loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), reduction='none')
+                loss = criterion(logits.view(-1, logits.size(-1)), targets.view(-1), reduction='none')
                 loss = torch.sum(loss * mask) / sum_mask
             elif args.loss_mask!='none' or args.data_type=='jsonl':
                 idx, targets, mask = batch
@@ -242,18 +249,18 @@ class RWKV(pl.LightningModule):
                 mask = mask.reshape(-1)
                 sum_mask = torch.sum(mask).item()
                 
-                loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), reduction='none')
+                loss = criterion(logits.view(-1, logits.size(-1)), targets.view(-1), reduction='none')
                 loss = torch.sum(loss * mask) / sum_mask
             elif args.my_qa_mask != 1:
                 idx, targets = batch
 
                 logits = self(idx)
-                loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1))
+                loss = criterion(logits.view(-1, logits.size(-1)), targets.view(-1))
 
 
             return L2Wrap.apply(loss, logits)
     
-
+    
     def training_step_end(self, batch_parts):
         if pl.__version__[0]!='2':
             all = self.all_gather(batch_parts)
