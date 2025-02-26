@@ -32,7 +32,9 @@ class RWKV_CMix_x070(nn.Module):
         # self.key.weight.data.uniform_(-0.5/(args.n_embd**0.5), 0.5/(args.n_embd**0.5))
         # self.value.weight.data.zero_()
 
-    def forward(self, x):
+    def forward(self, x, attention_mask=None):
+        if attention_mask is not None:
+            x = x.mul(attention_mask[:, -x.shape[-2]:, None])
         xx = self.time_shift(x) - x
         
         k = x + xx * self.x_k

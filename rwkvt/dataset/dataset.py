@@ -94,14 +94,15 @@ class MyDataset(Dataset):
         self.real_epoch = 0
         self.world_size = 0
         self.index_manager = None
-
+        self.vocab_size = args.vocab_size
         if args.data_type == "sft":
-            self.vocab_size = args.vocab_size
             self.data = sft_dataset(args)
-        elif args.data_type == "binidx":
-            self.vocab_size = args.vocab_size
-            rank_zero_info(f"Current vocab size = {self.vocab_size} (make sure it's correct)")
+        elif args.data_type == "jsonl":
+            import jsonlines
+            with jsonlines.open(args.data_file) as file:
+                self.data = list(file)
 
+        elif args.data_type == "binidx":
             if args.my_pile_version == 1:
                 self.data = MMapIndexedDataset(args.data_file)
                 self.data_size = len(self.data._bin_buffer) // self.data._index._dtype_size
@@ -201,22 +202,36 @@ class MyDataset(Dataset):
             y = torch.tensor(dix[1:], dtype=torch.long)
         elif args.data_type == "sft":
 
+            inputs, labels, attn_mask = self.data[0][idx], self.data[1][idx], self.data[2][idx]
+            labels= torch.roll(labels, shifts=-1, dims=-1)
+
+            return inputs, labels, attn_mask
+        elif args.data_type == "jsonl":
             ctx_len = args.ctx_len
             req_len = ctx_len + 1
-            dix = self.data[0][idx]
-            label = self.data[1][idx]
+            ctx = self.data[idx]['text']
+            token = torch.tensor(pipeline.encode(ctx))
+            token_len = len(token)
+            min_len = min(token_len, req_len)
+            if req_len < token_len :
+                token = token[:req_len]
+                pad_len = 0
+            else:
+                pad_len = req_len - token_len
+        
+            # dix = F.pad(token, (pad_len, 0), value=0)
+            dix = F.pad(token, (0, pad_len), value=0)
+            x = dix[:-1]
+            y = dix[1:]
+            # mask = torch.zeros(req_len)
+            # mask[pad_len:] = 1
 
-            data_len = len(dix)
+            # mask = torch.zeros(req_len)
+            # mask[:min_len] = 1
 
-            padding = (0, req_len-data_len)
-            dix_pad = F.pad(dix, padding, "constant", 0)
-            label_pad = F.pad(label, padding, "constant", -100)
-            mask = (label_pad != -100).int()
-
-            x = dix_pad[:-1].to(dtype=torch.long)
-            y = dix_pad[1:].to(dtype=torch.long)
-
-            return x, y, mask[1:]
+            mask = torch.zeros(req_len - 1)
+            mask[:min_len - 1] = 1
+            return x, y, mask
         else:
             ctx_len = args.ctx_len
             req_len = ctx_len + 1
@@ -315,8 +330,8 @@ class MyDataset(Dataset):
                 return x, y, mask
 
             if args.loss_mask == 'pad':
-                mask = torch.zeros(req_len - 1)
-                mask[:min_len - 1] = 1
+                mask = torch.zeros(req_len)
+                mask[:min_len] = 1
                 return x, y, mask
             if args.loss_mask == 'se':
                 t1 = pipeline.encode(args.mask_id['mask0'])

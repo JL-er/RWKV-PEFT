@@ -38,14 +38,14 @@ class Block(nn.Module):
             return self.forward_infctx(*args, **kwargs)
         return self.forward_normal(*args, **kwargs)
 
-    def forward_normal(self, x, v_first):
+    def forward_normal(self, x, v_first, attention_mask = None):
         if self.layer_id == 0:
             x = self.ln0(x)
 
-        x_attn, v_first = self.att(self.ln1(x), v_first)
+        x_attn, v_first = self.att(self.ln1(x), v_first, attention_mask = attention_mask)
         x = x + x_attn
 
-        x = x + self.ffn(self.ln2(x))
+        x = x + self.ffn(self.ln2(x), attention_mask = attention_mask)
         return x, v_first
 
     def forward_infctx(self, x, v_first, last_state: BlockState):

@@ -108,9 +108,12 @@ class RWKV_Tmix_x070(nn.Module):
             # self.value.weight.data.uniform_(-0.5/(C**0.5), 0.5/(C**0.5))
             # self.output.weight.data.zero_()
 
-    def forward(self, x, v_first):
+    def forward(self, x, v_first, attention_mask=None):
         B, T, C = x.size()
         H = self.n_head
+
+        if attention_mask is not None:
+            x = x.mul(attention_mask[:, -x.shape[-2]:, None])
         xx = self.time_shift(x) - x
 
         xr = x + xx * self.x_r
@@ -134,6 +137,9 @@ class RWKV_Tmix_x070(nn.Module):
         kk = k * self.k_k
         kk = F.normalize(kk.view(B,T,H,-1), dim=-1, p=2.0).view(B,T,C)
         k = k * (1 + (a-1) * self.k_a)
+
+        if attention_mask is not None:
+            v = v * attention_mask[:, -v.shape[-2]:, None]
         
         x = RUN_CUDA_RWKV7g(r, w, k, v, -kk, kk*a)
         x = self.ln_x(x.view(B * T, C)).view(B, T, C)
