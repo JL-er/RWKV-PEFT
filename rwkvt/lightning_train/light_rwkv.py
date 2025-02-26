@@ -25,6 +25,13 @@ try:
 except:
     os.environ["RWKV_MY_TESTING"] = ''
 
+if os.environ["FUSED_KERNEL"] == '1':
+    from rwkvfla.modules import FusedCrossEntropyLoss
+    criterion = FusedCrossEntropyLoss(inplace_backward=True)
+else:
+    FusedCrossEntropyLoss = None
+    criterion = nn.CrossEntropyLoss()
+
 if "7" in os.environ["RWKV_MY_TESTING"]:
     from rwkvt.rwkv7.model import RWKV7 as RWKVModel
 elif "6" in os.environ["RWKV_MY_TESTING"]:
@@ -227,13 +234,13 @@ class RWKV(pl.LightningModule):
                 mask = mask.view(-1)
                 sum_mask = torch.sum(mask).item()
                 logits = self(idx)
-                loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), reduction='none')
+                loss = criterion(logits.view(-1, logits.size(-1)), targets.view(-1), reduction='none')
                 loss = torch.sum(loss * mask) / sum_mask
             elif args.my_qa_mask != 1:
                 idx, targets = batch
 
                 logits = self(idx)
-                loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1))
+                loss = criterion(logits.view(-1, logits.size(-1)), targets.view(-1))
 
             else:
                 idx, targets, mask = batch
@@ -244,16 +251,16 @@ class RWKV(pl.LightningModule):
 
                 logits = self(idx)
                 if sum_mask == mask.shape[0]:
-                    loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1))
+                    loss = criterion(logits.view(-1, logits.size(-1)), targets.view(-1))
                     # print('rank', self.global_rank, 'loss', loss.item())
                 else:
-                    loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), reduction='none')
+                    loss = criterion(logits.view(-1, logits.size(-1)), targets.view(-1), reduction='none')
                     # loss_raw = loss
                     loss = torch.sum(loss * mask) / sum_mask
 
             return L2Wrap.apply(loss, logits)
     
-
+    
     def training_step_end(self, batch_parts):
         if pl.__version__[0]!='2':
             all = self.all_gather(batch_parts)

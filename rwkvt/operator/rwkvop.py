@@ -27,37 +27,37 @@ def RUN_CUDA_RWKV5():
 
 if os.environ["WKV"] == 'fla':
     if 'x070' in os.environ["RWKV_MY_TESTING"]:
-        from fla.ops.rwkv7 import chunk_rwkv7
+        from rwkvfla.ops.rwkv7 import chunk_rwkv7
         if os.environ["RWKV_TRAIN_TYPE"] == 'infctx':
             def RUN_RWKV7_INFCTX(r, k, v, w, a, b, s, HEAD_SIZE=64): # for State-tuning, infctx
                 B,T,HC = w.shape
                 C = HEAD_SIZE
                 H = HC//C
-                w=-torch.exp(w)
                 r,w,k,v,a,b = [i.view(B,T,H,C) for i in [r,w,k,v,a,b]]
-                o, state = chunk_rwkv7(r, w, k, v, a, b, scale=1.0, initial_state=s, output_final_state=True, head_first=False)
+                # when use w=, -exp(w) is not needed, w=-torch.exp(w), otherwise, use log_w = -torch.exp(w)
+                o, state = chunk_rwkv7(r=r, w=w, k=k, v=v, a=a, b=b, scale=1.0, initial_state=s, output_final_state=True, head_first=False)
                 return o, state
         if os.environ["RWKV_TRAIN_TYPE"] == 'state':
             def RUN_RWKV7_STATE(r, k, v, w, a, b, s, HEAD_SIZE=64): # for State-tuning, infctx
                 B,T,HC = w.shape
                 C = HEAD_SIZE
                 H = HC//C
-                w=-torch.exp(w)
                 s = s.transpose(1, 2).expand(B,*s.shape)
                 r,w,k,v,a,b = [i.view(B,T,H,C) for i in [r,w,k,v,a,b]]
-                o, state = chunk_rwkv7(r, w, k, v, a, b, scale=1.0, initial_state=s, output_final_state=True, head_first=False)
+                # when use w=, -exp(w) is not needed, w=-torch.exp(w), otherwise, use log_w = -torch.exp(w)
+                o, state = chunk_rwkv7(r=r, w=w, k=k, v=v, a=a, b=b, scale=1.0, initial_state=s, output_final_state=True, head_first=False)
                 return o, state
         else:
             def RUN_CUDA_RWKV7g(r,w,k,v,a,b, HEAD_SIZE=64): #compatible with cuda implement
                 B,T,HC = w.shape
                 C = HEAD_SIZE
                 H = HC//C
-                w=-torch.exp(w)
                 r,w,k,v,a,b = [i.view(B,T,H,C) for i in [r,w,k,v,a,b]]
-                o, state = chunk_rwkv7(r, w, k, v, a, b, scale=1.0, initial_state=None, output_final_state=False, head_first=False)
+                # when use w=, -exp(w) is not needed, w=-torch.exp(w), otherwise, use log_w = -torch.exp(w)
+                o, _ = chunk_rwkv7(r=r, w=w, k=k, v=v, a=a, b=b, scale=1.0, initial_state=None, output_final_state=False, head_first=False)
                 return o
     if 'x060' in os.environ["RWKV_MY_TESTING"]:
-        from fla.ops.rwkv6 import chunk_rwkv6
+        from rwkvfla.ops.rwkv6 import chunk_rwkv6
 
         if os.environ["RWKV_TRAIN_TYPE"] == 'infctx':
             def RUN_CUDA_RWKV6_STATE(B, T, C, H, r, k, v, w, u, s):

@@ -125,6 +125,7 @@ if __name__ == "__main__":
 
 
     parser.add_argument("--op", default="cuda", type=str)
+    parser.add_argument("--fused_kernel", action='store_true', help="Enable rwkv-fla fused kernel")
 
     parser.add_argument("--lr_schedule", default="cos", type=str)        #['cos', 'wsd']
 
@@ -183,8 +184,10 @@ if __name__ == "__main__":
     elif args.train_type=='infctx':
         os.environ["RWKV_TRAIN_TYPE"]='infctx'
 
-
+    print(f"########## WKV OP           {args.op}               ##########\n" * 3)
+    print(f"########## FUSED OP    {args.fused_kernel}          ##########\n" * 3)
     os.environ["WKV"]= args.op
+    os.environ["FUSED_KERNEL"] = '1' if args.fused_kernel else '0'
 
     if args.dim_att <= 0:
         args.dim_att = args.n_embd
