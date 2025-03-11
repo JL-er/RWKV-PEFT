@@ -49,12 +49,11 @@ class train_callback(pl.Callback):
             lr = args.lr_init
         else:
             if 'wsd' == args.lr_schedule:
-                lr = wsd(args.lr_init, 0, real_step, args.epoch_steps//int(args.devices))
+                lr = wsd(args.lr_init, 0, real_step, args.epoch_steps//int(args.devices),warmup_steps=w_step)
             else:
                 lr = cos_decay(args.lr_init, args.lr_final, real_step, args.epoch_steps//int(args.devices))
 
-        if trainer.global_step < w_step:
-            lr = lr * (0.01 + 0.99 * trainer.global_step / w_step)
+
 
         if args.weight_decay_final > 0:
             wd_now = args.weight_decay * math.exp(math.log(args.weight_decay_final / args.weight_decay) * progress)

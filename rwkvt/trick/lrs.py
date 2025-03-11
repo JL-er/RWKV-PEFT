@@ -39,6 +39,8 @@ def wsd(initial_lr, final_lr, current_step, total_steps, warmup_steps=100):
     Returns:
         float: The computed learning rate.
     """
+    if warmup_steps<=0:
+        warmup_steps = 100
     if current_step < warmup_steps:
         # Warmup phase: linearly increase LR from 0 to initial_lr.
         return initial_lr * current_step / max(1, warmup_steps)
