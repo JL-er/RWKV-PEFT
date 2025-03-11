@@ -48,14 +48,14 @@ class Block(nn.Module):
         x = x + self.ffn(self.ln2(x), attention_mask = attention_mask)
         return x, v_first
 
-    def forward_infctx(self, x, v_first, last_state: BlockState):
+    def forward_infctx(self, x, v_first, last_state: BlockState, attention_mask = None):
         if self.layer_id == 0:
             x = self.ln0(x)
 
-        x_attn, v_first, att_state = self.att(self.ln1(x), v_first, last_state.time_mix_state)
+        x_attn, v_first, att_state = self.att(self.ln1(x), v_first, last_state.time_mix_state, attention_mask = attention_mask)
         x = x + x_attn
 
-        ffn_out ,ffn_state = self.ffn(self.ln2(x), last_state.channel_mix_state)
+        ffn_out ,ffn_state = self.ffn(self.ln2(x), last_state.channel_mix_state, attention_mask = attention_mask)
 
         x = x + ffn_out
         return x, v_first, BlockState(att_state, ffn_state)

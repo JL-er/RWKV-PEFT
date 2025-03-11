@@ -110,11 +110,14 @@ class RWKV_Tmix_x060(nn.Module):
         x = self.output(x * g)
         return x
 
-    def forward(self, x):
+    def forward(self, x, attention_mask=None):
         B, T, C = x.size()
         H = self.n_head
-
+        if attention_mask is not None:
+            x = x.mul(attention_mask[:, -x.shape[-2]:, None])
         r, k, v, g, w = self.jit_func(x)
+        if attention_mask is not None:
+            v = v * attention_mask[:, -v.shape[-2]:, None]
         x = RUN_CUDA_RWKV6(B, T, C, H, r, k, v, w, u=self.time_faaaa)
 
         return self.jit_func_2(x, g)
@@ -214,11 +217,14 @@ class RWKV_Tmix_x060_state(nn.Module):
         x = self.output(x * g)
         return x
 
-    def forward(self, x):
+    def forward(self, x, attention_mask=None):
         B, T, C = x.size()
         H = self.n_head
-
+        if attention_mask is not None:
+            x = x.mul(attention_mask[:, -x.shape[-2]:, None])
         r, k, v, g, w = self.jit_func(x)
+        if attention_mask is not None:
+            v = v * attention_mask[:, -v.shape[-2]:, None]
         x = RUN_CUDA_RWKV6_STATE(B, T, C, H, r, k, v, w, u=self.time_faaaa, s=self.time_state)
 
         return self.jit_func_2(x, g)
@@ -316,12 +322,15 @@ class RWKV_Tmix_x060_infctx(nn.Module):
         x = self.output(x * g)
         return x, timemixstate
 
-    def forward(self, x, last_state: TimeMixState):
+    def forward(self, x, last_state: TimeMixState, attention_mask=None):
         B, T, C = x.size()
         H = self.n_head
         shift_state = last_state.shift_state
+        if attention_mask is not None:
+            x = x.mul(attention_mask[:, -x.shape[-2]:, None])
         r, k, v, g, w, lx = self.jit_func(x, shift_state)
-        ######
+        if attention_mask is not None:
+            v = v * attention_mask[:, -v.shape[-2]:, None]
         wkv_state = last_state.wkv_state.clone().contiguous()
         x, wkv_state = RUN_CUDA_RWKV6_STATE(B, T, C, H, r, k, v, w, u=self.time_faaaa, s=wkv_state)
         #wkv_state = last_state.wkv_state                                                                                                                                                                                                                                                                                         

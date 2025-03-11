@@ -31,7 +31,9 @@ class RWKV_CMix_x060(nn.Module):
         self.receptance = make_linear_ffn(args.n_embd, args.n_embd, bias=False)
         self.value = make_linear_ffn(args.dim_ffn, args.n_embd, bias=False)
 
-    def forward(self, x):
+    def forward(self, x, attention_mask=None):
+        if attention_mask is not None:
+            x = x.mul(attention_mask[:, -x.shape[-2]:, None])
         xx = self.time_shift(x) - x
         xk = x + xx * self.time_maa_k
         xr = x + xx * self.time_maa_r
@@ -60,7 +62,9 @@ class RWKV_CMix_x060_infctx(nn.Module):
         self.receptance = make_linear_ffn(args.n_embd, args.n_embd, bias=False)
         self.value = make_linear_ffn(args.dim_ffn, args.n_embd, bias=False)
 
-    def forward(self, x, last_state: ChannelMixState):
+    def forward(self, x, last_state: ChannelMixState, attention_mask=None):
+        if attention_mask is not None:
+            x = x.mul(attention_mask[:, -x.shape[-2]:, None])
         xx = torch.concat((last_state.shift_state.unsqueeze(1), x[:, :-1]), dim=1) - x
         xk = x + xx * self.time_maa_k
         xr = x + xx * self.time_maa_r

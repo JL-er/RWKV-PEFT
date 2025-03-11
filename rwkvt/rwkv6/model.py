@@ -34,7 +34,7 @@ class RWKV6(nn.Module):
             return self.forward_infctx(*args, **kwargs)
         return self.forward_normal(*args, **kwargs)
 
-    def forward_normal(self, idx):
+    def forward_normal(self, idx, attention_mask = None):
         args = self.args
         B, T = idx.size()
         assert T <= args.ctx_len, "Cannot forward, model ctx_len is exhausted."
@@ -44,11 +44,11 @@ class RWKV6(nn.Module):
         for block in self.blocks:
             if args.grad_cp == 1:
                 if args.train_type == 'state' or args.peft !='none':
-                    x = torch_checkpoint(block, x, use_reentrant=False)
+                    x = torch_checkpoint(block, x, attention_mask, use_reentrant=False)
                 else:
-                    x = deepspeed.checkpointing.checkpoint(block, x)
+                    x = deepspeed.checkpointing.checkpoint(block, x, attention_mask)
             else:
-                x = block(x)
+                x = block(x, attention_mask)
 
         x = self.ln_out(x)
         x = self.head(x)
@@ -56,7 +56,7 @@ class RWKV6(nn.Module):
         return x
 
     def forward_infctx(self, idx,  last_shift_states: torch.Tensor,
-            last_wkv_states: torch.Tensor):
+            last_wkv_states: torch.Tensor, attention_mask = None):
         args = self.args
         B, T = idx.size()
         assert T <= args.chunk_ctx, "Cannot forward, model ctx_len is exhausted."
@@ -72,9 +72,9 @@ class RWKV6(nn.Module):
         for i, (block, block_state) in enumerate(zip(self.blocks,
             BlockStateList(last_shift_states, last_wkv_states))):
             if args.grad_cp == 1 and i > 0:# and i < len(self.blocks)-1 :
-                x, new_block_state = torch_checkpoint(block, x, block_state, use_reentrant=False)
+                x, new_block_state = torch_checkpoint(block, x, block_state, attention_mask, use_reentrant=False)
             else:
-                x, new_block_state = block(x, block_state)    
+                x, new_block_state = block(x, block_state, attention_mask)    
             new_states[i] = new_block_state 
 
         x = self.ln_out(x)

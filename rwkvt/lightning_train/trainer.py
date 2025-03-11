@@ -49,7 +49,7 @@ class train_callback(pl.Callback):
             lr = args.lr_init
         else:
             if 'wsd' == args.lr_schedule:
-                lr = wsc_decay(args.lr_init, args.lr_final, real_step, args.epoch_steps//int(args.devices))
+                lr = wsd(args.lr_init, 0, real_step, args.epoch_steps//int(args.devices))
             else:
                 lr = cos_decay(args.lr_init, args.lr_final, real_step, args.epoch_steps//int(args.devices))
 

@@ -38,21 +38,21 @@ class Block(nn.Module):
             return self.forward_infctx(*args, **kwargs)
         return self.forward_normal(*args, **kwargs)
 
-    def forward_normal(self, x):
+    def forward_normal(self, x, attention_mask = None):
         if self.layer_id == 0:
             x = self.ln0(x)
 
-        x = x + self.att(self.ln1(x))
-        x = x + self.ffn(self.ln2(x))
+        x = x + self.att(self.ln1(x), attention_mask = attention_mask)
+        x = x + self.ffn(self.ln2(x), attention_mask = attention_mask)
         return x
 
-    def forward_infctx(self, x, last_state: BlockState):
+    def forward_infctx(self, x, last_state: BlockState, attention_mask = None):
         if self.layer_id == 0:
             x = self.ln0(x)
 
-        x_attn,  att_state = self.att(self.ln1(x), last_state.time_mix_state)
+        x_attn,  att_state = self.att(self.ln1(x), last_state.time_mix_state, attention_mask = attention_mask)
         x = x + x_attn
 
-        ffn_out ,ffn_state = self.ffn(self.ln2(x), last_state.channel_mix_state)
+        ffn_out ,ffn_state = self.ffn(self.ln2(x), last_state.channel_mix_state, attention_mask = attention_mask)
         x = x + ffn_out
         return x, BlockState(att_state, ffn_state)
