@@ -174,8 +174,8 @@ class RWKV(pl.LightningModule):
 
     if os.environ.get("RWKV_TRAIN_TYPE") == 'infctx':
         def forward(self, idx,  last_shift_states: torch.Tensor,
-                last_wkv_states: torch.Tensor):
-            return self.model(idx, last_shift_states, last_wkv_states)
+                last_wkv_states: torch.Tensor, attention_mask=None):
+            return self.model(idx, last_shift_states, last_wkv_states, attention_mask)
     else:
         def forward(self, idx, attention_mask=None):
             return self.model(idx, attention_mask)
@@ -184,7 +184,8 @@ class RWKV(pl.LightningModule):
         def training_step(self, batch, batch_idx):
             args = self.args
             T_train = args.chunk_ctx 
-            idx, targets = batch
+            idx, targets, mask = batch
+
             B, T = idx.shape
             C = args.n_embd
             H =  args.dim_att // args.head_size_a
@@ -192,15 +193,21 @@ class RWKV(pl.LightningModule):
             states = BlockStateList.create(args.n_layer, B, C, H, idx.device,
                 self.model.emb.weight.dtype)
 
-            def checkpointed_step(idx, targets, prev_loss, last_shift_states,
+            def checkpointed_step(idx, targets, mask, prev_loss, last_shift_states,
                                 last_wkv_states, prev_token_amount):
                 logits, new_shift_states, new_wkv_states = self(idx, last_shift_states, last_wkv_states)
                 current_token_amount = (targets!=-100).sum() #这样是不是更合适？
                 current_token_amount = idx.shape[1]
+
+                mask = mask.reshape(-1)
+                sum_mask = torch.sum(mask).item()
+
                 if current_token_amount == 0:
                     loss = self.criterion(logits.view(-1, logits.size(-1)), targets.reshape(-1),reduction='sum')
+                    loss = torch.sum(loss * mask) / sum_mask
                 else:
                     loss = self.criterion(logits.view(-1, logits.size(-1)), targets.reshape(-1))
+                    loss = torch.sum(loss * mask) / sum_mask
                     loss = L2Wrap.apply(loss, logits, current_token_amount)
                 new_token_amount = prev_token_amount+current_token_amount
                 if new_token_amount>0:
@@ -220,6 +227,7 @@ class RWKV(pl.LightningModule):
                     checkpointed_step,
                     idx[:, i * T_train:(i + 1) * T_train],
                     targets[:, i * T_train:(i + 1) * T_train],
+                    mask[:, i * T_train:(i + 1) * T_train],
                     total_loss,
                     states.shift_states,
                     states.wkv_states,
