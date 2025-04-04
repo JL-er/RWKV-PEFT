@@ -240,7 +240,7 @@ class RWKV_Tmix_x070_infctx(RWKV_Tmix_x070):
 
         #print(f'x shape = {x.shape}')
 
-        shift_state = x[:,-1,:]
+        shift_state = x[:,0,:]
 
         r = self.receptance(xr)
         w = -F.softplus(-(self.w0 + torch.tanh(xw @ self.w1) @ self.w2)) - 0.5 # soft-clamp to (-inf, -0.5)
