@@ -76,6 +76,114 @@ pip install -r requirements.txt
 
 ## Hardware Requirements
 
+### RWKV-7 模型
+
+Below is the RWKV-7 model fine-tuned video memory requirement data, tested with RTX 4090 (24GB video memory) + 64GB RAM, based on the following parameter configurations:
+
+- `--strategy deepspeed_stage_1`
+- `--ctx_len 1024`
+- `--micro_bsz 1`
+- `--lora_r 64` or `disha_config='{"mode":"bone","r":32}'`
+
+<table>
+  <tr>
+    <th rowspan="2" style="text-align: center;">Fine-tuning Method (Training Accuracy)</th>
+    <th colspan="4" style="text-align: center;">Model Parameters Size</th>
+  </tr>
+  <tr>
+    <th>RWKV7-0.1B</th>
+    <th>RWKV7-0.4B</th>
+    <th>RWKV7-1.5B</th>
+    <th>RWKV7-3B</th>
+  </tr>
+  <tr>
+    <td>State Tuning (BF16)</td>
+    <td>2.6 GB</td>
+    <td>3.1 GB</td>
+    <td>5.3 GB</td>
+    <td>8.2 GB</td>
+  </tr>
+  <tr>
+    <td>State Tuning (INT8)</td>
+    <td>2.4 GB</td>
+    <td>2.9 GB</td>
+    <td>4.1 GB</td>
+    <td>5.7 GB</td>
+  </tr>
+  <tr>
+    <td>State Tuning (NF4)</td>
+    <td>2.5 GB</td>
+    <td>2.8 GB</td>
+    <td>3.7 GB</td>
+    <td>4.7 GB</td>
+  </tr>
+  <tr>
+    <td>LoRA (BF16)</td>
+    <td>2.7 GB</td>
+    <td>3.4 GB</td>
+    <td>5.6 GB</td>
+    <td>8.8 GB</td>
+  </tr>
+  <tr>
+    <td>LoRA (INT8)</td>
+    <td>2.5 GB</td>
+    <td>2.9 GB</td>
+    <td>4.6 GB</td>
+    <td>6.7 GB</td>
+  </tr>
+  <tr>
+    <td>LoRA (NF4)</td>
+    <td>2.4 GB</td>
+    <td>2.7 GB</td>
+    <td>3.9 GB</td>
+    <td>5.7 GB</td>
+  </tr>
+  <tr>
+    <td>DiSHA (BF16)</td>
+    <td>2.7 GB</td>
+    <td>3.1 GB</td>
+    <td>5.6 GB</td>
+    <td>8.8 GB</td>
+  </tr>
+  <tr>
+    <td>DiSHA (INT8)</td>
+    <td>2.5 GB</td>
+    <td>2.9 GB</td>
+    <td>4.5 GB</td>
+    <td>6.7 GB</td>
+  </tr>
+  <tr>
+    <td>DiSHA (NF4)</td>
+    <td>2.4 GB</td>
+    <td>2.7 GB</td>
+    <td>3.9 GB</td>
+    <td>5.7 GB</td>
+  </tr>
+  <tr>
+    <td>PiSSA (BF16)</td>
+    <td>2.6 GB</td>
+    <td>3.4 GB</td>
+    <td>5.6 GB</td>
+    <td>8.8 GB</td>
+  </tr>
+  <tr>
+    <td>PiSSA (INT8)</td>
+    <td>2.5 GB</td>
+    <td>3.0 GB</td>
+    <td>4.6 GB</td>
+    <td>6.7 GB</td>
+  </tr>
+  <tr>
+    <td>PiSSA (NF4)</td>
+    <td>2.4 GB</td>
+    <td>2.7 GB</td>
+    <td>3.9 GB</td>
+    <td>5.7 GB</td>
+  </tr>
+</table>
+
+### RWKV-6 Models
+
 The following shows memory usage when using an RTX 4090 (24GB VRAM) + 64GB RAM (with parameters: `--strategy deepspeed_stage_1 --ctx_len 1024 --micro_bsz 1 --lora_r 64`):
 
 |   Model Size   | Full Finetuning | LoRA/PISSA | QLoRA/QPISSA | State Tuning |
