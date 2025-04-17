@@ -76,17 +76,63 @@ pip install -r requirements.txt
 
 ## Hardware Requirements
 
+### RWKV-7 Models
+
+Below is the RWKV-7 model fine-tuned video memory requirement data, tested with RTX 4090 (24GB video memory) + 64GB RAM, based on the following parameter configurations:
+
+- Training precision: BF16
+- `--strategy deepspeed_stage_1`
+- `--ctx_len 1024`
+- `--micro_bsz 1`
+- `--lora_r 64` or `disha_config='{"mode":"bone","r":32}'`
+
+| Model Parameters | State Tuning | LoRA | DiSHA | PiSSA |
+|------------------|--------------|------|-------|-------|
+| RWKV7-0.1B       | 2.6 GB       | 2.7 GB  | 2.7 GB   | 2.6 GB   |
+| RWKV7-0.4B       | 3.1 GB       | 3.4 GB  | 3.1 GB   | 3.4 GB   |
+| RWKV7-1.5B       | 5.3 GB       | 5.6 GB  | 5.6 GB   | 5.6 GB   |
+| RWKV7-3B         | 8.2 GB       | 8.8 GB  | 8.8 GB   | 8.8 GB   |
+
+<details>
+<summary>🔍 <b>Click to view the VRAM requirements for quantized training of RWKV-7 models</b> </summary>
+
+### INT8 VRAM Requirements
+
+| Model Parameters | State Tuning | LoRA | DiSHA | PiSSA |
+|------------------|--------------|------|-------|-------|
+| RWKV7-0.1B       | 2.4 GB       | 2.5 GB  | 2.5 GB   | 2.5 GB   |
+| RWKV7-0.4B       | 2.9 GB       | 2.9 GB  | 2.9 GB   | 3.0 GB   |
+| RWKV7-1.5B       | 4.1 GB       | 4.6 GB  | 4.5 GB   | 4.6 GB   |
+| RWKV7-3B         | 5.7 GB       | 6.7 GB  | 6.7 GB   | 6.7 GB   |
+
+### NF4 VRAM Requirements
+
+| Model Parameters | State Tuning | LoRA | DiSHA | PiSSA |
+|------------------|--------------|------|-------|-------|
+| RWKV7-0.1B       | 2.5 GB       | 2.4 GB  | 2.4 GB   | 2.4 GB   |
+| RWKV7-0.4B       | 2.8 GB       | 2.7 GB  | 2.7 GB   | 2.7 GB   |
+| RWKV7-1.5B       | 3.7 GB       | 3.9 GB  | 3.9 GB   | 3.9 GB   |
+| RWKV7-3B         | 4.7 GB       | 5.7 GB  | 5.7 GB   | 5.7 GB   |
+
+</details>
+
+<details>
+<summary>🔍 <b>Click to view the VRAM requirements of RWKV-6 models</b> </summary>
+
+
 The following shows memory usage when using an RTX 4090 (24GB VRAM) + 64GB RAM (with parameters: `--strategy deepspeed_stage_1 --ctx_len 1024 --micro_bsz 1 --lora_r 64`):
 
 |   Model Size   | Full Finetuning | LoRA/PISSA | QLoRA/QPISSA | State Tuning |
 |---------------|-----------------|------------|--------------|--------------|
-| RWKV6-1.6B    | OOM            | 7.4GB      | 5.6GB        | 6.4GB        |
-| RWKV6-3B      | OOM            | 12.1GB     | 8.2GB        | 9.4GB        |
-| RWKV6-7B      | OOM            | 23.7GB*    | 14.9GB**     | 18.1GB       |
+| RWKV6-1.6B    | OOM            | 7.4 GB      | 5.6 GB        | 6.4 GB        |
+| RWKV6-3B      | OOM            | 12.1 GB     | 8.2 GB        | 9.4 GB        |
+| RWKV6-7B      | OOM            | 23.7 GB*    | 14.9 GB**     | 18.1 GB       |
 
 Note:
 * OOM when batch size is 8
 ** Requires 19.5GB VRAM when batch size is 8
+
+</details>
 
 ## Quick Start
 
