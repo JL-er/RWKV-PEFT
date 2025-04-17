@@ -92,107 +92,41 @@ PROMPT = (
 
 以下是使用 RTX 4090 (24GB 显存) + 64GB 内存测试的 RWKV-7 模型微调显存占用数据，基于以下参数配置：
 
+- 训练精度：BF16
 - `--strategy deepspeed_stage_1`
 - `--ctx_len 1024`
 - `--micro_bsz 1`
 - `--lora_r 64` 或者 `disha_config='{"mode":"bone","r":32}'`
 
-<table>
-  <tr>
-    <th rowspan="2" style="text-align: center;">微调方法（训练精度）</th>
-    <th colspan="4" style="text-align: center;">模型参数</th>
-  </tr>
-  <tr>
-    <th>RWKV7-0.1B</th>
-    <th>RWKV7-0.4B</th>
-    <th>RWKV7-1.5B</th>
-    <th>RWKV7-3B</th>
-  </tr>
-  <tr>
-    <td>State Tuning (BF16)</td>
-    <td>2.6 GB</td>
-    <td>3.1 GB</td>
-    <td>5.3 GB</td>
-    <td>8.2 GB</td>
-  </tr>
-  <tr>
-    <td>State Tuning (INT8)</td>
-    <td>2.4 GB</td>
-    <td>2.9 GB</td>
-    <td>4.1 GB</td>
-    <td>5.7 GB</td>
-  </tr>
-  <tr>
-    <td>State Tuning (NF4)</td>
-    <td>2.5 GB</td>
-    <td>2.8 GB</td>
-    <td>3.7 GB</td>
-    <td>4.7 GB</td>
-  </tr>
-  <tr>
-    <td>LoRA (BF16)</td>
-    <td>2.7 GB</td>
-    <td>3.4 GB</td>
-    <td>5.6 GB</td>
-    <td>8.8 GB</td>
-  </tr>
-  <tr>
-    <td>LoRA (INT8)</td>
-    <td>2.5 GB</td>
-    <td>2.9 GB</td>
-    <td>4.6 GB</td>
-    <td>6.7 GB</td>
-  </tr>
-  <tr>
-    <td>LoRA (NF4)</td>
-    <td>2.4 GB</td>
-    <td>2.7 GB</td>
-    <td>3.9 GB</td>
-    <td>5.7 GB</td>
-  </tr>
-  <tr>
-    <td>DiSHA (BF16)</td>
-    <td>2.7 GB</td>
-    <td>3.1 GB</td>
-    <td>5.6 GB</td>
-    <td>8.8 GB</td>
-  </tr>
-  <tr>
-    <td>DiSHA (INT8)</td>
-    <td>2.5 GB</td>
-    <td>2.9 GB</td>
-    <td>4.5 GB</td>
-    <td>6.7 GB</td>
-  </tr>
-  <tr>
-    <td>DiSHA (NF4)</td>
-    <td>2.4 GB</td>
-    <td>2.7 GB</td>
-    <td>3.9 GB</td>
-    <td>5.7 GB</td>
-  </tr>
-  <tr>
-    <td>PiSSA (BF16)</td>
-    <td>2.6 GB</td>
-    <td>3.4 GB</td>
-    <td>5.6 GB</td>
-    <td>8.8 GB</td>
-  </tr>
-  <tr>
-    <td>PiSSA (INT8)</td>
-    <td>2.5 GB</td>
-    <td>3.0 GB</td>
-    <td>4.6 GB</td>
-    <td>6.7 GB</td>
-  </tr>
-  <tr>
-    <td>PiSSA (NF4)</td>
-    <td>2.4 GB</td>
-    <td>2.7 GB</td>
-    <td>3.9 GB</td>
-    <td>5.7 GB</td>
-  </tr>
-</table>
+| 模型参数      | State Tuning | LoRA | DiSHA | PiSSA |
+|--------------|--------------|------|-------|-------|
+| RWKV7-0.1B   | 2.6         | 2.7  | 2.7   | 2.6   |
+| RWKV7-0.4B   | 3.1         | 3.4  | 3.1   | 3.4   |
+| RWKV7-1.5B   | 5.3         | 5.6  | 5.6   | 5.6   |
+| RWKV7-3B     | 8.2         | 8.8  | 8.8   | 8.8   |
+
+<details>
+<summary>🔍 <b>点击查看 RWKV-7 模型量化训练的显存需求</b> </summary>
+
+### INT8 显存需求
+
+| 模型参数      | State Tuning | LoRA | DiSHA | PiSSA |
+|--------------|--------------|------|-------|-------|
+| RWKV7-0.1B   | 2.4         | 2.5  | 2.5   | 2.5   |
+| RWKV7-0.4B   | 2.9         | 2.9  | 2.9   | 3.0   |
+| RWKV7-1.5B   | 4.1         | 4.6  | 4.5   | 4.6   |
+| RWKV7-3B     | 5.7         | 6.7  | 6.7   | 6.7   |
+
+### NF4 显存需求
+
+| 模型参数      | State Tuning | LoRA | DiSHA | PiSSA |
+|--------------|--------------|------|-------|-------|
+| RWKV7-0.1B   | 2.5         | 2.4  | 2.4   | 2.4   |
+| RWKV7-0.4B   | 2.8         | 2.7  | 2.7   | 2.7   |
+| RWKV7-1.5B   | 3.7         | 3.9  | 3.9   | 3.9   |
+| RWKV7-3B     | 4.7         | 5.7  | 5.7   | 5.7   |
+
+</details>
 
 ### RWKV-6 模型
 
