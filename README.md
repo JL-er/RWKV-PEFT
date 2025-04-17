@@ -88,10 +88,10 @@ Below is the RWKV-7 model fine-tuned video memory requirement data, tested with 
 
 | Model Parameters | State Tuning | LoRA | DiSHA | PiSSA |
 |------------------|--------------|------|-------|-------|
-| RWKV7-0.1B       | 2.6         | 2.7  | 2.7   | 2.6   |
-| RWKV7-0.4B       | 3.1         | 3.4  | 3.1   | 3.4   |
-| RWKV7-1.5B   | 5.3         | 5.6  | 5.6   | 5.6   |
-| RWKV7-3B     | 8.2         | 8.8  | 8.8   | 8.8   |
+| RWKV7-0.1B       | 2.6 GB       | 2.7 GB  | 2.7 GB   | 2.6 GB   |
+| RWKV7-0.4B       | 3.1 GB       | 3.4 GB  | 3.1 GB   | 3.4 GB   |
+| RWKV7-1.5B       | 5.3 GB       | 5.6 GB  | 5.6 GB   | 5.6 GB   |
+| RWKV7-3B         | 8.2 GB       | 8.8 GB  | 8.8 GB   | 8.8 GB   |
 
 <details>
 <summary>🔍 <b>Click to view the VRAM requirements for quantized training of RWKV-7 models</b> </summary>
@@ -100,19 +100,19 @@ Below is the RWKV-7 model fine-tuned video memory requirement data, tested with 
 
 | Model Parameters | State Tuning | LoRA | DiSHA | PiSSA |
 |------------------|--------------|------|-------|-------|
-| RWKV7-0.1B       | 2.4         | 2.5  | 2.5   | 2.5   |
-| RWKV7-0.4B       | 2.9         | 2.9  | 2.9   | 3.0   |
-| RWKV7-1.5B   | 4.1         | 4.6  | 4.5   | 4.6   |
-| RWKV7-3B     | 5.7         | 6.7  | 6.7   | 6.7   |
+| RWKV7-0.1B       | 2.4 GB       | 2.5 GB  | 2.5 GB   | 2.5 GB   |
+| RWKV7-0.4B       | 2.9 GB       | 2.9 GB  | 2.9 GB   | 3.0 GB   |
+| RWKV7-1.5B       | 4.1 GB       | 4.6 GB  | 4.5 GB   | 4.6 GB   |
+| RWKV7-3B         | 5.7 GB       | 6.7 GB  | 6.7 GB   | 6.7 GB   |
 
 ### NF4 VRAM Requirements
 
 | Model Parameters | State Tuning | LoRA | DiSHA | PiSSA |
 |------------------|--------------|------|-------|-------|
-| RWKV7-0.1B       | 2.5         | 2.4  | 2.4   | 2.4   |
-| RWKV7-0.4B       | 2.8         | 2.7  | 2.7   | 2.7   |
-| RWKV7-1.5B   | 3.7         | 3.9  | 3.9   | 3.9   |
-| RWKV7-3B     | 4.7         | 5.7  | 5.7   | 5.7   |
+| RWKV7-0.1B       | 2.5 GB       | 2.4 GB  | 2.4 GB   | 2.4 GB   |
+| RWKV7-0.4B       | 2.8 GB       | 2.7 GB  | 2.7 GB   | 2.7 GB   |
+| RWKV7-1.5B       | 3.7 GB       | 3.9 GB  | 3.9 GB   | 3.9 GB   |
+| RWKV7-3B         | 4.7 GB       | 5.7 GB  | 5.7 GB   | 5.7 GB   |
 
 </details>
 
@@ -124,9 +124,9 @@ The following shows memory usage when using an RTX 4090 (24GB VRAM) + 64GB RAM (
 
 |   Model Size   | Full Finetuning | LoRA/PISSA | QLoRA/QPISSA | State Tuning |
 |---------------|-----------------|------------|--------------|--------------|
-| RWKV6-1.6B    | OOM            | 7.4GB      | 5.6GB        | 6.4GB        |
-| RWKV6-3B      | OOM            | 12.1GB     | 8.2GB        | 9.4GB        |
-| RWKV6-7B      | OOM            | 23.7GB*    | 14.9GB**     | 18.1GB       |
+| RWKV6-1.6B    | OOM            | 7.4 GB      | 5.6 GB        | 6.4 GB        |
+| RWKV6-3B      | OOM            | 12.1 GB     | 8.2 GB        | 9.4 GB        |
+| RWKV6-7B      | OOM            | 23.7 GB*    | 14.9 GB**     | 18.1 GB       |
 
 Note:
 * OOM when batch size is 8
