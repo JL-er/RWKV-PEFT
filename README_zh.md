@@ -77,7 +77,7 @@ PROMPT = (
 
 ## 主要特性
 
-- **多种微调方法**：支持 LoRA、PISSA、Bone, State Tuning 等
+- **多种微调方法**：支持 LoRA、PISSA、DiSHA、State Tuning、SFT 等
 - **量化训练**：支持 INT8/NF4 量化，显著降低显存占用
 - **灵活的数据加载**：支持多种数据采样策略
 - **显存优化**：多种 DeepSpeed 策略可选
@@ -128,7 +128,8 @@ PROMPT = (
 
 </details>
 
-### RWKV-6 模型
+<details>
+<summary>🔍 <b>点击查看 RWKV-6 模型的微调显存需求</b> </summary>
 
 以下是使用 RTX 4090 (24GB 显存) + 64GB 内存测试的 RWKV-6 模型微调显存占用数据，基于以下参数配置：
 - `--strategy deepspeed_stage_1`
@@ -145,6 +146,8 @@ PROMPT = (
 > [!TIP]
 > - $^a$：批次大小为 8 时会显存溢出
 > - $^b$：批次大小为 8 时需要 19.5GB 显存
+
+</details>
 
 ## 安装训练环境
 

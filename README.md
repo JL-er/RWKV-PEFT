@@ -116,7 +116,9 @@ Below is the RWKV-7 model fine-tuned video memory requirement data, tested with 
 
 </details>
 
-### RWKV-6 Models
+<details>
+<summary>🔍 <b>Click to view the VRAM requirements of RWKV-6 models</b> </summary>
+
 
 The following shows memory usage when using an RTX 4090 (24GB VRAM) + 64GB RAM (with parameters: `--strategy deepspeed_stage_1 --ctx_len 1024 --micro_bsz 1 --lora_r 64`):
 
@@ -129,6 +131,8 @@ The following shows memory usage when using an RTX 4090 (24GB VRAM) + 64GB RAM (
 Note:
 * OOM when batch size is 8
 ** Requires 19.5GB VRAM when batch size is 8
+
+</details>
 
 ## Quick Start
 
