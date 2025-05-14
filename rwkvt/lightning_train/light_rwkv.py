@@ -87,10 +87,7 @@ class RWKV(pl.LightningModule):
             self.criterion = FusedCrossEntropyLoss(inplace_backward=True)
         else:
             FusedCrossEntropyLoss = None
-            if args.loss_mask!='none' or args.data_type=='jsonl' or args.data_type=='sft':
-                self.criterion = nn.CrossEntropyLoss(reduction='none')
-            else:
-                self.criterion = nn.CrossEntropyLoss()
+            self.criterion = nn.CrossEntropyLoss()
 
     def configure_optimizers(self):
         args = self.args
@@ -184,7 +181,7 @@ class RWKV(pl.LightningModule):
         def training_step(self, batch, batch_idx):
             args = self.args
             T_train = args.chunk_ctx 
-            idx, targets, mask = batch
+            idx, targets= batch
 
             B, T = idx.shape
             C = args.n_embd
@@ -193,21 +190,14 @@ class RWKV(pl.LightningModule):
             states = BlockStateList.create(args.n_layer, B, C, H, idx.device,
                 self.model.emb.weight.dtype)
 
-            def checkpointed_step(idx, targets, mask, prev_loss, last_shift_states,
+            def checkpointed_step(idx, targets, prev_loss, last_shift_states,
                                 last_wkv_states, prev_token_amount):
                 logits, new_shift_states, new_wkv_states = self(idx, last_shift_states, last_wkv_states)
                 current_token_amount = (targets!=-100).sum() #这样是不是更合适？
                 current_token_amount = idx.shape[1]
 
-                mask = mask.reshape(-1)
-                sum_mask = torch.sum(mask).item()
-
-                if current_token_amount == 0:
-                    loss = self.criterion(logits.view(-1, logits.size(-1)), targets.reshape(-1),reduction='sum')
-                    loss = torch.sum(loss * mask) / sum_mask
-                else:
-                    loss = self.criterion(logits.view(-1, logits.size(-1)), targets.reshape(-1))
-                    loss = torch.sum(loss * mask) / sum_mask
+                loss = self.criterion(logits.view(-1, logits.size(-1)), targets.reshape(-1))
+                if current_token_amount != 0:
                     loss = L2Wrap.apply(loss, logits, current_token_amount)
                 new_token_amount = prev_token_amount+current_token_amount
                 if new_token_amount>0:
@@ -227,7 +217,6 @@ class RWKV(pl.LightningModule):
                     checkpointed_step,
                     idx[:, i * T_train:(i + 1) * T_train],
                     targets[:, i * T_train:(i + 1) * T_train],
-                    mask[:, i * T_train:(i + 1) * T_train],
                     total_loss,
                     states.shift_states,
                     states.wkv_states,
@@ -243,33 +232,13 @@ class RWKV(pl.LightningModule):
             args = self.args
             if args.data_type=='sft':
                 idx, targets, mask = batch
-
-                logits = self(idx, mask)
-
-                mask = mask.reshape(-1)
-                sum_mask = torch.sum(mask).item()
+                logits = self(idx, mask)            
                 
-                loss = self.criterion(logits.view(-1, logits.size(-1)), targets.view(-1), reduction='none')
-                loss = torch.sum(loss * mask) / sum_mask
-            elif args.loss_mask!='none' or args.data_type=='jsonl':
-                idx, targets, mask = batch
-
-                logits = self(idx)
-
-                # mask = mask[:, :-1].reshape(-1)
-                # mask = mask[:, 1:].reshape(-1)
-                mask = mask.reshape(-1)
-                sum_mask = torch.sum(mask).item()
-                
-                loss = self.criterion(logits.view(-1, logits.size(-1)), targets.view(-1))
-                loss = torch.sum(loss * mask) / sum_mask
-            elif args.my_qa_mask != 1:
+            else:
                 idx, targets = batch
-
                 logits = self(idx)
-                loss = self.criterion(logits.view(-1, logits.size(-1)), targets.view(-1))
-
-
+            loss = self.criterion(logits.view(-1, logits.size(-1)), targets.view(-1))
+            
             return L2Wrap.apply(loss, logits)
     
     
