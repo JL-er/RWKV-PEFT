@@ -145,11 +145,7 @@ class MyDataset(Dataset):
             label = F.pad(token, (0, pad_len), value=-100)
             x = dix[:-1]
             y = label[1:]
-            # mask = torch.zeros(req_len)
-            # mask[pad_len:] = 1
 
-            # mask = torch.zeros(req_len)
-            # mask[:min_len] = 1
         else:
             ctx_len = args.ctx_len
             req_len = ctx_len + 1

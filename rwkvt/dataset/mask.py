@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 
-def create_mask(self, seq, token1, token2, min_len):
+def create_mask(seq, token1, token2, min_len):
     # 找到所有特殊标记的索引
     indices1 = []
     for i in range(min_len - len(token1) + 1):
