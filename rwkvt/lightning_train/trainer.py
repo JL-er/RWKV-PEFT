@@ -27,7 +27,7 @@ class train_callback(pl.Callback):
     def __init__(self, args):
         super().__init__()
         self.args = args
-        self.loss_file = os.path.join(args.proj_dir, "loss_data.json")
+        self.loss_file = os.path.join(args.proj_dir, "loss_data.jsonl")
         if os.path.exists(self.loss_file):
             os.remove(self.loss_file)
             
@@ -49,9 +49,9 @@ class train_callback(pl.Callback):
             lr = args.lr_init
         else:
             if 'wsd' == args.lr_schedule:
-                lr = wsd(args.lr_init, 0, real_step, args.epoch_steps//int(args.devices)//args.accumulate_grad_batches,warmup_steps=w_step)
+                lr = wsd(args.lr_init, 0, real_step, (args.epoch_steps*args.epoch_count)//int(args.devices)//args.accumulate_grad_batches,warmup_steps=w_step)
             else:
-                lr = cos_decay(args.lr_init, args.lr_final, real_step, args.epoch_steps//int(args.devices)//args.accumulate_grad_batches)
+                lr = cos_decay(args.lr_init, args.lr_final, real_step, (args.epoch_steps*args.epoch_count)//int(args.devices)//args.accumulate_grad_batches)
 
 
 
